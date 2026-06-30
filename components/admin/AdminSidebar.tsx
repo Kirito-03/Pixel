@@ -1,7 +1,8 @@
 import React from 'react'
-import { View, Text, Pressable, StyleSheet, useWindowDimensions, Platform } from 'react-native'
+import { View, Text, Pressable, StyleSheet, useWindowDimensions, Platform, Animated } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { ADMIN_NAV_ITEMS, type AdminNavItem } from './AdminNav'
+import { adminColors } from '../../theme'
 
 type Props = {
   activeKey: string
@@ -13,10 +14,33 @@ export function AdminSidebar({ activeKey, onSelect }: Props) {
   const isWide = width >= 980 && Platform.OS === 'web'
   if (!isWide) return null
 
+  const pulse = React.useRef(new Animated.Value(0)).current
+
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1400, useNativeDriver: true }),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+
   return (
     <View style={styles.wrap}>
       <View style={styles.brand}>
-        <View style={styles.brandDot} />
+        <Animated.View
+          style={[
+            styles.brandDot,
+            {
+              opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }),
+              transform: [
+                { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) },
+              ],
+            },
+          ]}
+        />
         <Text style={styles.brandText}>Admin</Text>
       </View>
 
@@ -36,7 +60,13 @@ export function AdminSidebar({ activeKey, onSelect }: Props) {
             <Ionicons
               name={item.icon as any}
               size={18}
-              color={item.key === activeKey ? '#E50914' : item.disabled ? '#374151' : '#9ca3af'}
+              color={
+                item.key === activeKey
+                  ? adminColors.primary
+                  : item.disabled
+                    ? 'rgba(255, 255, 255, 0.35)'
+                    : adminColors.sidebarTextMuted
+              }
             />
             <Text
               style={[
@@ -58,9 +88,9 @@ export function AdminSidebar({ activeKey, onSelect }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     width: 260,
-    backgroundColor: '#000000',
+    backgroundColor: adminColors.sidebarBg,
     borderRightWidth: 1,
-    borderRightColor: '#111111',
+    borderRightColor: adminColors.sidebarBorder,
     paddingTop: 14,
     paddingHorizontal: 12,
   },
@@ -71,13 +101,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#111111',
+    borderBottomColor: adminColors.sidebarBorder,
   },
   brandDot: {
     width: 10,
     height: 10,
     borderRadius: 999,
-    backgroundColor: '#E50914',
+    backgroundColor: adminColors.primary,
   },
   brandText: {
     fontSize: 14,
@@ -101,15 +131,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   itemHover: {
-    backgroundColor: '#0b0b0b',
-    borderColor: '#141414',
+    backgroundColor: adminColors.sidebarHover,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   itemPressed: {
     opacity: 0.9,
   },
   itemActive: {
-    backgroundColor: '#0b0b0b',
-    borderColor: '#1f1f1f',
+    backgroundColor: adminColors.sidebarHover,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   itemDisabled: {
     opacity: 0.55,
@@ -117,7 +147,7 @@ const styles = StyleSheet.create({
   itemText: {
     flex: 1,
     minWidth: 0,
-    color: '#e5e7eb',
+    color: adminColors.sidebarText,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -125,7 +155,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   itemTextDisabled: {
-    color: '#6b7280',
+    color: 'rgba(255, 255, 255, 0.35)',
   },
 })
 

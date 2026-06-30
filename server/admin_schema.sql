@@ -63,8 +63,9 @@ CREATE TABLE IF NOT EXISTS anime_episodes (
     episode_number INTEGER NOT NULL,
     title VARCHAR(255),
     video_url VARCHAR(1000), -- Google Drive direct link o local path (puede faltar en fase inicial)
+    stream_url VARCHAR(1000), -- HLS stream URL (R2/CDN) generada tras transcode
     status VARCHAR(20) NOT NULL DEFAULT 'missing', -- missing | queued | processing | ready | error
-    storage_type VARCHAR(20) DEFAULT 'gdrive', -- 'gdrive' | 'local'
+    storage_type VARCHAR(20) DEFAULT 'gdrive', -- 'gdrive' | 'local' | 'r2' | 'external'
     duration INTEGER, -- Duración en minutos
     thumbnail_url VARCHAR(500),
     file_size BIGINT, -- Tamaño en bytes

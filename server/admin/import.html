@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importar - Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/admin.css">
+    <style>
+        .import-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .import-stat { padding: 12px 20px; background: var(--surface-2); border-radius: 10px; text-align: center; min-width: 100px; }
+        .import-stat .label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 2px; }
+        .import-stat .val { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); }
+        .import-stat .val.accent { color: var(--primary); }
+
+        .anime-list-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap; }
+        .anime-list-controls .left { display: flex; gap: 10px; align-items: center; }
+        .anime-list-controls input[type="text"] { padding: 6px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.875rem; width: 220px; font-family: inherit; }
+        .anime-list-controls input[type="text"]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--focus); }
+        .anime-list-controls .count { font-size: 0.85rem; color: var(--text-secondary); }
+
+        .anime-check-list { max-height: 520px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 10px; }
+        .anime-check-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.15s; cursor: pointer; }
+        .anime-check-item:last-child { border-bottom: none; }
+        .anime-check-item:hover { background: var(--hover); }
+        .anime-check-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+        .anime-check-item .title { flex: 1; font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .anime-check-item .ep-count { font-weight: 700; color: var(--primary); font-size: 0.9rem; min-width: 36px; text-align: right; }
+        .anime-check-item .poster { width: 32px; height: 44px; border-radius: 4px; object-fit: cover; background: var(--surface-2); flex-shrink: 0; }
+
+        .btn.loading-state { pointer-events: none; opacity: 0.7; }
+        .btn .spinner { display: none; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.7s linear infinite; margin-right: 8px; }
+        .btn.loading-state .spinner { display: inline-block; }
+
+        .btn-link { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.85rem; font-weight: 500; padding: 4px 8px; border-radius: 4px; }
+        .btn-link:hover { background: var(--hover); }
+
+        #results-section { display: none; }
+        #results-section.visible { display: block; animation: enterFadeUp 300ms ease both; }
+
+        .samples-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 12px; }
+        .sample-card { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+        .sample-card .s-title { font-weight: 700; font-size: 0.875rem; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sample-card .s-meta { color: var(--text-secondary); font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Admin Panel</h1>
+                <p>Netflix Clone</p>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="./dashboard.html" class="nav-item">
+                    <svg fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="./anime-list.html" class="nav-item">
+                    <svg fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
+                    <span>Biblioteca de Anime</span>
+                </a>
+                <a href="./anime-form.html" class="nav-item">
+                    <svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                    <span>Agregar Anime</span>
+                </a>
+                <a href="./import.html" class="nav-item active">
+                    <svg fill="currentColor" viewBox="0 0 20 20"><path d="M3 3a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 11-2 0V4H5v12h4a1 1 0 110 2H4a1 1 0 01-1-1V3zm11 7a1 1 0 011 1v2.586l.293-.293a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 111.414-1.414l.293.293V11a1 1 0 011-1z" /></svg>
+                    <span>Importar</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img id="user-avatar" src="" alt="Avatar" class="user-avatar">
+                    <div class="user-details">
+                        <h3 id="user-name">Cargando...</h3>
+                        <p id="user-email">...</p>
+                    </div>
+                </div>
+                <button id="logout-btn" class="logout-btn">Cerrar Sesión</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <h1>Importar</h1>
+                <p>M3U &rarr; catálogo + cola</p>
+            </div>
+
+            <!-- Fuentes -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Fuentes M3U</h2>
+                </div>
+
+                <div class="form-group">
+                    <label>M3U (uno por línea: ruta local o URL https)</label>
+                    <textarea id="m3u-sources" placeholder="c:\path\playlist.m3u&#10;https://example.com/lista.m3u" rows="4"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Subir archivo .m3u</label>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <input id="m3u-file" type="file" accept=".m3u,.m3u8" />
+                        <button id="upload-m3u-btn" class="btn btn-secondary">Subir y agregar</button>
+                        <span id="upload-m3u-status" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="form-group" style="margin:0;">
+                        <label>Validación</label>
+                        <select id="validate-mode">
+                            <option value="mixed" selected>Mixto</option>
+                            <option value="heuristic">Heurístico</option>
+                            <option value="api">API</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Max items</label>
+                        <input id="max-items" type="number" value="5000" min="1" />
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Max transcodes</label>
+                        <input id="max-transcodes" type="number" value="25" min="0" />
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Opciones</label>
+                        <div style="display:flex; gap:16px; align-items:center; padding-top:10px;">
+                            <label style="display:flex; gap:8px; align-items:center; margin:0; cursor:pointer;">
+                                <input id="enable-transcode" type="checkbox" checked />
+                                <span>Encolar transcode</span>
+                            </label>
+                            <label style="display:flex; gap:8px; align-items:center; margin:0; cursor:pointer;">
+                                <input id="allow-no-episode" type="checkbox" />
+                                <span>Sin episodio</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:20px;">
+                    <button id="analyze-btn" class="btn btn-secondary" style="flex:1; justify-content:center; padding: 12px;">
+                        <span class="spinner"></span>
+                        <span class="btn-text">Analizar</span>
+                    </button>
+                    <button id="import-btn" class="btn btn-primary" style="flex:1; justify-content:center; padding: 12px;" disabled>
+                        <span class="spinner"></span>
+                        <span class="btn-text">Importar seleccionados</span>
+                    </button>
+                    <button id="stop-btn" class="btn btn-secondary" style="display:none; justify-content:center; padding: 12px; color: var(--error); border-color: var(--error);">
+                        <span class="btn-text">Detener</span>
+                    </button>
+                </div>
+
+                <div id="run-error" class="error-message" style="display:none; margin-top:16px;"></div>
+            </div>
+
+            <!-- Resultados -->
+            <div id="results-section" class="card">
+                <div class="card-header">
+                    <h2>Resultado del análisis</h2>
+                </div>
+
+                <div id="import-stats" class="import-stats"></div>
+
+                <div class="anime-list-controls">
+                    <div class="left">
+                        <button id="select-all-btn" class="btn-link">Seleccionar todo</button>
+                        <button id="deselect-all-btn" class="btn-link">Deseleccionar</button>
+                        <span id="selected-count" class="count">0 seleccionados</span>
+                    </div>
+                    <input id="anime-search" type="text" placeholder="Buscar anime..." />
+                </div>
+
+                <div id="anime-check-list" class="anime-check-list"></div>
+
+                <details style="margin-top: 16px;">
+                    <summary style="cursor:pointer; font-weight:600; font-size:0.9rem; color: var(--text-secondary);">Muestras del M3U</summary>
+                    <div id="samples" class="samples-grid"></div>
+                </details>
+            </div>
+
+            <!-- Cola -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Cola de transcode</h2>
+                    <button id="refresh-jobs" class="btn btn-secondary">Actualizar</button>
+                </div>
+                <div id="jobs-summary" style="color: var(--text-secondary); font-size: 0.95rem;">—</div>
+                <div class="table-container" style="margin-top:12px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Episodio</th>
+                                <th>Status</th>
+                                <th>Intentos</th>
+                                <th>Actualizado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-table">
+                            <tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: var(--text-secondary);">Sin datos</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="./js/api.js"></script>
+    <script src="./js/import.js"></script>
+</body>
+</html>

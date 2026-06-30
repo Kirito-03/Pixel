@@ -11,6 +11,9 @@ import { spawn } from 'child_process';
 import { uploadHlsFolderToR2, deleteLocalHlsFolder, deleteR2Prefix } from '../services/r2Service.js';
 import { refreshNews } from '../services/newsService.js';
 import { refreshMangaPopularCache } from '../services/mangaService.js';
+import { importAnimeFromSources } from '../services/animeImportService.js';
+import { listTranscodeJobs, getTranscodeJobSummary, retryTranscodeJob } from '../services/transcodeQueueService.js';
+import { ensureImportsDir, saveM3uText } from '../services/importM3uStorageService.js';
 
 const router = express.Router();
 
@@ -50,6 +53,36 @@ const episodeVideoUpload = multer({
         if (!ok) {
             return cb(new Error('Tipo de archivo no permitido. Usa mp4, mkv, webm, mov o avi.'));
         }
+        return cb(null, true);
+    }
+});
+
+const importUploadsDir = join(__dirname, '..', 'uploads', 'imports');
+try {
+    mkdirSync(importUploadsDir, { recursive: true });
+} catch (e) {
+}
+
+const importM3uStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, importUploadsDir);
+    },
+    filename: (req, file, cb) => {
+        const original = String(file.originalname || 'playlist.m3u');
+        const ext = original.toLowerCase().endsWith('.m3u') ? 'm3u' : 'm3u';
+        const base = original.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_') || 'playlist';
+        const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        cb(null, `m3u-${unique}-${base}.${ext}`);
+    }
+});
+
+const importM3uUpload = multer({
+    storage: importM3uStorage,
+    limits: { fileSize: 100 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const name = String(file.originalname || '').toLowerCase();
+        const ok = name.endsWith('.m3u') || name.endsWith('.m3u8') || String(file.mimetype || '').includes('text');
+        if (!ok) return cb(new Error('Archivo no permitido. Usa .m3u o .m3u8.'));
         return cb(null, true);
     }
 });
@@ -864,6 +897,106 @@ router.post('/news/refresh', async (req, res) => {
         return res.json(result);
     } catch (e) {
         return res.status(500).json({ message: 'Error actualizando noticias', error: e.message });
+    }
+});
+
+router.post('/import/m3u/upload', importM3uUpload.single('file'), async (req, res) => {
+    try {
+        await ensureImportsDir();
+        const file = req.file;
+        if (!file) return res.status(400).json({ ok: false, message: 'Archivo requerido' });
+        const url = `${req.protocol}://${req.get('host')}/uploads/imports/${encodeURIComponent(file.filename)}`;
+        // Devolver también el path local para que el import no necesite hacer HTTP self-request
+        return res.json({ ok: true, url, localPath: file.path, filename: file.filename });
+    } catch (e) {
+        return res.status(500).json({ ok: false, message: 'Error subiendo M3U', error: e.message });
+    }
+});
+
+router.post('/import/m3u/text', async (req, res) => {
+    try {
+        await ensureImportsDir();
+        const content = String(req.body?.content || '');
+        const name = req.body?.name ? String(req.body.name) : 'playlist.m3u';
+        if (!content.trim()) return res.status(400).json({ ok: false, message: 'content requerido' });
+        const saved = await saveM3uText({ content, name });
+        const url = `${req.protocol}://${req.get('host')}/uploads/imports/${encodeURIComponent(saved.fileName)}`;
+        return res.json({ ok: true, url, filename: saved.fileName });
+    } catch (e) {
+        return res.status(500).json({ ok: false, message: 'Error guardando M3U', error: e.message });
+    }
+});
+
+router.post('/import/anime', async (req, res) => {
+    const defaultM3u = join(__dirname, '..', 'videos', 'animes_madre.m3u');
+    const rawM3u = Array.isArray(req.body?.m3u) && req.body.m3u.length ? req.body.m3u : [defaultM3u];
+    const m3u = rawM3u
+        .map((v) => {
+            if (typeof v === 'string') {
+                return v.startsWith('http://') || v.startsWith('https://')
+                    ? { type: 'url', url: v }
+                    : { type: 'file', path: v };
+            }
+            return v;
+        })
+        .filter(Boolean);
+
+    const rawFolders = Array.isArray(req.body?.folders) ? req.body.folders : [];
+    const folders = rawFolders
+        .map((v) => (typeof v === 'string' ? { path: v } : v))
+        .filter(Boolean);
+
+    const ac = new AbortController();
+    req.on('close', () => ac.abort());
+
+    const options = {
+        dryRun: req.body?.dryRun !== false,
+        transcode: req.body?.transcode === true,
+        validateMode: req.body?.validateMode || 'mixed',
+        maxItems: typeof req.body?.maxItems === 'number' ? req.body.maxItems : undefined,
+        maxTranscodes: typeof req.body?.maxTranscodes === 'number' ? req.body.maxTranscodes : undefined,
+        allowNoEpisode: req.body?.allowNoEpisode === true,
+        selectedTitles: Array.isArray(req.body?.selectedTitles) ? req.body.selectedTitles : undefined,
+        signal: ac.signal,
+    };
+
+    try {
+        const result = await importAnimeFromSources({ m3u, folders, options });
+        return res.json({ ok: true, ...result });
+    } catch (e) {
+        return res.status(500).json({ ok: false, message: 'Error importando fuentes', error: e.message });
+    }
+});
+
+router.get('/import/jobs', async (req, res) => {
+    const status = typeof req.query?.status === 'string' ? req.query.status : undefined;
+    const limit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : undefined;
+    try {
+        const jobs = await listTranscodeJobs({ status, limit });
+        return res.json({ ok: true, jobs });
+    } catch (e) {
+        return res.status(500).json({ ok: false, message: 'Error listando jobs', error: e.message });
+    }
+});
+
+router.get('/import/jobs/summary', async (req, res) => {
+    try {
+        const summary = await getTranscodeJobSummary();
+        return res.json({ ok: true, summary });
+    } catch (e) {
+        return res.status(500).json({ ok: false, message: 'Error obteniendo resumen', error: e.message });
+    }
+});
+
+router.post('/import/jobs/:id/retry', async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ ok: false, message: 'id inválido' });
+    try {
+        const job = await retryTranscodeJob(id);
+        if (!job) return res.status(404).json({ ok: false, message: 'job no encontrado' });
+        return res.json({ ok: true, job });
+    } catch (e) {
+        return res.status(500).json({ ok: false, message: 'Error reintentando job', error: e.message });
     }
 });
 

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { adminAuthService } from '../services/adminAuthService';
+import { auth as firebaseAuth } from '../services/firebase';
 
 interface AdminUser {
     id: number;
@@ -54,21 +55,8 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Check admin status on mount
-    // Obtener usuario del contexto de autenticación para reaccionar a cambios (login/logout)
-    // Usamos require para evitar ciclos de importación si AuthContext usa AdminContext (aunque aquí parece seguro)
-    // Pero mejor usar el hook expuesto si es posible, o simplemente suscribirse a firebase auth direct
-    // Dado que AuthProvider envuelve a AdminProvider, podemos usar useAuth?
-    // Sí, App.tsx muestra AuthProvider > AdminProvider.
-
-    // Sin embargo, para evitar dependencias circulares si las hubiera, vamos a usar un listener de firebase simple o 
-    // mejor aún, aceptar que AdminProvider se actualice cuando AuthContext cambie si lo consumimos.
-
-    // Vamos a importar useAuth dinámicamente o asumir que el componente se renderiza.
-    // Para simplificar y asegurar que funciona:
-
     useEffect(() => {
-        const unsubscribe = require('../services/firebase').auth.onAuthStateChanged((user: any) => {
+        const unsubscribe = firebaseAuth.onAuthStateChanged((user: any) => {
             console.log('AdminContext: Auth state changed, re-checking admin status', user?.email);
             checkAdminStatus();
         });
@@ -80,7 +68,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             setIsLoading(true);
 
             // 1. Check if we have a firebase user and sync with backend
-            const currentUser = require('../services/firebase').auth.currentUser;
+            const currentUser = firebaseAuth.currentUser;
             if (currentUser) {
                 const currentEmail = currentUser.email as string | undefined;
                 if (!isAllowedAdminEmail(currentEmail)) {

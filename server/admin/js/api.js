@@ -9,11 +9,12 @@ class AdminAPI {
 
     // Helper method for fetch with credentials
     async request(endpoint, options = {}) {
+        const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
         const config = {
             ...options,
             credentials: 'include',
             headers: {
-                'Content-Type': 'application/json',
+                ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
                 ...options.headers
             }
         };
@@ -120,6 +121,43 @@ class AdminAPI {
 
     async getTMDBDetails(tmdbId) {
         return this.request(`/api/admin/tmdb/details/${tmdbId}`);
+    }
+
+    async importAnime(payload, signal) {
+        return this.request('/api/admin/import/anime', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            signal
+        });
+    }
+
+    async getImportJobs(params = {}) {
+        const queryString = new URLSearchParams(params).toString();
+        return this.request(`/api/admin/import/jobs?${queryString}`);
+    }
+
+    async getImportJobsSummary() {
+        return this.request('/api/admin/import/jobs/summary');
+    }
+
+    async retryImportJob(id) {
+        return this.request(`/api/admin/import/jobs/${id}/retry`, { method: 'POST' });
+    }
+
+    async uploadM3uFile(file) {
+        const form = new FormData();
+        form.append('file', file);
+        return this.request('/api/admin/import/m3u/upload', {
+            method: 'POST',
+            body: form
+        });
+    }
+
+    async uploadM3uText(content, name) {
+        return this.request('/api/admin/import/m3u/text', {
+            method: 'POST',
+            body: JSON.stringify({ content, name })
+        });
     }
 }
 

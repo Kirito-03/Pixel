@@ -20,6 +20,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../../types/navigation';
 import { AdminShell } from '../../components/admin/AdminShell';
+import { adminColors } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
 type EpisodeManagerRouteProp = RouteProp<AdminStackParamList, 'EpisodeManager'>;
@@ -312,7 +313,7 @@ export default function EpisodeManagerScreen() {
                             <Ionicons
                                 name={item.storage_type === 'r2' ? 'cloud-done-outline' : (item.storage_type === 'gdrive' ? 'cloud' : 'server')}
                                 size={12}
-                                color="#FFFFFF"
+                                color={adminColors.text}
                             />
                             <Text style={styles.storageBadgeText}>
                                 {STORAGE_LABELS[item.storage_type] || String(item.storage_type || '').toUpperCase()}
@@ -426,7 +427,7 @@ export default function EpisodeManagerScreen() {
                         <Ionicons
                             name="play-circle-outline"
                             size={18}
-                            color={item.video_url ? '#FFFFFF' : '#666666'}
+                            color={item.video_url ? adminColors.text : adminColors.textSecondary}
                         />
                     </TouchableOpacity>
                 )}
@@ -434,13 +435,13 @@ export default function EpisodeManagerScreen() {
                     style={styles.iconButton}
                     onPress={() => openEditModal(item)}
                 >
-                    <Ionicons name="pencil" size={18} color="#B3B3B3" />
+                    <Ionicons name="pencil" size={18} color={adminColors.textSecondary} />
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.iconButton}
                     onPress={() => handleDeleteEpisode(item)}
                 >
-                    <Ionicons name="trash-outline" size={18} color="#E50914" />
+                    <Ionicons name="trash-outline" size={18} color={adminColors.primary} />
                 </TouchableOpacity>
             </View>
         </Pressable>
@@ -454,7 +455,7 @@ export default function EpisodeManagerScreen() {
                     <View style={styles.headerLeft}>
                         {Platform.OS !== 'web' && (
                             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                                <Ionicons name="arrow-back" size={24} color={adminColors.text} />
                             </TouchableOpacity>
                         )}
                         <View style={styles.headerTitleContainer}>
@@ -474,7 +475,11 @@ export default function EpisodeManagerScreen() {
                         style={[styles.optionChip, autoProcessAfterUpload && styles.optionChipActive]}
                         onPress={() => setAutoProcessAfterUpload(v => !v)}
                     >
-                        <Ionicons name="flash-outline" size={14} color={autoProcessAfterUpload ? '#E50914' : '#808080'} />
+                        <Ionicons
+                            name="flash-outline"
+                            size={14}
+                            color={autoProcessAfterUpload ? adminColors.primary : adminColors.textSecondary}
+                        />
                         <Text style={[styles.optionChipText, autoProcessAfterUpload && styles.optionChipTextActive]}>
                             Auto procesar
                         </Text>
@@ -484,7 +489,11 @@ export default function EpisodeManagerScreen() {
                         onPress={() => setCleanupLocalAfterProcess(v => !v)}
                         disabled={!autoProcessAfterUpload}
                     >
-                        <Ionicons name="trash-outline" size={14} color={cleanupLocalAfterProcess ? '#E50914' : '#808080'} />
+                        <Ionicons
+                            name="trash-outline"
+                            size={14}
+                            color={cleanupLocalAfterProcess ? adminColors.primary : adminColors.textSecondary}
+                        />
                         <Text style={[styles.optionChipText, cleanupLocalAfterProcess && styles.optionChipTextActive]}>
                             Borrar local
                         </Text>
@@ -499,7 +508,7 @@ export default function EpisodeManagerScreen() {
                 {/* Episodes List */}
                 {isLoading ? (
                     <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color="#E50914" />
+                        <ActivityIndicator size="large" color={adminColors.primary} />
                     </View>
                 ) : episodes.length === 0 ? (
                     <View style={styles.centerContainer}>
@@ -673,7 +682,11 @@ export default function EpisodeManagerScreen() {
                                                 ]}
                                                 onPress={() => setEpisodeForm({ ...episodeForm, storage_type: 'gdrive' })}
                                             >
-                                                <Ionicons name="cloud" size={16} color={episodeForm.storage_type === 'gdrive' ? '#E50914' : '#808080'} />
+                                                <Ionicons
+                                                    name="cloud"
+                                                    size={16}
+                                                    color={episodeForm.storage_type === 'gdrive' ? adminColors.primary : adminColors.textSecondary}
+                                                />
                                                 <Text
                                                     style={[
                                                         styles.storageButtonText,
@@ -690,7 +703,11 @@ export default function EpisodeManagerScreen() {
                                                 ]}
                                                 onPress={() => setEpisodeForm({ ...episodeForm, storage_type: 'local' })}
                                             >
-                                                <Ionicons name="server" size={16} color={episodeForm.storage_type === 'local' ? '#E50914' : '#808080'} />
+                                                <Ionicons
+                                                    name="server"
+                                                    size={16}
+                                                    color={episodeForm.storage_type === 'local' ? adminColors.primary : adminColors.textSecondary}
+                                                />
                                                 <Text
                                                     style={[
                                                         styles.storageButtonText,
@@ -822,14 +839,14 @@ function getEpisodeStatusTextStyle(status: string) {
         case 'queued': return { color: '#3498db' };
         case 'error': return { color: '#e74c3c' };
         case 'missing':
-        default: return { color: '#B3B3B3' };
+        default: return { color: adminColors.textSecondary };
     }
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.background,
     },
     header: {
         flexDirection: 'row',
@@ -852,21 +869,21 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: adminColors.text,
         letterSpacing: -0.5,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#808080',
+        color: adminColors.textSecondary,
         marginTop: 2,
     },
     addButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        borderRadius: 4,
+        borderRadius: 12,
         gap: 6,
     },
     addButtonText: {
@@ -882,16 +899,16 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 15,
-        color: '#808080',
+        color: adminColors.textSecondary,
         marginTop: 16,
         textAlign: 'center',
     },
     emptyButton: {
         marginTop: 24,
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         paddingHorizontal: 24,
         paddingVertical: 12,
-        borderRadius: 4,
+        borderRadius: 12,
     },
     emptyButtonText: {
         color: '#FFFFFF',
@@ -906,15 +923,15 @@ const styles = StyleSheet.create({
     episodeCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         padding: 16,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     episodeCardHovered: {
-        borderColor: '#404040',
-        backgroundColor: '#1a1a1a',
+        borderColor: 'rgba(117, 2, 15, 0.20)',
+        backgroundColor: 'rgba(117, 2, 15, 0.06)',
         transform: [{ translateY: -2 }],
     },
     episodeInfo: {
@@ -929,7 +946,7 @@ const styles = StyleSheet.create({
     episodeNumber: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     badges: {
         flexDirection: 'row',
@@ -941,7 +958,7 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     statusBadgeText: {
         fontSize: 11,
@@ -949,13 +966,13 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     qualityBadge: {
-        backgroundColor: 'rgba(229, 9, 20, 0.15)',
+        backgroundColor: 'rgba(117, 2, 15, 0.10)',
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 4,
     },
     storageBadge: {
-        backgroundColor: '#262626',
+        backgroundColor: adminColors.background,
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4,
@@ -972,21 +989,21 @@ const styles = StyleSheet.create({
     storageBadgeText: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     badgeText: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#E50914',
+        color: adminColors.primary,
     },
     episodeTitle: {
         fontSize: 14,
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         marginBottom: 4,
     },
     episodeUrl: {
         fontSize: 12,
-        color: '#666666',
+        color: adminColors.textSecondary,
     },
     episodeMetaRow: {
         flexDirection: 'row',
@@ -996,16 +1013,16 @@ const styles = StyleSheet.create({
     },
     episodeMetaText: {
         fontSize: 12,
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         fontWeight: '600',
     },
     episodeMetaMuted: {
         fontSize: 12,
-        color: '#808080',
+        color: adminColors.textSecondary,
         fontWeight: '600',
     },
     metaDot: {
-        color: '#404040',
+        color: 'rgba(25, 23, 27, 0.25)',
         fontSize: 12,
         marginHorizontal: 2,
     },
@@ -1016,13 +1033,15 @@ const styles = StyleSheet.create({
     },
     iconButton: {
         padding: 8,
-        borderRadius: 4,
-        backgroundColor: '#262626',
+        borderRadius: 10,
+        backgroundColor: adminColors.background,
+        borderWidth: 1,
+        borderColor: adminColors.border,
     },
     iconButtonDisabled: {
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
         opacity: 0.8,
     },
     optionsRow: {
@@ -1038,12 +1057,12 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 12,
         borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        backgroundColor: 'rgba(117, 2, 15, 0.06)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.10)',
+        borderColor: adminColors.focus,
     },
     inlineNoticeText: {
-        color: 'rgba(255, 255, 255, 0.85)',
+        color: adminColors.text,
         fontSize: 12,
         fontWeight: '800',
     },
@@ -1055,20 +1074,20 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: '#262626',
-        backgroundColor: '#141414',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
     },
     optionChipActive: {
-        borderColor: 'rgba(229, 9, 20, 0.55)',
-        backgroundColor: 'rgba(229, 9, 20, 0.08)',
+        borderColor: 'rgba(117, 2, 15, 0.40)',
+        backgroundColor: 'rgba(117, 2, 15, 0.08)',
     },
     optionChipText: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#808080',
+        color: adminColors.textSecondary,
     },
     optionChipTextActive: {
-        color: '#E50914',
+        color: adminColors.primary,
     },
     modalOverlay: {
         flex: 1,
@@ -1080,10 +1099,10 @@ const styles = StyleSheet.create({
     modalContainer: {
         width: '100%',
         maxWidth: 600,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
         overflow: 'hidden',
     },
     modalHeader: {
@@ -1093,12 +1112,12 @@ const styles = StyleSheet.create({
         padding: 24,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#262626',
+        borderBottomColor: adminColors.border,
     },
     modalTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     modalContent: {
         padding: 24,
@@ -1106,10 +1125,10 @@ const styles = StyleSheet.create({
     confirmModalContainer: {
         width: '100%',
         maxWidth: 520,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
         overflow: 'hidden',
     },
     confirmHeader: {
@@ -1119,15 +1138,15 @@ const styles = StyleSheet.create({
         padding: 20,
         paddingBottom: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#262626',
+        borderBottomColor: adminColors.border,
     },
     confirmTitle: {
         fontSize: 18,
         fontWeight: '900',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     confirmBody: {
-        color: '#FFFFFF',
+        color: adminColors.text,
         fontSize: 14,
         fontWeight: '800',
         paddingHorizontal: 20,
@@ -1144,29 +1163,29 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333333',
-        backgroundColor: '#000000',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
         alignItems: 'center',
     },
     deleteModeChipActive: {
-        borderColor: 'rgba(229, 9, 20, 0.55)',
-        backgroundColor: 'rgba(229, 9, 20, 0.08)',
+        borderColor: 'rgba(117, 2, 15, 0.40)',
+        backgroundColor: 'rgba(117, 2, 15, 0.08)',
     },
     deleteModeChipDanger: {
-        borderColor: 'rgba(229, 9, 20, 0.65)',
-        backgroundColor: 'rgba(229, 9, 20, 0.12)',
+        borderColor: 'rgba(117, 2, 15, 0.55)',
+        backgroundColor: 'rgba(117, 2, 15, 0.12)',
     },
     deleteModeChipText: {
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         fontSize: 12,
         fontWeight: '900',
         textTransform: 'uppercase',
     },
     deleteModeChipTextActive: {
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     confirmHint: {
-        color: '#808080',
+        color: adminColors.textSecondary,
         fontSize: 12,
         fontWeight: '700',
         paddingHorizontal: 20,
@@ -1182,7 +1201,7 @@ const styles = StyleSheet.create({
     deleteNotice: {
         paddingHorizontal: 20,
         paddingTop: 12,
-        color: '#FFFFFF',
+        color: adminColors.text,
         fontSize: 12,
         fontWeight: '800',
     },
@@ -1198,12 +1217,12 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333333',
-        backgroundColor: '#000000',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
         alignItems: 'center',
     },
     cancelButtonText: {
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         fontSize: 13,
         fontWeight: '800',
     },
@@ -1211,12 +1230,12 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         borderRadius: 8,
-        backgroundColor: '#333333',
+        backgroundColor: adminColors.ink,
         alignItems: 'center',
         justifyContent: 'center',
     },
     deleteButtonDanger: {
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
     },
     deleteButtonText: {
         color: '#FFFFFF',
@@ -1235,21 +1254,21 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#333333',
-        borderRadius: 4,
+        borderColor: adminColors.border,
+        borderRadius: 12,
         padding: 12,
         fontSize: 15,
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     hint: {
         fontSize: 12,
-        color: '#666666',
+        color: adminColors.textSecondary,
         marginTop: 6,
     },
     statusButtons: {
@@ -1260,23 +1279,23 @@ const styles = StyleSheet.create({
     statusButton: {
         paddingVertical: 10,
         paddingHorizontal: 10,
-        borderRadius: 4,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#333333',
-        backgroundColor: '#000000',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
     },
     statusButtonActive: {
-        backgroundColor: 'rgba(229, 9, 20, 0.1)',
-        borderColor: '#E50914',
+        backgroundColor: 'rgba(117, 2, 15, 0.08)',
+        borderColor: adminColors.primary,
     },
     statusButtonText: {
         fontSize: 12,
         fontWeight: '800',
-        color: '#808080',
+        color: adminColors.textSecondary,
         textTransform: 'uppercase',
     },
     statusButtonTextActive: {
-        color: '#E50914',
+        color: adminColors.primary,
     },
     qualityButtons: {
         flexDirection: 'row',
@@ -1285,23 +1304,23 @@ const styles = StyleSheet.create({
     qualityButton: {
         flex: 1,
         paddingVertical: 10,
-        borderRadius: 4,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#333333',
-        backgroundColor: '#000000',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
         alignItems: 'center',
     },
     qualityButtonActive: {
-        backgroundColor: 'rgba(229, 9, 20, 0.1)',
-        borderColor: '#E50914',
+        backgroundColor: 'rgba(117, 2, 15, 0.08)',
+        borderColor: adminColors.primary,
     },
     qualityButtonText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#808080',
+        color: adminColors.textSecondary,
     },
     qualityButtonTextActive: {
-        color: '#E50914',
+        color: adminColors.primary,
     },
     storageButtons: {
         flexDirection: 'row',
@@ -1314,27 +1333,27 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 6,
         paddingVertical: 10,
-        borderRadius: 4,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#333333',
-        backgroundColor: '#000000',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
     },
     storageButtonActive: {
-        backgroundColor: 'rgba(229, 9, 20, 0.1)',
-        borderColor: '#E50914',
+        backgroundColor: 'rgba(117, 2, 15, 0.08)',
+        borderColor: adminColors.primary,
     },
     storageButtonText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#808080',
+        color: adminColors.textSecondary,
     },
     storageButtonTextActive: {
-        color: '#E50914',
+        color: adminColors.primary,
     },
     saveButton: {
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         padding: 16,
-        borderRadius: 4,
+        borderRadius: 12,
         alignItems: 'center',
         marginTop: 8,
     },

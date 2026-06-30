@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Storage } from '../services/storage';
 import { auth, db } from '../services/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -34,14 +34,13 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
     console.log('ProfileContext: Setting current profile:', profile?.id, profile?.name);
     setCurrentProfileState(profile);
     if (profile) {
-      await AsyncStorage.setItem('currentProfile', JSON.stringify(profile));
-      console.log('ProfileContext: Profile saved to AsyncStorage');
+      Storage.setObject('currentProfile', profile);
+      console.log('ProfileContext: Profile saved to Storage');
       // Cargar preferencia de +18 asociada al perfil
       try {
-        const stored = await AsyncStorage.getItem(`adultContentEnabled:${profile.id}`);
-        if (stored !== null) {
-          const parsed = JSON.parse(stored);
-          setAdultContentEnabledState(Boolean(parsed));
+        const raw = Storage.getString(`adultContentEnabled:${profile.id}`);
+        if (raw !== undefined) {
+          setAdultContentEnabledState(Boolean(JSON.parse(raw)));
         } else {
           setAdultContentEnabledState(false);
         }
@@ -50,8 +49,8 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
         setAdultContentEnabledState(false);
       }
     } else {
-      await AsyncStorage.removeItem('currentProfile');
-      console.log('ProfileContext: Profile removed from AsyncStorage');
+      Storage.delete('currentProfile');
+      console.log('ProfileContext: Profile removed from Storage');
       setAdultContentEnabledState(false);
     }
   };
@@ -59,16 +58,15 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
   const loadCurrentProfile = async () => {
     try {
       console.log('ProfileContext: Loading current profile...');
-      const profileData = await AsyncStorage.getItem('currentProfile');
-      if (profileData) {
-        const profile = JSON.parse(profileData);
+      const profile = Storage.getObject<Profile>('currentProfile');
+      if (profile) {
         console.log('ProfileContext: Parsed profile ID:', profile?.id, 'Name:', profile?.name);
         setCurrentProfileState(profile);
         // Cargar preferencia de +18 para el perfil
         try {
-          const stored = await AsyncStorage.getItem(`adultContentEnabled:${profile.id}`);
-          if (stored !== null) {
-            setAdultContentEnabledState(Boolean(JSON.parse(stored)));
+          const raw = Storage.getString(`adultContentEnabled:${profile.id}`);
+          if (raw !== undefined) {
+            setAdultContentEnabledState(Boolean(JSON.parse(raw)));
           } else {
             setAdultContentEnabledState(false);
           }
@@ -85,7 +83,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
 
   const clearCurrentProfile = async () => {
     setCurrentProfileState(null);
-    await AsyncStorage.removeItem('currentProfile');
+    Storage.delete('currentProfile');
     setAdultContentEnabledState(false);
   };
 
@@ -94,7 +92,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
     const profileId = currentProfile?.id;
     if (profileId) {
       try {
-        await AsyncStorage.setItem(`adultContentEnabled:${profileId}`, JSON.stringify(enabled));
+        Storage.setString(`adultContentEnabled:${profileId}`, JSON.stringify(enabled));
       } catch (err) {
         console.warn('ProfileContext: No se pudo guardar preferencia +18');
       }

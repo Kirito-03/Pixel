@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions, Alert, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList, MovieDetail, ContentItem, AnimeDetail } from '../types';
 import { colors } from '../theme';
@@ -13,7 +13,7 @@ import { useMyList } from '../contexts/MyListContext';
 import { catalogService, CatalogAnime } from '../services/catalogService';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'Inicio'>;
+type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
 export default function HomeScreen({ navigation }: Props) {
     const { currentProfile, adultContentEnabled } = useProfile();
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: 60,
+        paddingBottom: Platform.OS === 'web' ? 60 : 80,
     },
     sectionsWrapper: {
         paddingTop: 28,

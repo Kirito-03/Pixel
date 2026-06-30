@@ -6,17 +6,19 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
-    Image,
+    Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAdmin } from '../../contexts/AdminContext';
 import { useNavigation } from '@react-navigation/native';
+import { adminColors } from '../../theme';
 
 export default function AdminLoginScreen() {
     const [isLoading, setIsLoading] = useState(true); // Start loading immediately
     const { isAdmin, checkAdminStatus } = useAdmin();
     const navigation = useNavigation();
+    const enter = React.useRef(new Animated.Value(0)).current
 
     // Intentar login automático al montar
     React.useEffect(() => {
@@ -44,6 +46,16 @@ export default function AdminLoginScreen() {
         tryAutoLogin();
     }, [isAdmin]);
 
+    React.useEffect(() => {
+        if (isLoading) return
+        enter.setValue(0)
+        Animated.timing(enter, {
+            toValue: 1,
+            duration: 260,
+            useNativeDriver: true,
+        }).start()
+    }, [enter, isLoading])
+
     const handleRetry = async () => {
         setIsLoading(true);
         const success = await checkAdminStatus();
@@ -57,8 +69,8 @@ export default function AdminLoginScreen() {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.content}>
-                    <ActivityIndicator size="large" color="#0A2342" />
-                    <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
+                    <ActivityIndicator size="large" color={adminColors.primary} />
+                    <Text style={{ textAlign: 'center', marginTop: 20, color: adminColors.textSecondary }}>
                         Verificando credenciales...
                     </Text>
                 </View>
@@ -68,10 +80,25 @@ export default function AdminLoginScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
+            <Animated.View
+                style={[
+                    styles.content,
+                    {
+                        opacity: enter,
+                        transform: [
+                            {
+                                translateY: enter.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [10, 0],
+                                }),
+                            },
+                        ],
+                    },
+                ]}
+            >
                 <View style={styles.header}>
                     <View style={styles.iconContainer}>
-                        <Ionicons name="lock-closed" size={64} color="#e50914" />
+                        <Ionicons name="lock-closed" size={64} color={adminColors.primary} />
                     </View>
                     <Text style={styles.title}>Acceso Restringido</Text>
                     <Text style={styles.subtitle}>Solo personal autorizado</Text>
@@ -85,18 +112,20 @@ export default function AdminLoginScreen() {
                     <TouchableOpacity
                         style={styles.googleButton}
                         onPress={handleRetry}
+                        activeOpacity={0.92}
                     >
                         <Text style={styles.googleButtonText}>Reintentar Verificación</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[styles.googleButton, { backgroundColor: '#666', marginTop: 10 }]}
+                        style={[styles.googleButton, styles.secondaryButton]}
                         onPress={() => navigation.goBack()}
+                        activeOpacity={0.92}
                     >
-                        <Text style={styles.googleButtonText}>Volver</Text>
+                        <Text style={styles.secondaryButtonText}>Volver</Text>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </Animated.View>
         </SafeAreaView>
     );
 }
@@ -104,7 +133,7 @@ export default function AdminLoginScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
+        backgroundColor: adminColors.background,
     },
     content: {
         flex: 1,
@@ -119,7 +148,9 @@ const styles = StyleSheet.create({
         width: 120,
         height: 120,
         borderRadius: 60,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: adminColors.surface,
+        borderWidth: 1,
+        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 24,
@@ -132,18 +163,20 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: '700',
-        color: '#0A2342',
+        color: adminColors.text,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#666666',
+        color: adminColors.textSecondary,
         fontWeight: '400',
     },
     loginSection: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: adminColors.surface,
         borderRadius: 16,
         padding: 32,
+        borderWidth: 1,
+        borderColor: adminColors.border,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
@@ -165,9 +198,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1.5,
-        borderColor: '#e0e0e0',
+        backgroundColor: adminColors.primary,
+        borderWidth: 1,
+        borderColor: adminColors.primary,
         borderRadius: 12,
         padding: 16,
         marginBottom: 24,
@@ -180,7 +213,18 @@ const styles = StyleSheet.create({
     googleButtonText: {
         fontSize: 16,
         fontWeight: '500',
-        color: '#1a1a1a',
+        color: '#FFFFFF',
+    },
+    secondaryButton: {
+        backgroundColor: adminColors.ink,
+        borderColor: adminColors.ink,
+        marginTop: 10,
+        marginBottom: 0,
+    },
+    secondaryButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
     infoBox: {
         flexDirection: 'row',
@@ -193,7 +237,7 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 13,
-        color: '#666666',
+        color: adminColors.textSecondary,
         lineHeight: 20,
     },
 });

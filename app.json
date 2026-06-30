@@ -29,6 +29,7 @@
     },
     "plugins": [
       "expo-font",
+      "expo-video",
       "@react-native-google-signin/google-signin"
     ]
   }

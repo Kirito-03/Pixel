@@ -8,7 +8,10 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "proxy": "node proxy.js",
-    "proxy-dev": "nodemon proxy.js"
+    "proxy-dev": "nodemon proxy.js",
+    "migrate:up": "node-pg-migrate up --config-file .migrate.cjs",
+    "migrate:down": "node-pg-migrate down --config-file .migrate.cjs",
+    "migrate:create": "node-pg-migrate create --config-file .migrate.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1028.0",
@@ -19,6 +22,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
+    "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "passport": "^0.7.0",
@@ -26,6 +30,7 @@
     "pg": "^8.13.1"
   },
   "devDependencies": {
+    "node-pg-migrate": "^8.0.4",
     "nodemon": "^3.0.2"
   }
 }

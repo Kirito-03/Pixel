@@ -1,5 +1,6 @@
 import express from 'express';
 import pool from '../db.js';
+import cache from '../services/cacheService.js';
 
 const router = express.Router();
 
@@ -61,71 +62,75 @@ router.get('/featured', async (req, res) => {
   const limit = Math.min(12, Math.max(1, Number(req.query?.limit || 6) || 6));
 
   try {
-    const featuredWithImage = await pool.query(
-      `
-      SELECT
-        id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
-        has_valid_image, is_publishable, quality_score
-      FROM news_articles
-      WHERE is_active = true AND is_publishable = true AND is_featured = true AND has_valid_image = true
-      ORDER BY quality_score DESC, published_at DESC NULLS LAST, id DESC
-      LIMIT 1
-      `
-    );
+    const data = await cache.getOrSet(`news:featured:${limit}`, 1800, async () => {
+      const featuredWithImage = await pool.query(
+        `
+        SELECT
+          id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
+          has_valid_image, is_publishable, quality_score
+        FROM news_articles
+        WHERE is_active = true AND is_publishable = true AND is_featured = true AND has_valid_image = true
+        ORDER BY quality_score DESC, published_at DESC NULLS LAST, id DESC
+        LIMIT 1
+        `
+      );
 
-    const fallbackWithImage = await pool.query(
-      `
-      SELECT
-        id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
-        has_valid_image, is_publishable, quality_score
-      FROM news_articles
-      WHERE is_active = true AND is_publishable = true AND has_valid_image = true
-      ORDER BY is_featured DESC, quality_score DESC, published_at DESC NULLS LAST, id DESC
-      LIMIT 1
-      `
-    );
+      const fallbackWithImage = await pool.query(
+        `
+        SELECT
+          id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
+          has_valid_image, is_publishable, quality_score
+        FROM news_articles
+        WHERE is_active = true AND is_publishable = true AND has_valid_image = true
+        ORDER BY is_featured DESC, quality_score DESC, published_at DESC NULLS LAST, id DESC
+        LIMIT 1
+        `
+      );
 
-    const main = featuredWithImage.rows[0] || fallbackWithImage.rows[0] || null;
-    const noImageFallback = !main;
+      const main = featuredWithImage.rows[0] || fallbackWithImage.rows[0] || null;
+      const noImageFallback = !main;
 
-    const fallbackHero = {
-      id: -1,
-      title: 'Noticias Destacadas',
-      slug: '__fallback-premium__',
-      excerpt: 'Actualizando contenido. Vuelve en unos minutos para ver las últimas novedades.',
-      source_name: 'Pixel no Sekai',
-      image_url: null,
-      published_at: new Date().toISOString(),
-      category: 'industria',
-      tags: [],
-      language: 'es',
-      is_featured: true,
-      external_url: null,
-      has_valid_image: false,
-      is_publishable: true,
-      quality_score: 100,
-      use_fallback_image: true,
-    };
+      const fallbackHero = {
+        id: -1,
+        title: 'Noticias Destacadas',
+        slug: '__fallback-premium__',
+        excerpt: 'Actualizando contenido. Vuelve en unos minutos para ver las últimas novedades.',
+        source_name: 'Pixel no Sekai',
+        image_url: null,
+        published_at: new Date().toISOString(),
+        category: 'industria',
+        tags: [],
+        language: 'es',
+        is_featured: true,
+        external_url: null,
+        has_valid_image: false,
+        is_publishable: true,
+        quality_score: 100,
+        use_fallback_image: true,
+      };
 
-    const secondary = await pool.query(
-      `
-      SELECT
-        id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
-        has_valid_image, is_publishable, quality_score
-      FROM news_articles
-      WHERE is_active = true AND is_publishable = true
-        AND ($1::text IS NULL OR slug <> $1)
-      ORDER BY has_valid_image DESC, quality_score DESC, published_at DESC NULLS LAST, id DESC
-      LIMIT $2
-      `,
-      [main?.slug || null, limit]
-    );
+      const secondary = await pool.query(
+        `
+        SELECT
+          id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
+          has_valid_image, is_publishable, quality_score
+        FROM news_articles
+        WHERE is_active = true AND is_publishable = true
+          AND ($1::text IS NULL OR slug <> $1)
+        ORDER BY has_valid_image DESC, quality_score DESC, published_at DESC NULLS LAST, id DESC
+        LIMIT $2
+        `,
+        [main?.slug || null, limit]
+      );
 
-    return res.json({
-      featured: main || fallbackHero,
-      items: secondary.rows,
-      meta: { used_fallback_hero: noImageFallback },
+      return {
+        featured: main || fallbackHero,
+        items: secondary.rows,
+        meta: { used_fallback_hero: noImageFallback },
+      };
     });
+
+    return res.json(data);
   } catch (e) {
     return res.status(500).json({ message: 'Error obteniendo featured', error: e.message });
   }

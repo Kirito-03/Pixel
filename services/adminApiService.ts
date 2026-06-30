@@ -235,6 +235,50 @@ class AdminApiService {
         return response.data;
     }
 
+    async importAnime(payload: any) {
+        const response = await this.axiosInstance.post('/api/admin/import/anime', payload);
+        return response.data;
+    }
+
+    async getImportJobs(params?: { status?: string; limit?: number }) {
+        const response = await this.axiosInstance.get('/api/admin/import/jobs', { params });
+        return response.data;
+    }
+
+    async getImportJobsSummary() {
+        const response = await this.axiosInstance.get('/api/admin/import/jobs/summary');
+        return response.data;
+    }
+
+    async retryImportJob(id: number) {
+        const response = await this.axiosInstance.post(`/api/admin/import/jobs/${id}/retry`);
+        return response.data;
+    }
+
+    async uploadM3uText(payload: { content: string; name?: string }) {
+        const response = await this.axiosInstance.post('/api/admin/import/m3u/text', payload);
+        return response.data;
+    }
+
+    async uploadM3uFile(file: { uri: string; name?: string; mimeType?: string } | any) {
+        const formData = new FormData();
+        if (file && typeof file.uri === 'string') {
+            formData.append(
+                'file',
+                {
+                    uri: file.uri,
+                    name: file.name || 'playlist.m3u',
+                    type: file.mimeType || 'application/octet-stream',
+                } as any
+            );
+        } else {
+            formData.append('file', file);
+        }
+
+        const response = await this.axiosInstance.post('/api/admin/import/m3u/upload', formData);
+        return response.data;
+    }
+
     // ========================================
     // News Admin
     // ========================================

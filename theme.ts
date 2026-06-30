@@ -42,6 +42,24 @@ export const lightColors = {
   divider: 'rgba(0, 0, 0, 0.06)',
 };
 
+export const adminColors = {
+  ink: '#19171b',
+  primary: '#75020f',
+  secondary: '#51080d',
+  deep: '#2b0307',
+  background: '#f7f7f8',
+  surface: '#ffffff',
+  text: '#19171b',
+  textSecondary: 'rgba(25, 23, 27, 0.68)',
+  border: 'rgba(25, 23, 27, 0.12)',
+  focus: 'rgba(117, 2, 15, 0.22)',
+  sidebarBg: '#19171b',
+  sidebarBorder: 'rgba(255, 255, 255, 0.10)',
+  sidebarText: 'rgba(255, 255, 255, 0.85)',
+  sidebarTextMuted: 'rgba(255, 255, 255, 0.55)',
+  sidebarHover: 'rgba(255, 255, 255, 0.08)',
+};
+
 // Compatibilidad: exportar 'colors' por defecto usando paleta oscura.
 // Esto evita romper componentes que aún no usan ThemeContext.
 export const colors = darkColors;

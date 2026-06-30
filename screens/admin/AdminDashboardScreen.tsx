@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../../types/navigation';
 import { AdminShell } from '../../components/admin/AdminShell';
+import { adminColors } from '../../theme';
 
 interface DashboardStats {
     totalAnime: number;
@@ -33,7 +34,7 @@ interface DashboardStats {
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
 
 export default function AdminDashboardScreen() {
-    const { adminUser, logoutAdmin } = useAdmin();
+    const { adminUser } = useAdmin();
     const navigation = useNavigation<NavigationProp>();
     const { width } = useWindowDimensions();
     const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -62,12 +63,6 @@ export default function AdminDashboardScreen() {
     const handleRefresh = () => {
         setRefreshing(true);
         loadStats();
-    };
-
-    const handleLogout = async () => {
-        // En lugar de cerrar sesión, volvemos al perfil
-        // Si se quiere "cerrar" el panel, basta con salir de la navegación admin
-        navigation.getParent()?.goBack();
     };
 
     const handleGoBack = () => {
@@ -112,7 +107,7 @@ export default function AdminDashboardScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                    <Ionicons name="arrow-back" size={24} color={adminColors.text} />
                 </TouchableOpacity>
                 <View style={styles.headerTitleWrap}>
                     <Text style={styles.headerTitle}>Administrador</Text>
@@ -120,10 +115,10 @@ export default function AdminDashboardScreen() {
                 </View>
                 <View style={styles.headerActions}>
                     <TouchableOpacity onPress={loadStats} style={styles.iconButton} disabled={isLoading || refreshing}>
-                        <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                        <Ionicons name="refresh" size={20} color={adminColors.text} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleGoBack} style={styles.iconButton}>
-                        <Ionicons name="exit-outline" size={20} color="#ef4444" />
+                        <Ionicons name="exit-outline" size={20} color={adminColors.secondary} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -153,7 +148,7 @@ export default function AdminDashboardScreen() {
 
                 {isLoading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#E50914" />
+                        <ActivityIndicator size="large" color={adminColors.primary} />
                     </View>
                 ) : (
                     <>
@@ -198,6 +193,12 @@ export default function AdminDashboardScreen() {
                                                     console.error('Error refreshing news:', e);
                                                 }
                                             }}
+                                        />
+                                        <QuickAction
+                                            title="Importar fuentes"
+                                            subtitle="M3U/carpeta → catálogo"
+                                            icon="cloud-download"
+                                            onPress={() => navigation.navigate('AdminImport' as never)}
                                         />
                                     </View>
                                 </View>
@@ -281,7 +282,7 @@ function StatCard({ title, value, icon, style }: any) {
             <View style={styles.statCardTop}>
                 <Text style={styles.statBig}>{value}</Text>
                 <View style={styles.statChip}>
-                    <Ionicons name={icon} size={14} color="#E50914" />
+                    <Ionicons name={icon} size={14} color={adminColors.primary} />
                 </View>
             </View>
             <Text style={styles.statLabel} numberOfLines={1}>{title}</Text>
@@ -302,13 +303,17 @@ function QuickAction({ title, subtitle, icon, onPress, primary }: any) {
             ]}
         >
             <View style={[styles.actionIconWrap, primary && styles.actionIconWrapPrimary]}>
-                <Ionicons name={icon} size={22} color={primary ? '#000000' : '#E50914'} />
+                <Ionicons name={icon} size={22} color={primary ? '#FFFFFF' : adminColors.primary} />
             </View>
             <View style={styles.actionText}>
                 <Text style={[styles.actionTitle, primary && styles.actionTitlePrimary]} numberOfLines={1}>{title}</Text>
                 <Text style={[styles.actionSubtitle, primary && styles.actionSubtitlePrimary]} numberOfLines={1}>{subtitle}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={primary ? '#000000' : '#6b7280'} />
+            <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={primary ? 'rgba(255, 255, 255, 0.92)' : adminColors.textSecondary}
+            />
         </Pressable>
     );
 }
@@ -316,16 +321,16 @@ function QuickAction({ title, subtitle, icon, onPress, primary }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.surface,
         borderBottomWidth: 1,
-        borderBottomColor: '#333333',
+        borderBottomColor: adminColors.border,
     },
     backButton: {
         padding: 6,
@@ -337,11 +342,11 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     headerMeta: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: adminColors.textSecondary,
         marginTop: 2,
     },
     headerActions: {
@@ -353,9 +358,9 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 10,
-        backgroundColor: '#111111',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#222222',
+        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -368,9 +373,9 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         padding: 12,
         borderRadius: 14,
-        backgroundColor: '#0b0b0b',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#1f1f1f',
+        borderColor: adminColors.border,
     },
     userRow: {
         flexDirection: 'row',
@@ -381,7 +386,7 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 12,
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -397,25 +402,25 @@ const styles = StyleSheet.create({
     userName: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     userEmail: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: adminColors.textSecondary,
         marginTop: 1,
     },
     badge: {
         height: 24,
         paddingHorizontal: 10,
         borderRadius: 999,
-        backgroundColor: '#111111',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#27272a',
+        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
     },
     badgeText: {
-        color: '#E50914',
+        color: adminColors.primary,
         fontSize: 11,
         fontWeight: '800',
         letterSpacing: 1,
@@ -451,9 +456,9 @@ const styles = StyleSheet.create({
     statCard: {
         padding: 14,
         borderRadius: 14,
-        backgroundColor: '#0b0b0b',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#1f1f1f',
+        borderColor: adminColors.border,
         minWidth: '47%',
     },
     statCardHalf: {
@@ -473,22 +478,22 @@ const styles = StyleSheet.create({
     statBig: {
         fontSize: 28,
         fontWeight: '900',
-        color: '#FFFFFF',
+        color: adminColors.text,
         letterSpacing: 0.2,
     },
     statLabel: {
         marginTop: 6,
         fontSize: 12,
         fontWeight: '700',
-        color: '#9ca3af',
+        color: adminColors.textSecondary,
     },
     statChip: {
         width: 28,
         height: 28,
         borderRadius: 10,
-        backgroundColor: '#111111',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#222222',
+        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -496,7 +501,7 @@ const styles = StyleSheet.create({
         marginTop: 10,
         height: 2,
         borderRadius: 999,
-        backgroundColor: '#141414',
+        backgroundColor: 'rgba(25, 23, 27, 0.08)',
     },
     section: {
         paddingHorizontal: 16,
@@ -506,7 +511,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: adminColors.text,
         marginBottom: 10,
         letterSpacing: 0.3,
     },
@@ -519,27 +524,27 @@ const styles = StyleSheet.create({
         gap: 10,
         padding: 14,
         borderRadius: 14,
-        backgroundColor: '#0b0b0b',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#1f1f1f',
+        borderColor: adminColors.border,
     },
     actionCardPrimary: {
-        backgroundColor: '#E50914',
-        borderColor: '#E50914',
+        backgroundColor: adminColors.primary,
+        borderColor: adminColors.primary,
     },
     actionIconWrap: {
         width: 36,
         height: 36,
         borderRadius: 12,
-        backgroundColor: '#111111',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#222222',
+        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
     },
     actionIconWrapPrimary: {
-        backgroundColor: '#000000',
-        borderColor: '#000000',
+        backgroundColor: 'rgba(255, 255, 255, 0.14)',
+        borderColor: 'rgba(255, 255, 255, 0.18)',
     },
     actionText: {
         flex: 1,
@@ -548,26 +553,25 @@ const styles = StyleSheet.create({
     actionTitle: {
         fontSize: 14,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     actionTitlePrimary: {
-        color: '#000000',
+        color: '#FFFFFF',
     },
     actionSubtitle: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: adminColors.textSecondary,
         marginTop: 2,
     },
     actionSubtitlePrimary: {
-        color: '#000000',
-        opacity: 0.85,
+        color: 'rgba(255, 255, 255, 0.92)',
     },
     panelCard: {
         padding: 14,
         borderRadius: 14,
-        backgroundColor: '#0b0b0b',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#1f1f1f',
+        borderColor: adminColors.border,
     },
     panelHeader: {
         flexDirection: 'row',
@@ -578,12 +582,12 @@ const styles = StyleSheet.create({
     panelTitle: {
         fontSize: 13,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     panelLink: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#E50914',
+        color: adminColors.primary,
     },
     activityRow: {
         flexDirection: 'row',
@@ -591,15 +595,15 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingVertical: 12,
         borderTopWidth: 1,
-        borderTopColor: '#141414',
+        borderTopColor: adminColors.border,
     },
     activityIcon: {
         width: 30,
         height: 30,
         borderRadius: 12,
-        backgroundColor: '#111111',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#222222',
+        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -615,25 +619,25 @@ const styles = StyleSheet.create({
     activityTime: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#6b7280',
+        color: adminColors.textSecondary,
     },
     rowTitle: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     rowSub: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: adminColors.textSecondary,
         marginTop: 2,
     },
     emptyText: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: adminColors.textSecondary,
         paddingVertical: 10,
     },
     hovered: {
-        backgroundColor: '#0f0f0f',
+        backgroundColor: 'rgba(117, 2, 15, 0.06)',
     },
     pressed: {
         opacity: 0.9,
@@ -646,15 +650,15 @@ const styles = StyleSheet.create({
     },
     summaryLabel: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: adminColors.textSecondary,
     },
     summaryValue: {
         fontSize: 13,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     divider: {
         height: 1,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.border,
     },
 });

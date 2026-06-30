@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../../types/navigation';
 import { AdminShell } from '../../components/admin/AdminShell';
+import { adminColors } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
 
@@ -93,7 +94,7 @@ export default function AnimeListScreen() {
 
     const renderFooter = () => {
         if (!isLoading || refreshing) return null;
-        return <ActivityIndicator style={{ marginVertical: 20 }} size="large" color="#E50914" />;
+        return <ActivityIndicator style={{ marginVertical: 20 }} size="large" color={adminColors.primary} />;
     };
 
     const openDetails = (item: any) => {
@@ -209,7 +210,7 @@ export default function AnimeListScreen() {
                         navigation.navigate('AnimeForm', { mode: 'edit', animeId: item.id });
                     }}
                 >
-                    <Ionicons name="pencil" size={18} color="#B3B3B3" />
+                    <Ionicons name="pencil" size={18} color={adminColors.textSecondary} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -218,7 +219,7 @@ export default function AnimeListScreen() {
                         openDetails(item);
                     }}
                 >
-                    <Ionicons name="eye-outline" size={18} color="#B3B3B3" />
+                    <Ionicons name="eye-outline" size={18} color={adminColors.textSecondary} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -227,7 +228,7 @@ export default function AnimeListScreen() {
                         confirmDelete(item);
                     }}
                 >
-                    <Ionicons name="trash-outline" size={18} color="#E50914" />
+                    <Ionicons name="trash-outline" size={18} color={adminColors.primary} />
                 </TouchableOpacity>
             </View>
         </Pressable>
@@ -244,7 +245,7 @@ export default function AnimeListScreen() {
                                 onPress={() => navigation.goBack()}
                                 style={styles.backButton}
                             >
-                                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                                <Ionicons name="arrow-back" size={24} color={adminColors.text} />
                             </TouchableOpacity>
                         )}
                         <Text style={styles.headerTitle}>Biblioteca de Anime</Text>
@@ -260,17 +261,17 @@ export default function AnimeListScreen() {
 
                 {/* Search */}
                 <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color="#808080" style={styles.searchIcon} />
+                    <Ionicons name="search" size={20} color={adminColors.textSecondary} style={styles.searchIcon} />
                     <TextInput
                         style={styles.searchInput}
                         placeholder="Buscar anime..."
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        placeholderTextColor="#808080"
+                        placeholderTextColor={adminColors.textSecondary}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color="#808080" />
+                            <Ionicons name="close-circle" size={20} color={adminColors.textSecondary} />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -299,11 +300,11 @@ export default function AnimeListScreen() {
                 {/* List */}
                 {isLoading && page === 1 ? (
                     <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color="#E50914" />
+                        <ActivityIndicator size="large" color={adminColors.primary} />
                     </View>
                 ) : animeList.length === 0 ? (
                     <View style={styles.centerContainer}>
-                        <Ionicons name="film-outline" size={64} color="#333333" />
+                        <Ionicons name="film-outline" size={64} color={adminColors.textSecondary} />
                         <Text style={styles.emptyTitle}>
                             {searchQuery || statusFilter !== 'all' ? 'No se encontraron resultados' : 'No hay animes registrados todavía'}
                         </Text>
@@ -331,8 +332,8 @@ export default function AnimeListScreen() {
                             <RefreshControl
                                 refreshing={refreshing}
                                 onRefresh={handleRefresh}
-                                tintColor="#E50914"
-                                colors={['#E50914']}
+                                tintColor={adminColors.primary}
+                                colors={[adminColors.primary]}
                             />
                         }
                         onEndReached={handleLoadMore}
@@ -347,7 +348,7 @@ export default function AnimeListScreen() {
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle} numberOfLines={1}>{selectedAnime?.title || 'Detalle'}</Text>
                                 <TouchableOpacity onPress={() => setDetailsVisible(false)} style={styles.modalClose}>
-                                    <Ionicons name="close" size={22} color="#FFFFFF" />
+                                    <Ionicons name="close" size={22} color={adminColors.text} />
                                 </TouchableOpacity>
                             </View>
 
@@ -429,7 +430,7 @@ function getStatusBadgeStyle(status: string) {
         case 'Airing': return { backgroundColor: 'rgba(46, 204, 113, 0.15)' };
         case 'Finished': return { backgroundColor: 'rgba(52, 152, 219, 0.15)' };
         case 'Upcoming': return { backgroundColor: 'rgba(241, 196, 15, 0.15)' };
-        default: return { backgroundColor: '#333333' };
+        default: return { backgroundColor: 'rgba(25, 23, 27, 0.08)' };
     }
 }
 
@@ -438,14 +439,14 @@ function getStatusTextStyle(status: string) {
         case 'Airing': return { color: '#2ecc71' };
         case 'Finished': return { color: '#3498db' };
         case 'Upcoming': return { color: '#f1c40f' };
-        default: return { color: '#B3B3B3' };
+        default: return { color: adminColors.textSecondary };
     }
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.background,
     },
     header: {
         flexDirection: 'row',
@@ -465,16 +466,16 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: adminColors.text,
         letterSpacing: -0.5,
     },
     addButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        borderRadius: 4,
+        borderRadius: 12,
         gap: 6,
     },
     addButtonText: {
@@ -485,14 +486,14 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         marginHorizontal: 24,
         marginBottom: 10,
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333333',
+        borderColor: adminColors.border,
     },
     searchIcon: {
         marginRight: 10,
@@ -500,7 +501,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 15,
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     centerContainer: {
         flex: 1,
@@ -510,16 +511,16 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 15,
-        color: '#808080',
+        color: adminColors.textSecondary,
         marginTop: 16,
         textAlign: 'center',
     },
     emptyButton: {
         marginTop: 24,
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         paddingHorizontal: 24,
         paddingVertical: 12,
-        borderRadius: 4,
+        borderRadius: 12,
     },
     emptyButtonText: {
         color: '#FFFFFF',
@@ -542,35 +543,35 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 999,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     filterChipActive: {
-        backgroundColor: 'rgba(229, 9, 20, 0.12)',
-        borderColor: '#E50914',
+        backgroundColor: 'rgba(117, 2, 15, 0.08)',
+        borderColor: adminColors.primary,
     },
     filterChipText: {
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         fontSize: 13,
         fontWeight: '600',
     },
     filterChipTextActive: {
-        color: '#E50914',
+        color: adminColors.primary,
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         paddingVertical: 12,
         paddingHorizontal: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     rowHovered: {
-        borderColor: '#404040',
-        backgroundColor: '#1a1a1a',
+        borderColor: 'rgba(117, 2, 15, 0.20)',
+        backgroundColor: 'rgba(117, 2, 15, 0.06)',
         transform: [{ translateY: -2 }],
     },
     thumbWrap: {
@@ -578,9 +579,9 @@ const styles = StyleSheet.create({
         height: 64,
         borderRadius: 6,
         overflow: 'hidden',
-        backgroundColor: '#0b0b0b',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
         marginRight: 12,
     },
     thumb: {
@@ -592,7 +593,7 @@ const styles = StyleSheet.create({
         height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#0b0b0b',
+        backgroundColor: adminColors.background,
     },
     main: {
         flex: 1,
@@ -607,7 +608,7 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: adminColors.text,
         letterSpacing: -0.2,
     },
     badge: {
@@ -628,14 +629,14 @@ const styles = StyleSheet.create({
     },
     metaText: {
         fontSize: 13,
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
     },
     metaMuted: {
         fontSize: 13,
-        color: '#808080',
+        color: adminColors.textSecondary,
     },
     metaDot: {
-        color: '#404040',
+        color: 'rgba(25, 23, 27, 0.25)',
         fontSize: 12,
         marginHorizontal: 2,
     },
@@ -652,12 +653,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: '#262626',
-        backgroundColor: '#0b0b0b',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.background,
     },
     actionPrimary: {
-        backgroundColor: '#E50914',
-        borderColor: '#E50914',
+        backgroundColor: adminColors.primary,
+        borderColor: adminColors.primary,
     },
     actionPrimaryText: {
         color: '#FFFFFF',
@@ -667,12 +668,14 @@ const styles = StyleSheet.create({
     },
     iconButton: {
         padding: 8,
-        borderRadius: 4,
-        backgroundColor: '#262626',
+        borderRadius: 10,
+        backgroundColor: adminColors.background,
+        borderWidth: 1,
+        borderColor: adminColors.border,
     },
     emptyTitle: {
         fontSize: 16,
-        color: '#FFFFFF',
+        color: adminColors.text,
         fontWeight: '700',
         marginTop: 16,
         textAlign: 'center',
@@ -687,10 +690,10 @@ const styles = StyleSheet.create({
     modalCard: {
         width: '100%',
         maxWidth: 820,
-        backgroundColor: '#0b0b0b',
+        backgroundColor: adminColors.surface,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
         overflow: 'hidden',
     },
     modalHeader: {
@@ -700,11 +703,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: '#262626',
+        borderBottomColor: adminColors.border,
     },
     modalTitle: {
         flex: 1,
-        color: '#FFFFFF',
+        color: adminColors.text,
         fontSize: 16,
         fontWeight: '800',
         marginRight: 12,
@@ -713,16 +716,16 @@ const styles = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 8,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
     },
     banner: {
         width: '100%',
         height: 160,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.background,
     },
     modalBody: {
         padding: 16,
@@ -737,9 +740,9 @@ const styles = StyleSheet.create({
         height: 130,
         borderRadius: 10,
         overflow: 'hidden',
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     detailThumb: {
         width: '100%',
@@ -760,26 +763,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 999,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     softBadgeText: {
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         fontSize: 12,
         fontWeight: '700',
     },
     detailMeta: {
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         fontSize: 13,
         lineHeight: 18,
     },
     detailMetaMuted: {
-        color: '#808080',
+        color: adminColors.textSecondary,
         fontSize: 12,
     },
     detailDesc: {
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         fontSize: 13,
         lineHeight: 19,
         marginTop: 6,
@@ -795,8 +798,8 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
     },
     modalActionSecondary: {
-        backgroundColor: '#141414',
-        borderColor: '#262626',
+        backgroundColor: adminColors.ink,
+        borderColor: adminColors.ink,
         paddingHorizontal: 14,
         paddingVertical: 10,
     },

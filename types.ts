@@ -172,22 +172,49 @@ export interface ContentItem {
 // Navegación
 export type RootStackParamList = {
   Ingreso: undefined;
-  Principal: undefined;
-  MiLista: undefined;
+  Registro: undefined;
+  SeleccionPerfil: undefined;
+  Principal: { selectedProfile?: any; userId?: number };
+  Buscar: undefined;
+  Perfil: undefined;
+  Apariencia: undefined;
   Descargas: undefined;
+  Admin: undefined;
 };
 
 export type TabParamList = {
   Inicio: undefined;
   Buscar: undefined;
-  Perfil: undefined;
+  Noticias: undefined;
+  Manga: undefined;
   MiLista: undefined;
+  Perfil: undefined;
 };
 
 export type HomeStackParamList = {
-  Inicio: undefined;
+  HomeMain: undefined;
   DetallePelicula: { movieId: number; type?: 'movie' | 'tv' | 'anime'; source?: 'tmdb' | 'anilist' };
   Categoria: { categoryId: string; categoryName: string; source?: 'tmdb' | 'anilist' };
   MiLista: undefined;
+};
+
+export type AdminStackParamList = {
+  AdminLogin: undefined;
+  AdminDashboard: undefined;
+  AdminImport: undefined;
+  AnimeList: undefined;
+  AnimeForm: { animeId?: number };
+  EpisodeManager: { animeId: number; animeTitle?: string };
+};
+
+export type NewsStackParamList = {
+  NoticiasHome: undefined;
+  NewsDetail: { articleId: number; slug?: string };
+};
+
+export type MangaStackParamList = {
+  MangaHome: undefined;
+  MangaDetail: { mangaId: string };
+  MangaReader: { chapterId: string; mangaId: string };
 };
 

@@ -20,6 +20,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../../types/navigation';
 import { AdminShell } from '../../components/admin/AdminShell';
+import { adminColors } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
 type AnimeFormRouteProp = RouteProp<AdminStackParamList, 'AnimeForm'>;
@@ -182,7 +183,7 @@ export default function AnimeFormScreen() {
         return (
             <AdminShell activeKey="anime">
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#E50914" />
+                    <ActivityIndicator size="large" color={adminColors.primary} />
                 </View>
             </AdminShell>
         );
@@ -196,7 +197,7 @@ export default function AnimeFormScreen() {
                     <View style={styles.headerLeft}>
                         {Platform.OS !== 'web' && (
                             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                                <Ionicons name="arrow-back" size={24} color={adminColors.text} />
                             </TouchableOpacity>
                         )}
                         <Text style={styles.headerTitle}>
@@ -386,7 +387,7 @@ export default function AnimeFormScreen() {
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>Buscar en TMDB</Text>
                                 <TouchableOpacity onPress={() => setShowTMDBSearch(false)}>
-                                    <Ionicons name="close" size={28} color="#FFFFFF" />
+                                    <Ionicons name="close" size={28} color={adminColors.text} />
                                 </TouchableOpacity>
                             </View>
 
@@ -406,7 +407,7 @@ export default function AnimeFormScreen() {
 
                             {isSearching ? (
                                 <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="large" color="#E50914" />
+                                    <ActivityIndicator size="large" color={adminColors.primary} />
                                 </View>
                             ) : (
                                 <FlatList
@@ -430,7 +431,7 @@ export default function AnimeFormScreen() {
                                                     {item.first_air_date ? `Estreno: ${item.first_air_date}` : ''}
                                                 </Text>
                                             </View>
-                                            <Ionicons name="chevron-forward" size={20} color="#666666" />
+                                            <Ionicons name="chevron-forward" size={20} color={adminColors.textSecondary} />
                                         </TouchableOpacity>
                                     )}
                                     contentContainerStyle={styles.tmdbResultsList}
@@ -454,13 +455,13 @@ export default function AnimeFormScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.background,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.background,
     },
     header: {
         flexDirection: 'row',
@@ -480,16 +481,16 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: adminColors.text,
         letterSpacing: -0.5,
     },
     tmdbButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#262626',
+        backgroundColor: adminColors.ink,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        borderRadius: 4,
+        borderRadius: 12,
         gap: 8,
     },
     tmdbButtonText: {
@@ -505,11 +506,11 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     formCard: {
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         borderRadius: 8,
         padding: 24,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     row: {
         flexDirection: 'row',
@@ -531,7 +532,7 @@ const styles = StyleSheet.create({
         height: 180,
         borderRadius: 8,
         borderWidth: 2,
-        borderColor: '#E50914',
+        borderColor: adminColors.primary,
     },
     formGroup: {
         marginBottom: 20,
@@ -539,7 +540,7 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         marginBottom: 8,
     },
     inputContainer: {
@@ -549,18 +550,20 @@ const styles = StyleSheet.create({
     },
     searchIcon: {
         padding: 12,
-        backgroundColor: '#262626',
-        borderRadius: 4,
+        backgroundColor: adminColors.background,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: adminColors.border,
     },
     input: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.surface,
         borderWidth: 1,
-        borderColor: '#333333',
-        borderRadius: 4,
+        borderColor: adminColors.border,
+        borderRadius: 12,
         padding: 12,
         fontSize: 15,
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     textArea: {
         minHeight: 120,
@@ -574,28 +577,28 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: 12,
         paddingHorizontal: 16,
-        borderRadius: 4,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#333333',
-        backgroundColor: '#000000',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
         alignItems: 'center',
     },
     statusButtonActive: {
-        backgroundColor: 'rgba(229, 9, 20, 0.1)',
-        borderColor: '#E50914',
+        backgroundColor: 'rgba(117, 2, 15, 0.08)',
+        borderColor: adminColors.primary,
     },
     statusButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#808080',
+        color: adminColors.textSecondary,
     },
     statusButtonTextActive: {
-        color: '#E50914',
+        color: adminColors.primary,
     },
     saveButton: {
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         padding: 16,
-        borderRadius: 4,
+        borderRadius: 12,
         alignItems: 'center',
         marginTop: 16,
     },
@@ -619,9 +622,11 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 700,
         maxHeight: '80%',
-        backgroundColor: '#000000',
+        backgroundColor: adminColors.surface,
         borderRadius: 12,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: adminColors.border,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -630,12 +635,12 @@ const styles = StyleSheet.create({
         padding: 24,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#262626',
+        borderBottomColor: adminColors.border,
     },
     modalTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     modalSearchContainer: {
         flexDirection: 'row',
@@ -645,19 +650,19 @@ const styles = StyleSheet.create({
     },
     modalSearchInput: {
         flex: 1,
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.background,
         borderWidth: 1,
-        borderColor: '#333333',
-        borderRadius: 4,
+        borderColor: adminColors.border,
+        borderRadius: 12,
         padding: 12,
         fontSize: 15,
-        color: '#FFFFFF',
+        color: adminColors.text,
     },
     modalSearchButton: {
-        backgroundColor: '#E50914',
+        backgroundColor: adminColors.primary,
         width: 48,
         height: 48,
-        borderRadius: 4,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -668,12 +673,12 @@ const styles = StyleSheet.create({
     tmdbResultItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#141414',
+        backgroundColor: adminColors.surface,
         padding: 12,
         borderRadius: 8,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#262626',
+        borderColor: adminColors.border,
     },
     tmdbResultImage: {
         width: 60,
@@ -689,18 +694,18 @@ const styles = StyleSheet.create({
     tmdbResultTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: adminColors.text,
         marginBottom: 6,
     },
     tmdbResultOverview: {
         fontSize: 13,
-        color: '#B3B3B3',
+        color: adminColors.textSecondary,
         marginBottom: 8,
         lineHeight: 18,
     },
     tmdbResultDate: {
         fontSize: 12,
-        color: '#808080',
+        color: adminColors.textSecondary,
         fontWeight: '500',
     },
     emptyContainer: {
@@ -708,7 +713,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyText: {
-        color: '#808080',
+        color: adminColors.textSecondary,
         fontSize: 15,
         textAlign: 'center',
     }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Storage } from '../services/storage';
 import { subscribeAuth, logout as firebaseLogout } from '../services/auth';
 
 interface User {
@@ -29,20 +29,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loadSession = async () => {
     try {
       console.log('AuthContext: Loading session...');
-      const stored = await AsyncStorage.getItem('userSession');
+      const stored = Storage.getObject<User>('userSession');
       if (stored) {
-        const parsed = JSON.parse(stored);
-        setUser(parsed);
+        setUser(stored);
       }
       subscribeAuth(async (firebaseUser) => {
         if (firebaseUser) {
-          const u: User = { uid: firebaseUser.uid, email: firebaseUser.email, role: 'user' }; // Default role
+          // Preserve existing role if login() was already called (avoids overwriting admin role)
+          const existingSession = Storage.getObject<User>('userSession');
+          const existingRole = (existingSession && existingSession.uid === firebaseUser.uid)
+            ? existingSession.role
+            : 'user';
+          const u: User = { uid: firebaseUser.uid, email: firebaseUser.email, role: existingRole };
           setUser(u);
-          await AsyncStorage.setItem('userSession', JSON.stringify(u));
+          Storage.setObject('userSession', u);
         } else {
           setUser(null);
-          await AsyncStorage.removeItem('userSession');
-          await AsyncStorage.removeItem('currentProfile');
+          Storage.delete('userSession');
+          Storage.delete('currentProfile');
         }
       });
     } catch (error) {
@@ -54,7 +58,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (userData: User) => {
     setUser(userData);
-    await AsyncStorage.setItem('userSession', JSON.stringify(userData));
+    Storage.setObject('userSession', userData);
   };
 
   const logout = async () => {
@@ -63,12 +67,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await firebaseLogout();
     } catch (e) { }
     setUser(null);
-    await AsyncStorage.removeItem('userSession');
-    // También limpiar el perfil actual
+    Storage.delete('userSession');
     // También limpiar el perfil actual y token de admin
-    await AsyncStorage.removeItem('currentProfile');
-    await AsyncStorage.removeItem('admin_token');
-    console.log('AuthContext: Session removed from AsyncStorage');
+    Storage.delete('currentProfile');
+    Storage.delete('admin_token');
+    console.log('AuthContext: Session cleared from Storage');
   };
 
   useEffect(() => {
@@ -97,4 +100,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

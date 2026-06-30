@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Storage } from '../services/storage';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -20,11 +20,38 @@ import NewsDetailScreen from '../screens/NewsDetailScreen';
 import MangaScreen from '../screens/MangaScreen';
 import MangaDetailScreen from '../screens/MangaDetailScreen';
 import MangaReaderScreen from '../screens/MangaReaderScreen';
-import AdminLoginScreen from '../screens/admin/AdminLoginScreen';
-import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
-import AnimeListScreen from '../screens/admin/AnimeListScreen';
-import AnimeFormScreen from '../screens/admin/AnimeFormScreen';
-import EpisodeManagerScreen from '../screens/admin/EpisodeManagerScreen';
+import AppearanceScreen from '../screens/AppearanceScreen';
+
+// ── Admin Screens: code-split on web, static on native ─────────
+// React.lazy only works on web (React DOM). On native, React Native
+// doesn't support React.lazy with Suspense for code splitting,
+// so we import statically.
+let AdminLoginScreen: React.ComponentType<any>;
+let AdminDashboardScreen: React.ComponentType<any>;
+let AdminImportScreen: React.ComponentType<any>;
+let AnimeListScreen: React.ComponentType<any>;
+let AnimeFormScreen: React.ComponentType<any>;
+let EpisodeManagerScreen: React.ComponentType<any>;
+
+if (Platform.OS === 'web') {
+  // Web: lazy-load admin screens → separate JS chunks
+  // Users who never navigate to Admin won't download this code.
+  AdminLoginScreen = React.lazy(() => import('../screens/admin/AdminLoginScreen'));
+  AdminDashboardScreen = React.lazy(() => import('../screens/admin/AdminDashboardScreen'));
+  AdminImportScreen = React.lazy(() => import('../screens/admin/AdminImportScreen'));
+  AnimeListScreen = React.lazy(() => import('../screens/admin/AnimeListScreen'));
+  AnimeFormScreen = React.lazy(() => import('../screens/admin/AnimeFormScreen'));
+  EpisodeManagerScreen = React.lazy(() => import('../screens/admin/EpisodeManagerScreen'));
+} else {
+  // Native: static imports (no code splitting support)
+  AdminLoginScreen = require('../screens/admin/AdminLoginScreen').default;
+  AdminDashboardScreen = require('../screens/admin/AdminDashboardScreen').default;
+  AdminImportScreen = require('../screens/admin/AdminImportScreen').default;
+  AnimeListScreen = require('../screens/admin/AnimeListScreen').default;
+  AnimeFormScreen = require('../screens/admin/AnimeFormScreen').default;
+  EpisodeManagerScreen = require('../screens/admin/EpisodeManagerScreen').default;
+}
+
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../contexts/ProfileContext';
@@ -41,23 +68,34 @@ const MangaStack = createNativeStackNavigator();
 function HomeNavigator() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}>
-      <HomeStack.Screen name="Inicio" component={HomeScreen as any} />
+      <HomeStack.Screen name="HomeMain" component={HomeScreen as any} />
       <HomeStack.Screen name="Categoria" component={CategoryScreen as any} />
-      <HomeStack.Screen name="MiLista" component={MyListScreen as any} />
     </HomeStack.Navigator>
   );
 }
 
 function AdminNavigator() {
-  return (
+  const content = (
     <AdminStack.Navigator screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}>
       <AdminStack.Screen name="AdminLogin" component={AdminLoginScreen as any} />
       <AdminStack.Screen name="AdminDashboard" component={AdminDashboardScreen as any} />
+      <AdminStack.Screen name="AdminImport" component={AdminImportScreen as any} />
       <AdminStack.Screen name="AnimeList" component={AnimeListScreen as any} />
       <AdminStack.Screen name="AnimeForm" component={AnimeFormScreen as any} />
       <AdminStack.Screen name="EpisodeManager" component={EpisodeManagerScreen as any} />
     </AdminStack.Navigator>
   );
+
+  // Wrap in Suspense on web for lazy-loaded admin screens
+  if (Platform.OS === 'web') {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        {content}
+      </Suspense>
+    );
+  }
+
+  return content;
 }
 
 function NewsNavigator() {
@@ -84,8 +122,7 @@ function MainTabs({ route }: { route: any }) {
   const { selectedProfile, userId } = route.params || {};
   const { isAdmin } = useAdmin();
 
-  // Importar useProfile hook
-  const { setCurrentProfile, currentProfile } = require('../contexts/ProfileContext').useProfile();
+  const { setCurrentProfile, currentProfile } = useProfile();
 
   // Establecer el perfil seleccionado cuando se monta el componente
   React.useEffect(() => {
@@ -123,70 +160,105 @@ function MainTabs({ route }: { route: any }) {
     console.log('MainTabs: Profile already set and matches selectedProfile. No action.');
   }, [selectedProfile, currentProfile, setCurrentProfile]);
 
+  // En web el Header ya proporciona navegación; en nativo necesitamos el tab bar
+  const isWeb = Platform.OS === 'web';
+  const hideTabBar = isWeb ? { display: 'none' as const } : undefined;
+
+  // Estilo premium del tab bar para Android/iOS
+  const tabBarBaseStyle = isWeb
+    ? { display: 'none' as const }
+    : {
+        backgroundColor: '#0a0a0a',
+        borderTopColor: 'rgba(255, 255, 255, 0.08)',
+        borderTopWidth: 1,
+        height: Platform.OS === 'android' ? 60 : 85,
+        paddingBottom: Platform.OS === 'android' ? 8 : 28,
+        paddingTop: 8,
+        elevation: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      };
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: colors.card },
-        tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.textGray,
+        tabBarStyle: tabBarBaseStyle,
+        tabBarActiveTintColor: '#E50914',
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.4)',
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
+          letterSpacing: 0.3,
+        },
       }}
     >
       <Tab.Screen
         name="Inicio"
         component={HomeNavigator}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+          ),
           tabBarLabel: 'Inicio',
-          // El header superior del Home reemplaza el tab bar — ocultarlo en esta tab
-          tabBarStyle: { display: 'none' },
         }}
       />
-      <Tab.Screen
-        name="Buscar"
-        component={SearchScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Ionicons name="search" size={24} color={color} />,
-          tabBarLabel: 'Buscar',
-          tabBarStyle: { display: 'none' },
-        }}
-      />
+      {Platform.OS === 'web' && (
+        <Tab.Screen
+          name="Buscar"
+          component={SearchScreen}
+          options={{
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'search' : 'search-outline'} size={22} color={color} />
+            ),
+            tabBarLabel: 'Buscar',
+          }}
+        />
+      )}
       <Tab.Screen
         name="Noticias"
         component={NewsNavigator}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="newspaper-outline" size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'newspaper' : 'newspaper-outline'} size={22} color={color} />
+          ),
           tabBarLabel: 'Noticias',
-          tabBarStyle: { display: 'none' },
         }}
       />
       <Tab.Screen
         name="Manga"
         component={MangaNavigator}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="book-outline" size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'book' : 'book-outline'} size={22} color={color} />
+          ),
           tabBarLabel: 'Manga',
-          tabBarStyle: { display: 'none' },
         }}
       />
       <Tab.Screen
         name="MiLista"
         component={MyListScreen as any}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="bookmark" size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'bookmark' : 'bookmark-outline'} size={22} color={color} />
+          ),
           tabBarLabel: 'Mi Lista',
-          tabBarStyle: { display: 'none' },
         }}
       />
-      <Tab.Screen
-        name="Perfil"
-        component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Ionicons name="person-circle" size={24} color={color} />,
-          tabBarLabel: 'Mi perfil',
-          tabBarStyle: { display: 'none' },
-        }}
-      />
+      {Platform.OS === 'web' && (
+        <Tab.Screen
+          name="Perfil"
+          component={ProfileScreen}
+          options={{
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={22} color={color} />
+            ),
+            tabBarLabel: 'Perfil',
+          }}
+        />
+      )}
 
     </Tab.Navigator>
   );
@@ -205,7 +277,7 @@ export default function AppNavigator() {
   useEffect(() => {
     const restoreState = async () => {
       try {
-        const savedStateString = await AsyncStorage.getItem('NAVIGATION_STATE');
+        const savedStateString = Storage.getString('NAVIGATION_STATE');
         const state = savedStateString ? JSON.parse(savedStateString) : undefined;
 
         if (state !== undefined) {
@@ -274,13 +346,13 @@ export default function AppNavigator() {
     <NavigationContainer
       initialState={initialState}
       onStateChange={(state) => {
-        AsyncStorage.setItem('NAVIGATION_STATE', JSON.stringify(state));
+        Storage.setObject('NAVIGATION_STATE', state);
       }}
     >
       <RootStack.Navigator
         screenOptions={{
           headerShown: false,
-          animation: Platform.OS === 'android' ? 'fade' : 'default', // Fade solo en Android para evitar la línea/sombra
+          animation: 'fade',
           presentation: 'card',
         }}
         initialRouteName={initialRoute === 'RESTORED_STATE' ? undefined : initialRoute}
@@ -297,7 +369,13 @@ export default function AppNavigator() {
               component={ProfileSelectionScreen as any}
             />
             <RootStack.Screen name="Principal" component={MainTabs} />
-            <RootStack.Screen name="Apariencia" component={require('../screens/AppearanceScreen').default} />
+            {Platform.OS !== 'web' && (
+              <>
+                <RootStack.Screen name="Buscar" component={SearchScreen} />
+                <RootStack.Screen name="Perfil" component={ProfileScreen} />
+              </>
+            )}
+            <RootStack.Screen name="Apariencia" component={AppearanceScreen} />
             <RootStack.Screen name="Descargas" component={DownloadsScreen as any} />
             {isAdmin && <RootStack.Screen name="Admin" component={AdminNavigator} />}
           </>

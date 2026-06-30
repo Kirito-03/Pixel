@@ -16,8 +16,9 @@ services:
     volumes:
       # Persistencia de datos
       - postgres_data:/var/lib/postgresql/data
-      # Auto-inicialización del schema en primer inicio
-      - ./server/bd_netflix_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Auto-inicialización del schema en primer inicio (orden alfabético)
+      - ./server/bd_netflix_postgres.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./server/admin_schema.sql:/docker-entrypoint-initdb.d/02-admin.sql:ro
     networks:
       - netflix_network
     healthcheck:
@@ -69,6 +70,9 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     volumes:
       # Anonymous volume para node_modules (evita conflictos con host)
       - /app/node_modules
@@ -111,30 +115,29 @@ services:
     networks:
       - netflix_network
 
-  # Redis (OPCIONAL - para futuro caching)
-  # Descomentar cuando se implemente caching
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: netflix_redis
-  #   restart: unless-stopped
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   networks:
-  #     - netflix_network
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 3s
-  #     retries: 3
+  # Redis - Caching layer
+  redis:
+    image: redis:7-alpine
+    container_name: netflix_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - netflix_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
 # Volumes para persistencia
 volumes:
   postgres_data:
     driver: local
-  # redis_data:
-  #   driver: local
+  redis_data:
+    driver: local
 
 # Red interna para comunicación entre servicios
 networks:

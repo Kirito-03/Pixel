@@ -110,16 +110,32 @@ export const requestEmailVerification = async () => {
   return { ok: true }
 }
 
-export const getUserDetails = async () => {
-  if (!auth.currentUser) throw new Error('No user logged in');
-  const token = await auth.currentUser.getIdToken();
-  const response = await fetch('/api/user/details', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  if (!response.ok) {
-    throw new Error('Failed to fetch user details');
+export const getUserDetails = async (): Promise<{ role: 'user' | 'admin' }> => {
+  if (!auth.currentUser) return { role: 'user' };
+  try {
+    // Check Firestore for the user's role first (works on all platforms)
+    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      if (data?.role === 'admin') return { role: 'admin' };
+    }
+    // Fallback: try the API endpoint (only works on web with backend running)
+    if (Platform.OS === 'web') {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const response = await fetch('/api/user/details', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          return { role: data.role || 'user' };
+        }
+      } catch (_) {
+        // API not available, use Firestore result
+      }
+    }
+    return { role: 'user' };
+  } catch (_) {
+    return { role: 'user' };
   }
-  return response.json();
 };
