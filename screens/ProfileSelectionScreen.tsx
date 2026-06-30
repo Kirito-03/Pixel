@@ -6,10 +6,9 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Image,
   Platform,
+  Pressable,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useProfile, Profile } from '../contexts/ProfileContext';
@@ -18,8 +17,7 @@ import { useProfileManagement } from '../hooks/useProfileManagement';
 import { CreateProfileModal } from '../components/modals/CreateProfileModal';
 import { DeleteProfileModal } from '../components/modals/DeleteProfileModal';
 import { AnimatedProfileCard } from '../components/AnimatedProfileCard';
-
-
+import AnimatedLeftPanel from '../components/AnimatedLeftPanel';
 
 interface ProfileSelectionScreenProps {
   navigation: any;
@@ -34,6 +32,9 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
   const [newProfileName, setNewProfileName] = useState('');
   const [creating, setCreating] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+
+  const [addHovered, setAddHovered] = useState(false);
+  const [logoutHovered, setLogoutHovered] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
@@ -121,22 +122,67 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
 
   if (loading) {
     return (
-      <LinearGradient colors={['#000000', '#1a1a1a']} style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando perfiles...</Text>
+      <View style={styles.container}>
+        <View style={StyleSheet.absoluteFillObject}>
+          <AnimatedLeftPanel fullScreenMode={true} />
         </View>
-      </LinearGradient>
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingBox}>
+            <View style={styles.loadingSpinnerWrap}>
+              <View style={styles.loadingSpinnerCore} />
+            </View>
+            <Text style={styles.loadingText}>INICIALIZANDO</Text>
+            <Text style={styles.loadingSubText}>Sincronizando base de datos central...</Text>
+          </View>
+        </View>
+      </View>
     );
   }
 
   return (
-    <LinearGradient colors={['#000000', '#1a1a1a']} style={styles.container}>
+    <View style={styles.container}>
+      {/* Background Glitch Engine */}
+      <View style={StyleSheet.absoluteFillObject}>
+        <AnimatedLeftPanel fullScreenMode={true} />
+      </View>
+
       <View style={styles.mainContentContainer}>
+        {/* Top Header */}
+        <View style={styles.topBar}>
+          <View style={styles.topLogo}>
+            <View style={styles.logoIconBox}>
+              <Ionicons name="play" size={11} color="#fff" />
+            </View>
+            <Text style={styles.logoText}>PIXEL NO SEKAI</Text>
+          </View>
+          <Pressable
+            style={[styles.logoutButton, logoutHovered && styles.logoutButtonHover]}
+            onPress={async () => {
+              await logout();
+              navigation.replace('Ingreso');
+            }}
+            // @ts-ignore
+            onHoverIn={() => setLogoutHovered(true)}
+            onHoverOut={() => setLogoutHovered(false)}
+          >
+            <Ionicons name="log-out-outline" size={16} color={logoutHovered ? "#fff" : "rgba(255,255,255,0.5)"} />
+            <Text style={[styles.logoutText, logoutHovered && styles.logoutTextHover]}>CERRAR SESIÓN</Text>
+          </Pressable>
+        </View>
+
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Main Titles */}
           <View style={styles.header}>
-            <Text style={styles.title}>¿Quién está viendo?</Text>
+            <View style={styles.welcomeRow}>
+              <View style={styles.welcomeLine} />
+              <Text style={styles.welcomeText}>BIENVENIDO</Text>
+              <View style={styles.welcomeLine} />
+            </View>
+            <Text style={styles.titleWhite}>¿QUIÉN ESTÁ</Text>
+            <Text style={styles.titleRed}>VIENDO?</Text>
           </View>
 
+          {/* Profiles Grid */}
           <View style={styles.profilesContainer}>
             {profiles.map((profile, index) => (
               <AnimatedProfileCard
@@ -153,27 +199,34 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
             ))}
 
             {profiles.length < 5 && (
-              <TouchableOpacity
-                style={styles.addProfileCard}
-                onPress={() => setShowCreateModal(true)}
-              >
-                <View style={styles.addAvatarContainer}>
-                  <Ionicons name="add" size={40} color="#666" />
-                </View>
-                <Text style={styles.addProfileText}>Agregar perfil</Text>
-              </TouchableOpacity>
+              <View style={styles.addProfileWrapper}>
+                <Pressable
+                  style={styles.addProfileCard}
+                  onPress={() => setShowCreateModal(true)}
+                  // @ts-ignore
+                  onHoverIn={() => setAddHovered(true)}
+                  onHoverOut={() => setAddHovered(false)}
+                >
+                  <View style={[styles.addAvatarContainer, addHovered && styles.addAvatarContainerHover]}>
+                    <Ionicons name="add" size={32} color={addHovered ? "#fff" : "rgba(255,255,255,0.4)"} />
+                    {addHovered && (
+                      <View style={styles.hoverCornerTopRight} />
+                    )}
+                  </View>
+                  <Text style={[styles.addProfileText, addHovered && styles.addProfileTextHover]}>Agregar perfil</Text>
+                </Pressable>
+              </View>
             )}
           </View>
 
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={async () => {
-              await logout();
-              navigation.replace('Ingreso');
-            }}
-          >
-            <Text style={styles.logoutText}>Cerrar sesión</Text>
-          </TouchableOpacity>
+          {/* Decorative Pagination */}
+          <View style={styles.pagination}>
+            <View style={styles.dot} />
+            <View style={styles.dot} />
+            <View style={[styles.dot, styles.dotActive]} />
+            <View style={styles.dot} />
+            <View style={styles.dot} />
+          </View>
         </ScrollView>
       </View>
 
@@ -195,94 +248,217 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDeleteConfirm}
       />
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        alignItems: 'center', // Centrar el contenedor principal
-    },
-    mainContentContainer: {
-        width: '100%',
-        maxWidth: 1200,
-        flex: 1,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    loadingText: {
-        color: '#fff',
-        fontSize: 18,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 60,
-        paddingHorizontal: 20,
-    },
-    header: {
-        marginBottom: 40,
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    profilesContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: 20,
-        width: '100%',
-    },
-    profileCard: {
-        alignItems: 'center',
-        width: 120,
-    },
-    avatarContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-        overflow: 'hidden',
-    },
-    profileName: {
-        color: '#fff',
-        fontSize: 16,
-        textAlign: 'center',
-    },
-    addProfileCard: {
-        alignItems: 'center',
-        width: 120,
-    },
-    addAvatarContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-        backgroundColor: '#333',
-    },
-    addProfileText: {
-        color: '#aaa',
-        fontSize: 16,
-    },
-    logoutButton: {
-        marginTop: 60,
-    },
-    logoutText: {
-        color: '#aaa',
-        fontSize: 16,
-    },
+  container: {
+    flex: 1,
+    backgroundColor: '#050505',
+    alignItems: 'center',
+  },
+  mainContentContainer: {
+    width: '100%',
+    flex: 1,
+    zIndex: 10,
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 40,
+    width: '100%',
+  },
+  topLogo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoIconBox: {
+    width: 28,
+    height: 28,
+    backgroundColor: '#E50914',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 4,
+  },
+  logoutButtonHover: {
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  logoutText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  logoutTextHover: {
+    color: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  loadingBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 10, 10, 0.8)',
+    paddingHorizontal: 40,
+    paddingVertical: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(229,9,20,0.3)',
+  },
+  loadingSpinnerWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderTopColor: '#E50914',
+    borderRightColor: '#E50914',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  loadingSpinnerCore: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#E50914',
+  },
+  loadingText: {
+    color: '#E50914',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 4,
+    marginBottom: 8,
+  },
+  loadingSubText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  header: {
+    marginBottom: 60,
+    alignItems: 'center',
+  },
+  welcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  welcomeLine: {
+    height: 1,
+    width: 40,
+    backgroundColor: '#E50914',
+  },
+  welcomeText: {
+    color: '#E50914',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 3,
+  },
+  titleWhite: {
+    fontSize: 56,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: -1,
+    lineHeight: 60,
+  },
+  titleRed: {
+    fontSize: 56,
+    fontWeight: '900',
+    color: '#E50914',
+    letterSpacing: -1,
+    lineHeight: 60,
+  },
+  profilesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 20,
+    width: '100%',
+    marginBottom: 80,
+  },
+  addProfileWrapper: {
+    alignItems: 'center',
+    width: 140,
+    marginHorizontal: 10,
+  },
+  addProfileCard: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  addAvatarContainer: {
+    width: 140,
+    height: 140,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderStyle: 'dashed',
+    position: 'relative',
+  },
+  addAvatarContainerHover: {
+    borderColor: '#E50914',
+  },
+  addProfileText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  addProfileTextHover: {
+    color: '#fff',
+  },
+  hoverCornerTopRight: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    backgroundColor: '#E50914',
+  },
+  pagination: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dot: {
+    width: 12,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  dotActive: {
+    backgroundColor: '#E50914',
+  },
 });
 
 export default ProfileSelectionScreen;

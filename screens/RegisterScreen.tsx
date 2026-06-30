@@ -18,6 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import AnimatedLeftPanel from '../components/AnimatedLeftPanel';
 import databaseService from '../services/databaseService';
 import { registerEmail, loginGoogle as loginGoogleProxy, signInWithGoogleAndroid, getUserDetails } from '../services/auth';
 import * as GoogleAuth from 'expo-auth-session/providers/google';
@@ -529,64 +530,8 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   if (Platform.OS === 'web') {
     return (
       <View style={webStyles.container}>
-        {/* ═══ LEFT PANEL — Dark branding ═══ */}
-        <View style={webStyles.leftPanel}>
-          {/* Particles */}
-          <View style={[webStyles.particle, webStyles.pSm, { top: 58, left: 44 }]} />
-          <View style={[webStyles.particle, webStyles.pMd, { top: 94, left: 198 }]} />
-          <View style={[webStyles.particleOut, webStyles.pSm, { top: 48, left: 268 }]} />
-          <View style={[webStyles.particle, webStyles.pSm, { top: 76, left: 370 }]} />
-          <View style={[webStyles.particleOut, webStyles.pMd, { top: 136, left: '30%' }]} />
-          <View style={[webStyles.particle, webStyles.pSm, { top: 107, left: '55%' }]} />
-          <View style={[webStyles.particleOut, webStyles.pSm, { top: 52, left: '62%' }]} />
-          <View style={[webStyles.particle, webStyles.pMd, { top: 164, left: '70%' }]} />
-          <View style={[webStyles.particleOut, webStyles.pSm, { top: 247, left: '48%' }]} />
-          <View style={[webStyles.particle, webStyles.pSm, { top: 298, left: '14%' }]} />
-          <View style={[webStyles.particleOut, webStyles.pMd, { top: 346, left: '58%' }]} />
-          <View style={[webStyles.particle, webStyles.pSm, { bottom: 245, left: '68%' }]} />
-          <View style={[webStyles.particleOut, webStyles.pSm, { bottom: 196, left: '38%' }]} />
-
-          {/* Geometric accent bottom-right */}
-          <View style={webStyles.geomAccent1} />
-          <View style={webStyles.geomAccent2} />
-
-          {/* Logo top-left */}
-          <View style={webStyles.topLogo}>
-            <View style={webStyles.logoIconBox}>
-              <Ionicons name="play" size={11} color="#fff" />
-            </View>
-            <Text style={webStyles.logoText}>PIXEL NO SEKAI</Text>
-          </View>
-
-          {/* Branding bottom-left */}
-          <View style={webStyles.brandingBlock}>
-            <View style={webStyles.subtitleRow}>
-              <View style={webStyles.accentBar} />
-              <Text style={webStyles.subtitleText}>T U   M U N D O   D E   A N I M E</Text>
-            </View>
-            <Text style={webStyles.heroWhite}>PIXEL</Text>
-            <Text style={webStyles.heroRed}>NO</Text>
-            <Text style={webStyles.heroWhite}>SEKAI</Text>
-            <View style={webStyles.statsRow}>
-              {[
-                { icon: 'film-outline', val: '10K+', label: 'Títulos' },
-                { icon: 'star-outline', val: '4.9', label: 'Rating' },
-                { icon: 'sparkles-outline', val: 'HD', label: 'Calidad' },
-              ].map((s, i) => (
-                <React.Fragment key={s.label}>
-                  {i > 0 && <View style={webStyles.statDivider} />}
-                  <View style={webStyles.statItem}>
-                    <View style={webStyles.statIcon}>
-                      <Ionicons name={s.icon as any} size={13} color="#E50914" />
-                    </View>
-                    <Text style={webStyles.statVal}>{s.val}</Text>
-                    <Text style={webStyles.statLabel}>{s.label}</Text>
-                  </View>
-                </React.Fragment>
-              ))}
-            </View>
-          </View>
-        </View>
+        {/* ═══ LEFT PANEL — Animated 3D background ═══ */}
+        <AnimatedLeftPanel />
 
         {/* Diagonal Background (White wedge + Red line) */}
         <View style={webStyles.diagonalBackground} />

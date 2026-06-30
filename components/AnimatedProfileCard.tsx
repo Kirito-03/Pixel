@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react';
-import { TouchableOpacity, Text, Image, View, StyleSheet } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
+import React, { useEffect, useState } from 'react';
+import { Pressable, Text, Image, View, StyleSheet, Animated } from 'react-native';
 
 interface Profile {
   id: number;
@@ -23,34 +22,58 @@ export const AnimatedProfileCard: React.FC<AnimatedProfileCardProps> = ({
   onLongPress,
   getCorrectedAvatarUrl,
 }) => {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(20);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-      transform: [{ translateY: translateY.value }],
-    };
-  });
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(20)).current;
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    opacity.value = withDelay(index * 100, withTiming(1, { duration: 500 }));
-    translateY.value = withDelay(index * 100, withTiming(0, { duration: 500 }));
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 500,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 500,
+        delay: index * 100,
+        useNativeDriver: true,
+      })
+    ]).start();
   }, []);
 
   return (
-    <Animated.View style={[styles.profileCard, animatedStyle]}>
-      <TouchableOpacity onPress={onPress} onLongPress={onLongPress}>
-        <View style={[styles.avatarContainer, { backgroundColor: '#333' }]}>
-          {profile.avatar_url && (
+    <Animated.View style={[styles.profileCard, { opacity, transform: [{ translateY }] }]}>
+      <Pressable 
+        onPress={onPress} 
+        onLongPress={onLongPress}
+        // @ts-ignore - React Native Web hover support
+        onHoverIn={() => setIsHovered(true)}
+        onHoverOut={() => setIsHovered(false)}
+        style={styles.pressableArea}
+      >
+        <View style={[styles.avatarContainer, isHovered && styles.avatarContainerHover]}>
+          {profile.avatar_url ? (
             <Image
               source={{ uri: getCorrectedAvatarUrl(profile.avatar_url) || '' }}
-              style={{ width: 80, height: 80, borderRadius: 40 }}
+              style={styles.avatarImage}
             />
+          ) : (
+            <View style={styles.defaultAvatarPlaceholder}>
+              <Text style={styles.defaultAvatarText}>{profile.name.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
+
+          {isHovered && (
+            <>
+              <View style={styles.hoverCornerTopRight} />
+              <View style={styles.hoverCornerBottomLeft} />
+            </>
           )}
         </View>
-        <Text style={styles.profileName}>{profile.name}</Text>
-      </TouchableOpacity>
+        <Text style={[styles.profileName, isHovered && styles.profileNameHover]}>{profile.name}</Text>
+      </Pressable>
     </Animated.View>
   );
 };
@@ -58,20 +81,69 @@ export const AnimatedProfileCard: React.FC<AnimatedProfileCardProps> = ({
 const styles = StyleSheet.create({
   profileCard: {
     alignItems: 'center',
-    width: 120,
+    width: 140,
+    marginHorizontal: 10,
+  },
+  pressableArea: {
+    alignItems: 'center',
+    width: '100%',
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 140,
+    height: 140,
+    borderRadius: 8,
+    backgroundColor: '#1b1b24',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    position: 'relative',
+  },
+  avatarContainerHover: {
+    borderColor: '#E50914',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  defaultAvatarPlaceholder: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#2A2A38',
+  },
+  defaultAvatarText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 50,
+    fontWeight: '900',
+  },
+  hoverCornerTopRight: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    backgroundColor: '#E50914',
+  },
+  hoverCornerBottomLeft: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    width: 24,
+    height: 24,
+    backgroundColor: '#E50914',
   },
   profileName: {
-    color: '#fff',
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 16,
+    fontWeight: '700',
     textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  profileNameHover: {
+    color: '#fff',
   },
 });
