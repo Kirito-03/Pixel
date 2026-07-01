@@ -36,9 +36,9 @@ export default function AdminImportScreen() {
   const [validateMode, setValidateMode] = useState<ValidateMode>('mixed')
   const [enableTranscode, setEnableTranscode] = useState(true)
   const [allowNoEpisode, setAllowNoEpisode] = useState(false)
-
-  const [isRunning, setIsRunning] = useState(false)
+  const [runningAction, setRunningAction] = useState<'analyze' | 'import' | 'upload_text' | 'upload_file' | null>(null)
   const [result, setResult] = useState<any>(null)
+  const [selectedAnimes, setSelectedAnimes] = useState<Set<string>>(new Set())
   const [jobsSummary, setJobsSummary] = useState<any>(null)
   const [jobs, setJobs] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +55,7 @@ export default function AdminImportScreen() {
       maxItems: mi,
       maxTranscodes: mt,
       allowNoEpisode,
+      useDefaultM3u,
     }
   }, [allowNoEpisode, folders, m3uSources, maxItems, maxTranscodes, useDefaultM3u, validateMode])
 
@@ -91,25 +92,34 @@ export default function AdminImportScreen() {
 
   const run = async (dryRun: boolean) => {
     setError(null)
-    setIsRunning(true)
+    setRunningAction(dryRun ? 'analyze' : 'import')
     try {
-      const r = await adminApiService.importAnime({
+      const payload = {
         ...payloadBase,
         dryRun,
         transcode: !dryRun && enableTranscode,
-      })
+      } as any
+      
+      if (!dryRun && result?.topAnime) {
+        payload.selectedTitles = Array.from(selectedAnimes)
+      }
+
+      const r = await adminApiService.importAnime(payload)
       setResult(r)
+      if (dryRun && r.topAnime) {
+        setSelectedAnimes(new Set(r.topAnime.map((a: any) => a.title)))
+      }
       await refreshJobs()
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Error')
     } finally {
-      setIsRunning(false)
+      setRunningAction(null)
     }
   }
 
   const uploadM3uText = async () => {
     setError(null)
-    setIsRunning(true)
+    setRunningAction('upload_text')
     try {
       const r = await adminApiService.uploadM3uText({ content: m3uText, name: 'playlist.m3u' })
       const current = useDefaultM3u ? [] : linesToArray(m3uSources)
@@ -120,7 +130,7 @@ export default function AdminImportScreen() {
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Error subiendo M3U')
     } finally {
-      setIsRunning(false)
+      setRunningAction(null)
     }
   }
 
@@ -148,7 +158,7 @@ export default function AdminImportScreen() {
         throw new Error('Archivo no permitido. Usa .m3u o .m3u8.')
       }
 
-      setIsRunning(true)
+      setRunningAction('upload_file')
       const r = await adminApiService.uploadM3uFile(file)
       const current = useDefaultM3u ? [] : linesToArray(m3uSources)
       current.push(r.url)
@@ -157,7 +167,23 @@ export default function AdminImportScreen() {
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Error subiendo archivo M3U')
     } finally {
-      setIsRunning(false)
+      setRunningAction(null)
+    }
+  }
+
+  const toggleAnime = (title: string) => {
+    const next = new Set(selectedAnimes)
+    if (next.has(title)) next.delete(title)
+    else next.add(title)
+    setSelectedAnimes(next)
+  }
+
+  const toggleAllAnimes = () => {
+    if (!result?.topAnime) return
+    if (selectedAnimes.size === result.topAnime.length) {
+      setSelectedAnimes(new Set())
+    } else {
+      setSelectedAnimes(new Set(result.topAnime.map((a: any) => a.title)))
     }
   }
 
@@ -219,18 +245,18 @@ export default function AdminImportScreen() {
             <TouchableOpacity
               style={[styles.btnInline, !m3uText.trim() && styles.btnInlineDisabled]}
               onPress={uploadM3uText}
-              disabled={!m3uText.trim() || isRunning}
+              disabled={!m3uText.trim() || !!runningAction}
               activeOpacity={0.92}
             >
-              <Text style={styles.btnInlineText}>Subir M3U</Text>
+              {runningAction === 'upload_text' ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.btnInlineText}>Subir M3U</Text>}
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.btnInlineSecondary, isRunning && styles.btnInlineDisabled]}
+              style={[styles.btnInlineSecondary, !!runningAction && styles.btnInlineDisabled]}
               onPress={pickAndUploadM3uFile}
-              disabled={isRunning}
+              disabled={!!runningAction}
               activeOpacity={0.92}
             >
-              <Text style={styles.btnInlineSecondaryText}>Buscar archivo .m3u</Text>
+              {runningAction === 'upload_file' ? <ActivityIndicator size="small" color={adminColors.text} /> : <Text style={styles.btnInlineSecondaryText}>Buscar archivo .m3u</Text>}
             </TouchableOpacity>
 
             <Text style={styles.label}>Carpetas (una por línea)</Text>
@@ -286,11 +312,11 @@ export default function AdminImportScreen() {
             {!!error && <Text style={styles.errorText}>{error}</Text>}
 
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={() => run(true)} disabled={isRunning} activeOpacity={0.92}>
-                {isRunning ? <ActivityIndicator color={adminColors.text} /> : <Text style={styles.btnSecondaryText}>Analizar</Text>}
+              <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={() => run(true)} disabled={!!runningAction} activeOpacity={0.92}>
+                {runningAction === 'analyze' ? <ActivityIndicator color={adminColors.text} /> : <Text style={styles.btnSecondaryText}>Analizar</Text>}
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={() => run(false)} disabled={isRunning} activeOpacity={0.92}>
-                {isRunning ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>Importar</Text>}
+              <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={() => run(false)} disabled={!!runningAction} activeOpacity={0.92}>
+                {runningAction === 'import' ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>Importar</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -308,15 +334,37 @@ export default function AdminImportScreen() {
                   <StatPill label="Eps" value={result.importedEpisodes} />
                   <StatPill label="Enqueue" value={result.transcoded} />
                 </View>
-                <Text style={styles.sectionTitle}>Top</Text>
-                {(result.topAnime || []).slice(0, 10).map((it: any) => (
-                  <View key={it.title} style={styles.itemRow}>
-                    <Text style={styles.itemTitle} numberOfLines={1}>{it.title}</Text>
-                    <Text style={styles.itemCount}>{it.count}</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
+                      Titulos detectados ({selectedAnimes.size}/{result.topAnime?.length || 0})
+                    </Text>
+                    <TouchableOpacity onPress={toggleAllAnimes}>
+                      <Text style={{ color: adminColors.primary, fontSize: 13, fontWeight: 'bold' }}>
+                        {selectedAnimes.size === result.topAnime?.length ? 'Desmarcar todos' : 'Marcar todos'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                ))}
-              </>
-            )}
+                  <View style={{ maxHeight: 300 }}>
+                    <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingRight: 8 }}>
+                      {(result.topAnime || []).map((it: any) => {
+                        const isSelected = selectedAnimes.has(it.title)
+                        return (
+                          <TouchableOpacity 
+                            key={it.title} 
+                            style={[styles.itemRow, { opacity: isSelected ? 1 : 0.5 }]}
+                            onPress={() => toggleAnime(it.title)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.toggleDot, isSelected && styles.toggleDotOn, { marginRight: 10 }]} />
+                            <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{it.title}</Text>
+                            <Text style={styles.itemCount}>{it.count}</Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </ScrollView>
+                  </View>
+                </>
+              )}
           </View>
 
           <View style={styles.card}>

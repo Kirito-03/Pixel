@@ -65,23 +65,31 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
 
     const checkAdminStatus = async (): Promise<boolean> => {
         try {
+            console.log('[AdminContext] checkAdminStatus starting');
             setIsLoading(true);
 
             // 1. Check if we have a firebase user and sync with backend
             const currentUser = firebaseAuth.currentUser;
+            console.log('[AdminContext] currentUser exists:', !!currentUser);
             if (currentUser) {
                 const currentEmail = currentUser.email as string | undefined;
+                console.log('[AdminContext] currentEmail:', currentEmail);
                 if (!isAllowedAdminEmail(currentEmail)) {
+                    console.log('[AdminContext] Email is not allowed admin');
                     setIsAdmin(false);
                     setAdminUser(null);
                     return false;
                 }
 
                 // Obtener ID Token de Firebase
+                console.log('[AdminContext] Getting Firebase ID Token...');
                 const idToken = await currentUser.getIdToken(true); // force refresh
+                console.log('[AdminContext] Got ID Token');
 
                 // Intentar login silencioso con backend
+                console.log('[AdminContext] Calling adminAuthService.loginWithFirebaseToken...');
                 const result = await adminAuthService.loginWithFirebaseToken(idToken);
+                console.log('[AdminContext] Result from backend:', result);
 
                 if (result.success && result.token && result.user) {
                     if (!isAllowedAdminEmail(result.user.email) && result.user.role !== 'admin') {
@@ -99,7 +107,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
 
             // 2. Fallback to stored token (if user not logged in via firebase but has token?)
             // Esto es raro si queremos single login, pero mantenemos por si acaso.
+            console.log('[AdminContext] Fallback to stored token...');
             const token = await AsyncStorage.getItem('admin_token');
+            console.log('[AdminContext] Stored token exists:', !!token);
             if (!token) {
                 setIsAdmin(false);
                 setAdminUser(null);
@@ -107,7 +117,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
             }
 
             // Verify token with backend
+            console.log('[AdminContext] Verifying stored token with backend...');
             const user = await adminAuthService.verifyToken(token);
+            console.log('[AdminContext] Verified user:', !!user);
 
             if (user && isAllowedAdminEmail(user.email)) {
                 setIsAdmin(true);

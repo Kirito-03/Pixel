@@ -29,6 +29,7 @@ import * as GoogleAuth from 'expo-auth-session/providers/google';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import AnimatedLeftPanel from '../components/AnimatedLeftPanel';
+import Loader from '../components/Loader';
 
 export default function LoginScreen({ navigation }: any) {
   const { login } = useAuth();
@@ -117,6 +118,15 @@ export default function LoginScreen({ navigation }: any) {
   if (Platform.OS === 'web') {
     return (
       <View style={webStyles.container}>
+        {/* Full-screen Loader Overlay */}
+        {(emailLoading || googleLoading) && (
+          <View style={StyleSheet.absoluteFillObject}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+              <Loader />
+            </View>
+          </View>
+        )}
+
         {/* ═══ DIAGONAL RED DIVIDER — absolute over both panels ═══ */}
         <View style={webStyles.diagonalDivider} />
 
@@ -233,7 +243,7 @@ export default function LoginScreen({ navigation }: any) {
               ) : (
                 <>
                   <Image
-                    source={{ uri: 'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg' }}
+                    source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
                     style={{ width: 18, height: 18 }}
                     resizeMode="contain"
                   />
@@ -312,185 +322,225 @@ export default function LoginScreen({ navigation }: any) {
   // ─────────────────────────────────────────────────────────────────────────
   // MOBILE — Original Netflix-style centered layout
   // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // MOBILE — Custom Angled Layout
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <View style={mobileStyles.container}>
-      <ImageBackground
-        source={require('../assets/fondo login.jpg')}
-        style={mobileStyles.backgroundImage}
-        blurRadius={2}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={mobileStyles.container}
+    >
+      {/* Full-screen Loader Overlay */}
+      {(emailLoading || googleLoading) && (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }]}>
+          <Loader />
+        </View>
+      )}
+
+      <ScrollView
+        contentContainerStyle={mobileStyles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
       >
-        <LinearGradient
-          colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)']}
-          style={mobileStyles.gradient}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={mobileStyles.keyboardView}
-          >
-            <ScrollView
-              contentContainerStyle={mobileStyles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={mobileStyles.logoContainer}>
-                <Text style={mobileStyles.logo}>Pixel No Sekai</Text>
-              </View>
-
-              <View style={mobileStyles.formContainer}>
-                <Text style={mobileStyles.title}>Iniciar sesión</Text>
-
-                <View style={mobileStyles.inputContainer}>
-                  <TextInput
-                    style={mobileStyles.input}
-                    placeholder="Email o número de celular"
-                    placeholderTextColor="#8c8c8c"
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                </View>
-
-                <View style={mobileStyles.inputContainer}>
-                  <TextInput
-                    style={mobileStyles.input}
-                    placeholder="Contraseña"
-                    placeholderTextColor="#8c8c8c"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    style={mobileStyles.eyeIcon}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#8c8c8c" />
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={[mobileStyles.loginButton, emailLoading && { opacity: 0.6 }]}
-                  onPress={handleLogin}
-                  disabled={emailLoading}
-                >
-                  {emailLoading
-                    ? <ActivityIndicator color="#FFFFFF" />
-                    : <Text style={mobileStyles.loginButtonText}>Iniciar sesión</Text>}
-                </TouchableOpacity>
-
-                <View style={mobileStyles.separatorContainer}>
-                  <View style={mobileStyles.separator} />
-                  <Text style={mobileStyles.separatorText}>O</Text>
-                  <View style={mobileStyles.separator} />
-                </View>
-
-                <TouchableOpacity
-                  style={[mobileStyles.googleButton, googleLoading && { opacity: 0.6 }]}
-                  onPress={handleLoginGoogle}
-                  disabled={googleLoading}
-                >
-                  {googleLoading ? (
-                    <ActivityIndicator color="#000000" />
-                  ) : (
-                    <>
-                      <Ionicons name="logo-google" size={20} color="#000" style={{ marginRight: 8 }} />
-                      <Text style={mobileStyles.googleButtonText}>Iniciar sesión con Google</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={mobileStyles.forgotPassword}
-                  onPress={() => { setForgotEmail(email); setForgotVisible(true); }}
-                >
-                  <Text style={mobileStyles.forgotPasswordText}>¿Olvidaste la contraseña?</Text>
-                </TouchableOpacity>
-
-                <View style={mobileStyles.rememberContainer}>
-                  <TouchableOpacity
-                    style={mobileStyles.checkbox}
-                    onPress={() => setRememberMe(!rememberMe)}
-                  >
-                    <View style={[mobileStyles.checkboxBox, rememberMe && mobileStyles.checkboxBoxChecked]}>
-                      {rememberMe && <Ionicons name="checkmark" size={16} color="#000" />}
-                    </View>
-                    <Text style={mobileStyles.rememberText}>Recordarme</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={mobileStyles.signupContainer}>
-                  <Text style={mobileStyles.signupText}>¿Primera vez en Pixel No Sekai?</Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
-                    <Text style={mobileStyles.signupLink}>Regístrate aquí.</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-
-          {/* Modal: Recuperar contraseña */}
-          <Modal
-            visible={forgotVisible}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setForgotVisible(false)}
-          >
-            <View style={mobileStyles.modalOverlay}>
-              <View style={mobileStyles.modalContent}>
-                <Text style={mobileStyles.modalTitle}>Recuperar contraseña</Text>
-                <Text style={mobileStyles.modalDesc}>
-                  Ingresa tu correo asociado a la cuenta. Te enviaremos un enlace para restablecer tu contraseña.
-                </Text>
-                <TextInput
-                  style={mobileStyles.modalInput}
-                  placeholder="Tu correo"
-                  placeholderTextColor="#8c8c8c"
-                  value={forgotEmail}
-                  onChangeText={setForgotEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <View style={mobileStyles.modalActions}>
-                  <TouchableOpacity
-                    style={[mobileStyles.modalButton, mobileStyles.modalButtonSecondary]}
-                    onPress={() => setForgotVisible(false)}
-                    disabled={forgotLoading}
-                  >
-                    <Text style={mobileStyles.modalButtonText}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[mobileStyles.modalButton, forgotLoading && { opacity: 0.7 }]}
-                    onPress={async () => {
-                      const emailToUse = (forgotEmail || email).trim().toLowerCase();
-                      if (!emailToUse) { Alert.alert('Email requerido', 'Ingresa tu correo para continuar.'); return; }
-                      setForgotLoading(true);
-                      try {
-                        await requestPasswordReset(emailToUse);
-                        Alert.alert('Correo enviado', 'Revisa tu bandeja de entrada y sigue el enlace para restablecer tu contraseña.');
-                        setEmail(emailToUse);
-                        setForgotVisible(false);
-                      } catch (error: any) {
-                        const code = error?.code || '';
-                        if (code === 'auth/user-not-found') Alert.alert('Cuenta no encontrada', 'No existe un usuario con ese correo.');
-                        else if (code === 'auth/invalid-email') Alert.alert('Email inválido', 'Revisa el formato de tu correo.');
-                        else if (code === 'auth/network-request-failed') Alert.alert('Error de conexión', 'No se pudo conectar. Verifica tu red.');
-                        else Alert.alert('Error', error?.message || 'No se pudo enviar el correo de recuperación.');
-                      } finally { setForgotLoading(false); }
-                    }}
-                    disabled={forgotLoading}
-                  >
-                    {forgotLoading
-                      ? <ActivityIndicator color="#FFFFFF" />
-                      : <Text style={mobileStyles.modalButtonText}>Enviar enlace</Text>}
-                  </TouchableOpacity>
-                </View>
-              </View>
+        {/* ═══ TOP HERO SECTION (Black) ═══ */}
+        <View style={mobileStyles.topHero}>
+          {/* Animated Background */}
+          <View style={StyleSheet.absoluteFillObject}>
+             <AnimatedLeftPanel fullScreenMode={true} />
+          </View>
+          
+          {/* Top Logo */}
+          <View style={mobileStyles.topLogo}>
+            <View style={mobileStyles.logoIconBox}>
+              <Ionicons name="play" size={14} color="#fff" />
             </View>
-          </Modal>
-        </LinearGradient>
-      </ImageBackground>
-    </View>
+            <Text style={mobileStyles.logoText}>PIXEL NO SEKAI</Text>
+          </View>
+          
+          {/* Branding */}
+          <View style={mobileStyles.brandingBlock}>
+            <View style={mobileStyles.subtitleRow}>
+              <View style={mobileStyles.accentBar} />
+              <Text style={mobileStyles.subtitleText}>TU MUNDO DE ANIME</Text>
+            </View>
+            <Text style={mobileStyles.heroWhite}>PIXEL</Text>
+            <Text style={mobileStyles.heroRed}>NO</Text>
+            <Text style={mobileStyles.heroWhite}>SEKAI</Text>
+          </View>
+
+          {/* Stats on the right side */}
+          <View style={mobileStyles.statsContainer}>
+            <View style={mobileStyles.statRowBox}>
+               <View style={mobileStyles.statIcon}><Ionicons name="play" size={10} color="#E50914"/></View>
+               <Text style={mobileStyles.statVal}>10K+</Text>
+            </View>
+            <View style={mobileStyles.statRowBox}>
+               <View style={mobileStyles.statIcon}><Ionicons name="star" size={10} color="#E50914"/></View>
+               <Text style={mobileStyles.statVal}>4.9</Text>
+            </View>
+            <View style={mobileStyles.statRowBox}>
+               <View style={mobileStyles.statIcon}><Ionicons name="flash" size={10} color="#E50914"/></View>
+               <Text style={mobileStyles.statVal}>HD</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ═══ BOTTOM FORM SECTION (White) ═══ */}
+        <View style={mobileStyles.bottomFormContainer}>
+          {/* Diagonal cut */}
+          <View style={mobileStyles.diagonalCut} />
+          <View style={mobileStyles.decorSquareOuter}>
+            <View style={mobileStyles.decorSquareInner} />
+          </View>
+
+          <View style={mobileStyles.formContent}>
+            {/* ACCEDER badge */}
+            <View style={mobileStyles.badge}>
+              <Text style={mobileStyles.badgeText}>ACCEDER</Text>
+            </View>
+            
+            <View style={mobileStyles.titleRow}>
+              <Text style={mobileStyles.titleBlack}>Iniciar</Text>
+            </View>
+            <Text style={mobileStyles.titleRed}>sesión</Text>
+            <Text style={mobileStyles.subtitle}>Ingresa tus credenciales para continuar</Text>
+            
+            {/* Email */}
+            <Text style={mobileStyles.fieldLabel}>EMAIL</Text>
+            <TextInput 
+              style={[mobileStyles.input, focusedInput === 'email' && mobileStyles.inputFocused]} 
+              placeholder="tu@email.com" 
+              placeholderTextColor="#bbb" 
+              value={email} 
+              onChangeText={setEmail} 
+              autoCapitalize="none" 
+              keyboardType="email-address" 
+              onFocus={() => setFocusedInput('email')}
+              onBlur={() => setFocusedInput(null)}
+            />
+            
+            {/* Password */}
+            <Text style={mobileStyles.fieldLabel}>CONTRASEÑA</Text>
+            <View style={mobileStyles.inputWrap}>
+              <TextInput 
+                style={[mobileStyles.input, focusedInput === 'password' && mobileStyles.inputFocused]} 
+                placeholder="••••••••" 
+                placeholderTextColor="#bbb" 
+                value={password} 
+                onChangeText={setPassword} 
+                secureTextEntry={!showPassword} 
+                autoCapitalize="none" 
+                onFocus={() => setFocusedInput('password')}
+                onBlur={() => setFocusedInput(null)}
+              />
+              <TouchableOpacity style={mobileStyles.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#bbb" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Remember Me & Forgot Password */}
+            <View style={mobileStyles.rememberRow}>
+              <TouchableOpacity style={mobileStyles.checkRow} onPress={() => setRememberMe(!rememberMe)}>
+                <View style={[mobileStyles.chk, rememberMe && mobileStyles.chkOn]}>
+                  {rememberMe && <Ionicons name="checkmark" size={12} color="#fff" />}
+                </View>
+                <Text style={mobileStyles.rememberTxt}>Recuérdame</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setForgotEmail(email); setForgotVisible(true); }}>
+                <Text style={mobileStyles.forgotTxt}>¿Olvidaste tu contraseña?</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Login Button */}
+            <TouchableOpacity 
+              style={[mobileStyles.primaryBtn, emailLoading && { opacity: 0.7 }]} 
+              onPress={handleLogin} 
+              disabled={emailLoading}
+            >
+              {emailLoading ? <ActivityIndicator color="#fff" /> : <Text style={mobileStyles.primaryBtnTxt}>ENTRAR</Text>}
+            </TouchableOpacity>
+
+            {/* Separator */}
+            <View style={mobileStyles.separatorRow}>
+              <View style={mobileStyles.separatorLine} />
+              <View style={mobileStyles.separatorDot} />
+              <View style={mobileStyles.separatorLine} />
+            </View>
+
+            {/* Google Button */}
+            <TouchableOpacity 
+              style={[mobileStyles.googleBtn, googleLoading && { opacity: 0.7 }]} 
+              onPress={handleLoginGoogle} 
+              disabled={googleLoading}
+            >
+              {googleLoading ? <ActivityIndicator color="#000" /> : (
+                <>
+                  <Image source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }} style={{ width: 18, height: 18 }} />
+                  <Text style={mobileStyles.googleBtnTxt}>INICIAR CON GOOGLE</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Registration Link */}
+            <View style={mobileStyles.bottomRow}>
+              <Text style={mobileStyles.bottomTxt}>¿Nuevo en Pixel No Sekai? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
+                <Text style={mobileStyles.bottomLink}>Regístrate aquí</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* ═══ MODAL: Forgot password ═══ */}
+      <Modal visible={forgotVisible} transparent animationType="fade" onRequestClose={() => setForgotVisible(false)}>
+        <View style={mobileStyles.modalOverlay}>
+          <View style={mobileStyles.modalBox}>
+            <Text style={mobileStyles.modalTitle}>Recuperar contraseña</Text>
+            <Text style={mobileStyles.modalDesc}>
+              Ingresa tu correo. Te enviaremos un enlace para restablecer tu contraseña.
+            </Text>
+            <TextInput
+              style={mobileStyles.modalInput}
+              placeholder="Tu correo"
+              placeholderTextColor="#999"
+              value={forgotEmail}
+              onChangeText={setForgotEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <View style={mobileStyles.modalActions}>
+              <TouchableOpacity style={mobileStyles.modalBtnSec} onPress={() => setForgotVisible(false)} disabled={forgotLoading}>
+                <Text style={mobileStyles.modalBtnSecTxt}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[mobileStyles.modalBtnPri, forgotLoading && { opacity: 0.7 }]}
+                disabled={forgotLoading}
+                onPress={async () => {
+                  const emailToUse = (forgotEmail || email).trim().toLowerCase();
+                  if (!emailToUse) { Alert.alert('Email requerido'); return; }
+                  setForgotLoading(true);
+                  try {
+                    await requestPasswordReset(emailToUse);
+                    Alert.alert('Correo enviado', 'Revisa tu bandeja de entrada.');
+                    setEmail(emailToUse);
+                    setForgotVisible(false);
+                  } catch (error: any) {
+                    const code = error?.code || '';
+                    if (code === 'auth/user-not-found') Alert.alert('Cuenta no encontrada');
+                    else if (code === 'auth/invalid-email') Alert.alert('Email inválido');
+                    else Alert.alert('Error', error?.message || 'No se pudo enviar el correo.');
+                  } finally { setForgotLoading(false); }
+                }}
+              >
+                {forgotLoading ? <ActivityIndicator color="#fff" /> : <Text style={mobileStyles.modalBtnPriTxt}>Enviar enlace</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -622,111 +672,105 @@ const webStyles = StyleSheet.create({
 // MOBILE STYLES — Original Netflix-style
 // ═══════════════════════════════════════════════════════════════════════════
 const mobileStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
-  backgroundImage: { flex: 1, width: '100%', height: '100%' },
-  gradient: { flex: 1 },
-  keyboardView: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: 40 },
-  logoContainer: { alignItems: 'center', marginBottom: 50, marginTop: 0 },
-  logo: { fontSize: 40, fontWeight: 'bold', color: '#E50914', letterSpacing: 2 },
-  formContainer: {
-    width: '90%',
-    maxWidth: 450,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 4,
-    padding: 60,
-  },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 28 },
-  inputContainer: { position: 'relative', marginBottom: 16 },
-  input: {
-    backgroundColor: '#333333',
-    borderRadius: 4,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  eyeIcon: { position: 'absolute', right: 16, top: 16 },
-  loginButton: {
-    backgroundColor: '#E50914',
-    borderRadius: 4,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  loginButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  separatorContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  separator: { flex: 1, height: 1, backgroundColor: '#333333' },
-  separatorText: { color: '#8c8c8c', paddingHorizontal: 16, fontSize: 14 },
-  googleButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 4,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  googleButtonText: { color: '#000000', fontSize: 14, fontWeight: 'bold' },
-  forgotPassword: { alignItems: 'center', marginTop: 8, marginBottom: 16 },
-  forgotPasswordText: { color: '#b3b3b3', fontSize: 13 },
-  rememberContainer: { marginBottom: 16 },
-  checkbox: { flexDirection: 'row', alignItems: 'center' },
-  checkboxBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: '#8c8c8c',
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxBoxChecked: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
-  rememberText: { color: '#b3b3b3', fontSize: 13 },
-  signupContainer: { flexDirection: 'row', marginTop: 16, flexWrap: 'wrap' },
-  signupText: { color: '#8c8c8c', fontSize: 16, marginRight: 6 },
-  signupLink: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalContent: {
+  container: { flex: 1, backgroundColor: '#000' },
+  scrollContent: { flexGrow: 1, minHeight: '100%' },
+  
+  // ── TOP HERO (Black) ──
+  topHero: {
+    height: 320,
     width: '100%',
-    maxWidth: 480,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    borderRadius: 6,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#333',
+    backgroundColor: '#0a0a0a',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-  modalDesc: { color: '#b3b3b3', fontSize: 14, marginBottom: 16 },
-  modalInput: {
-    backgroundColor: '#333333',
-    borderRadius: 4,
-    padding: 12,
-    fontSize: 16,
-    color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#333333',
-    marginBottom: 12,
+  topLogo: { position: 'absolute', top: 40, left: 24, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 5 },
+  logoIconBox: { width: 24, height: 24, backgroundColor: '#E50914', justifyContent: 'center', alignItems: 'center' },
+  logoText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 1.5 },
+  
+  brandingBlock: { position: 'absolute', bottom: 50, left: 24, zIndex: 5 },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  accentBar: { width: 3, height: 14, backgroundColor: '#E50914' },
+  subtitleText: { color: '#E50914', fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  heroWhite: { color: '#fff', fontSize: 44, fontWeight: '900', letterSpacing: -1, lineHeight: 44 },
+  heroRed: { color: '#E50914', fontSize: 44, fontWeight: '900', letterSpacing: -1, lineHeight: 44 },
+  
+  statsContainer: { position: 'absolute', bottom: 60, right: 24, zIndex: 5, gap: 10 },
+  statRowBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8 },
+  statIcon: { width: 22, height: 22, borderWidth: 1, borderColor: 'rgba(229,9,20,0.4)', justifyContent: 'center', alignItems: 'center' },
+  statVal: { color: '#fff', fontSize: 12, fontWeight: '800' },
+
+  // ── BOTTOM FORM (White) ──
+  bottomFormContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    marginTop: 20, // Negative overlap handled by diagonal cut
+    position: 'relative',
   },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
-  modalButton: {
-    backgroundColor: '#E50914',
-    borderRadius: 4,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
+  diagonalCut: {
+    position: 'absolute',
+    top: -24,
+    left: -10,
+    right: -10,
+    height: 60,
+    backgroundColor: '#fff',
+    borderTopWidth: 4,
+    borderTopColor: '#E50914',
+    transform: [{ rotate: '-4deg' }],
+    zIndex: 1,
   },
-  modalButtonSecondary: { backgroundColor: '#333333' },
-  modalButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' },
+  decorSquareOuter: { position: 'absolute', top: 16, right: 0, width: 80, height: 80, backgroundColor: 'rgba(229, 9, 20, 0.05)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
+  decorSquareInner: { width: 40, height: 40, borderWidth: 2, borderColor: 'rgba(229, 9, 20, 0.2)' },
+  
+  formContent: {
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingTop: 40,
+    paddingBottom: 40,
+    zIndex: 10,
+  },
+  badge: { alignSelf: 'flex-start', backgroundColor: '#000', paddingHorizontal: 10, paddingVertical: 4, marginBottom: 16 },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  titleRow: { flexDirection: 'row' },
+  titleBlack: { color: '#111', fontSize: 28, fontWeight: '900', lineHeight: 30 },
+  titleRed: { color: '#E50914', fontSize: 28, fontWeight: '900', lineHeight: 30, marginBottom: 6 },
+  subtitle: { color: '#777', fontSize: 13, marginBottom: 24 },
+  
+  fieldLabel: { color: '#111', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 6, marginTop: 4 },
+  input: { borderWidth: 1, borderColor: '#ddd', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111', marginBottom: 16, backgroundColor: '#fff' },
+  inputFocused: { borderColor: '#E50914' },
+  inputWrap: { position: 'relative' },
+  eyeBtn: { position: 'absolute', right: 14, top: 12 },
+  
+  rememberRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 4 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chk: { width: 16, height: 16, borderWidth: 1, borderColor: '#bbb', justifyContent: 'center', alignItems: 'center' },
+  chkOn: { backgroundColor: '#E50914', borderColor: '#E50914' },
+  rememberTxt: { color: '#666', fontSize: 13 },
+  forgotTxt: { color: '#E50914', fontSize: 12, fontWeight: '700' },
+  
+  primaryBtn: { backgroundColor: '#E50914', paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
+  primaryBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 1.5 },
+  
+  separatorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
+  separatorLine: { flex: 1, height: 1, backgroundColor: '#eee' },
+  separatorDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1, borderColor: '#ccc', backgroundColor: '#fff' },
+  
+  googleBtn: { borderWidth: 1, borderColor: '#000', paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 30 },
+  googleBtnTxt: { color: '#000', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  
+  bottomRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' },
+  bottomTxt: { color: '#888', fontSize: 13 },
+  bottomLink: { color: '#111', fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
+
+  // Modal (Same design as web, adapted for mobile sizing)
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalBox: { width: '100%', backgroundColor: '#fff', borderRadius: 8, padding: 24 },
+  modalTitle: { color: '#111', fontSize: 18, fontWeight: '800', marginBottom: 8 },
+  modalDesc: { color: '#666', fontSize: 13, marginBottom: 18, lineHeight: 18 },
+  modalInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 4, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#111', marginBottom: 18 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  modalBtnSec: { backgroundColor: '#eee', borderRadius: 4, paddingVertical: 10, paddingHorizontal: 16 },
+  modalBtnSecTxt: { color: '#333', fontSize: 13, fontWeight: '700' },
+  modalBtnPri: { backgroundColor: '#E50914', borderRadius: 4, paddingVertical: 10, paddingHorizontal: 16 },
+  modalBtnPriTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });

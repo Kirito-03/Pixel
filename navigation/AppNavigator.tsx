@@ -76,7 +76,10 @@ function HomeNavigator() {
 
 function AdminNavigator() {
   const content = (
-    <AdminStack.Navigator screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}>
+    <AdminStack.Navigator 
+      initialRouteName="AdminDashboard"
+      screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}
+    >
       <AdminStack.Screen name="AdminLogin" component={AdminLoginScreen as any} />
       <AdminStack.Screen name="AdminDashboard" component={AdminDashboardScreen as any} />
       <AdminStack.Screen name="AdminImport" component={AdminImportScreen as any} />
@@ -322,10 +325,10 @@ export default function AppNavigator() {
       }
 
       // Si hay usuario, verificar si hay perfil guardado
-      await loadCurrentProfile();
+      const loadedProfile = await loadCurrentProfile();
 
       // OPTIMIZACIÓN: Si ya tenemos usuario, no necesitamos un delay largo
-      if (currentProfile) {
+      if (loadedProfile) {
         // Si hay perfil guardado, ir directamente a Principal
         setInitialRoute('Principal');
       } else {

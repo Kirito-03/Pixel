@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Storage } from '../services/storage';
+import Loader from './Loader';
 
 const { width, height } = Dimensions.get('window');
 
@@ -471,6 +473,22 @@ const MobileLoadingAnimation: React.FC = () => {
 };
 
 export const LoadingScreen: React.FC = () => {
+    const hasSeenIntro = Storage.getString('hasSeenAppIntro');
+
+    useEffect(() => {
+        if (!hasSeenIntro) {
+            Storage.setString('hasSeenAppIntro', 'true');
+        }
+    }, [hasSeenIntro]);
+
+    if (hasSeenIntro) {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+                <Loader />
+            </View>
+        );
+    }
+
     return Platform.OS === 'web' ? <WebLoadingAnimation /> : <MobileLoadingAnimation />;
 };
 

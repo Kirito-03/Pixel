@@ -284,7 +284,16 @@ export default function EpisodeManagerScreen() {
         }
     };
 
-    const renderEpisodeItem = ({ item }: any) => (
+    const handleMarkAllReady = async () => {
+    try {
+        await adminApiService.markAllEpisodesReady(animeId);
+        await loadEpisodes();
+    } catch(e: any) {
+        Alert.alert('Error', e.message || 'Error');
+    }
+};
+
+const renderEpisodeItem = ({ item }: any) => (
         <Pressable
             style={({ hovered }: any) => [
                 styles.episodeCard,
@@ -497,6 +506,10 @@ export default function EpisodeManagerScreen() {
                         <Text style={[styles.optionChipText, cleanupLocalAfterProcess && styles.optionChipTextActive]}>
                             Borrar local
                         </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.optionChip} onPress={handleMarkAllReady}>
+                        <Ionicons name="checkmark-done-outline" size={14} color={adminColors.textSecondary} />
+                        <Text style={styles.optionChipText}>Listo a todos</Text>
                     </TouchableOpacity>
                 </View>
                 {!!deleteNotice && !showDeleteModal && (

@@ -286,7 +286,7 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         ) : (
           <>
             <Image
-              source={{ uri: 'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg' }}
+              source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
               style={{ width: 18, height: 18 }}
               resizeMode="contain"
             />
@@ -389,139 +389,171 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // MOBILE — Original Netflix-style Layout Renderers
+  // MOBILE — Custom Angled Layout Renderers
   // ─────────────────────────────────────────────────────────────────────────
-  const renderMobileStepIndicator = () => {
-    const steps = ['email', 'profile'];
-    const currentIndex = steps.indexOf(currentStep);
-    return (
-      <View style={mobileStyles.stepIndicator}>
-        {steps.map((step, index) => (
-          <View key={step} style={mobileStyles.stepContainer}>
-            <View style={[mobileStyles.stepCircle, index <= currentIndex && mobileStyles.stepCircleActive]}>
-              <Text style={[mobileStyles.stepNumber, index <= currentIndex && mobileStyles.stepNumberActive]}>
-                {index + 1}
-              </Text>
-            </View>
-            {index < steps.length - 1 && (
-              <View style={[mobileStyles.stepLine, index < currentIndex && mobileStyles.stepLineActive]} />
-            )}
-          </View>
-        ))}
-      </View>
-    );
-  };
-
   const renderMobileEmailStep = () => (
-    <View style={mobileStyles.stepContent}>
-      <Text style={mobileStyles.stepTitle}>Crea tu cuenta</Text>
-      <Text style={mobileStyles.stepSubtitle}>Ingresa tu email y una contraseña para empezar</Text>
-      <View style={mobileStyles.inputContainer}>
+    <View style={mobileStyles.formContent}>
+      <View style={mobileStyles.badge}>
+        <Text style={mobileStyles.badgeText}>REGISTRO</Text>
+      </View>
+      <View style={mobileStyles.titleRow}>
+        <Text style={mobileStyles.titleBlack}>Crea tu </Text>
+      </View>
+      <Text style={mobileStyles.titleRed}>cuenta</Text>
+      <Text style={mobileStyles.subtitle}>Ingresa tu email y contraseña para empezar</Text>
+
+      {/* Step Indicator */}
+      <View style={mobileStyles.stepRow}>
+        <View style={mobileStyles.stepCircleActive}><Text style={mobileStyles.stepNumActive}>1</Text></View>
+        <View style={mobileStyles.stepLine} />
+        <View style={mobileStyles.stepCircle}><Text style={mobileStyles.stepNum}>2</Text></View>
+        <Text style={mobileStyles.stepLabel}>Paso 1 de 2</Text>
+      </View>
+
+      <Text style={mobileStyles.fieldLabel}>EMAIL</Text>
+      <TextInput
+        style={[mobileStyles.input, focusedInput === 'email' && mobileStyles.inputFocused, errors.email && mobileStyles.inputError]}
+        placeholder="tu@email.com"
+        placeholderTextColor="#bbb"
+        value={email}
+        onChangeText={(t) => { setEmail(t.toLowerCase()); clearError('email'); }}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        editable={!loading}
+        onFocus={() => setFocusedInput('email')}
+        onBlur={() => setFocusedInput(null)}
+      />
+      {errors.email && <Text style={mobileStyles.errorText}>{errors.email}</Text>}
+
+      <Text style={mobileStyles.fieldLabel}>CONTRASEÑA</Text>
+      <View style={mobileStyles.inputWrap}>
         <TextInput
-          style={[mobileStyles.input, errors.email && mobileStyles.inputError]}
-          placeholder="Correo electrónico"
-          placeholderTextColor="#8c8c8c"
-          value={email}
-          onChangeText={(text) => { setEmail(text.toLowerCase()); clearError('email'); }}
-          keyboardType="email-address"
+          style={[mobileStyles.input, focusedInput === 'password' && mobileStyles.inputFocused, errors.password && mobileStyles.inputError]}
+          placeholder="••••••••"
+          placeholderTextColor="#bbb"
+          value={password}
+          onChangeText={(t) => { setPassword(t); clearError('password'); }}
+          secureTextEntry={!showPassword}
           autoCapitalize="none"
           editable={!loading}
+          onFocus={() => setFocusedInput('password')}
+          onBlur={() => setFocusedInput(null)}
         />
-        {errors.email && <Text style={mobileStyles.errorText}>{errors.email}</Text>}
+        <TouchableOpacity style={mobileStyles.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
+          <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#bbb" />
+        </TouchableOpacity>
       </View>
-      <View style={mobileStyles.inputContainer}>
-        <View style={{ position: 'relative' }}>
-          <TextInput
-            style={[mobileStyles.input, errors.password && mobileStyles.inputError, { paddingRight: 44 }]}
-            placeholder="Contraseña"
-            placeholderTextColor="#8c8c8c"
-            value={password}
-            onChangeText={(text) => { setPassword(text); clearError('password'); }}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            editable={!loading}
-          />
-          <TouchableOpacity
-            onPress={() => setShowPassword(prev => !prev)}
-            style={{ position: 'absolute', right: 12, top: 12, padding: 4 }}
-            disabled={loading}
-          >
-            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#8c8c8c" />
-          </TouchableOpacity>
-        </View>
-        {errors.password && <Text style={mobileStyles.errorText}>{errors.password}</Text>}
-      </View>
-      <TouchableOpacity style={mobileStyles.nextButton} onPress={handleNext} disabled={loading}>
-        <Text style={mobileStyles.nextButtonText}>Siguiente</Text>
+      {errors.password && <Text style={mobileStyles.errorText}>{errors.password}</Text>}
+
+      <TouchableOpacity style={[mobileStyles.primaryBtn, loading && { opacity: 0.7 }]} onPress={handleNext} disabled={loading}>
+        <Text style={mobileStyles.primaryBtnTxt}>SIGUIENTE</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[mobileStyles.googleButton, googleLoading && { opacity: 0.6 }]} onPress={handleLoginGoogle} disabled={googleLoading}>
-        {googleLoading ? (
-          <ActivityIndicator color="#000000" />
-        ) : (
+
+      <View style={mobileStyles.separatorRow}>
+        <View style={mobileStyles.separatorLine} />
+        <View style={mobileStyles.separatorDot} />
+        <View style={mobileStyles.separatorLine} />
+      </View>
+
+      <TouchableOpacity style={[mobileStyles.googleBtn, googleLoading && { opacity: 0.7 }]} onPress={handleLoginGoogle} disabled={googleLoading}>
+        {googleLoading ? <ActivityIndicator color="#000" /> : (
           <>
-            <Ionicons name="logo-google" size={20} color="#000" style={{ marginRight: 8 }} />
-            <Text style={mobileStyles.googleButtonText}>Continuar con Google</Text>
+            <Image source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }} style={{ width: 18, height: 18 }} />
+            <Text style={mobileStyles.googleBtnTxt}>CONTINUAR CON GOOGLE</Text>
           </>
         )}
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Ingreso')} style={mobileStyles.loginLink}>
-        <Text style={mobileStyles.loginLinkText}>¿Ya tienes cuenta? Inicia sesión</Text>
-      </TouchableOpacity>
+
+      <View style={mobileStyles.bottomRow}>
+        <Text style={mobileStyles.bottomTxt}>¿Ya tienes cuenta? </Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Ingreso')}>
+          <Text style={mobileStyles.bottomLink}>Inicia sesión</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
   const renderMobileProfileStep = () => (
-    <View style={mobileStyles.stepContent}>
-      <Text style={mobileStyles.stepTitle}>¡Casi terminamos!</Text>
-      <Text style={mobileStyles.stepSubtitle}>Crea tu perfil y comenzaremos tu experiencia</Text>
-      <View style={mobileStyles.inputContainer}>
-        <TextInput
-          style={[mobileStyles.input, errors.profileName && mobileStyles.inputError]}
-          placeholder="Nombre del perfil"
-          placeholderTextColor="#8c8c8c"
-          value={profileName}
-          onChangeText={(text) => { setProfileName(text); clearError('profileName'); }}
-          autoCapitalize="words"
-          editable={!loading}
-        />
-        {errors.profileName && <Text style={mobileStyles.errorText}>{errors.profileName}</Text>}
+    <View style={mobileStyles.formContent}>
+      <View style={[mobileStyles.badge, { backgroundColor: '#E50914' }]}>
+        <Text style={mobileStyles.badgeText}>¡CASI LISTO!</Text>
       </View>
-      <View style={mobileStyles.inputContainer}>
-        <Text style={mobileStyles.label}>Foto de perfil (obligatorio):</Text>
+      <View style={mobileStyles.titleRow}>
+        <Text style={mobileStyles.titleBlack}>Tu </Text>
+      </View>
+      <Text style={mobileStyles.titleRed}>perfil</Text>
+      <Text style={mobileStyles.subtitle}>Crea tu perfil y personaliza tu experiencia</Text>
+
+      {/* Step Indicator */}
+      <View style={mobileStyles.stepRow}>
+        <View style={mobileStyles.stepCircleCompleted}><Ionicons name="checkmark" size={14} color="#fff" /></View>
+        <View style={mobileStyles.stepLineActive} />
+        <View style={mobileStyles.stepCircleActive}><Text style={mobileStyles.stepNumActive}>2</Text></View>
+        <Text style={mobileStyles.stepLabel}>Paso 2 de 2</Text>
+      </View>
+
+      <Text style={[mobileStyles.fieldLabel, { marginTop: 10 }]}>
+        FOTO DE PERFIL <Text style={{ color: '#E50914' }}>(OBLIGATORIA)</Text>
+      </Text>
+      <View style={mobileStyles.avatarRow}>
         <TouchableOpacity
-          style={mobileStyles.imagePickerContainer}
+          style={mobileStyles.avatarPicker}
           onPress={handleSelectProfileImage}
           disabled={loading || uploadingImage}
         >
           {selectedImageUri ? (
-            <Image source={{ uri: selectedImageUri }} style={mobileStyles.previewImage} />
+            <Image source={{ uri: selectedImageUri }} style={mobileStyles.avatarPreview} />
           ) : (
-            <View style={mobileStyles.imagePickerPlaceholder}>
+            <View style={mobileStyles.avatarPlaceholder}>
               {uploadingImage ? (
-                <ActivityIndicator size="large" color="#E50914" />
+                <ActivityIndicator size="small" color="#E50914" />
               ) : (
                 <>
-                  <Ionicons name="camera" size={40} color="#8c8c8c" />
-                  <Text style={mobileStyles.imagePickerText}>Toca para seleccionar imagen</Text>
+                  <Ionicons name="camera-outline" size={26} color="#ccc" />
+                  <Text style={mobileStyles.avatarPlaceholderText}>Subir</Text>
                 </>
               )}
             </View>
           )}
         </TouchableOpacity>
-        {errors.avatar && <Text style={mobileStyles.errorText}>{errors.avatar}</Text>}
+        <View style={mobileStyles.avatarMeta}>
+          <Text style={mobileStyles.avatarMetaText}>JPG, PNG o GIF</Text>
+          <Text style={mobileStyles.avatarMetaText}>Máx. 5MB</Text>
+        </View>
       </View>
-      <View style={mobileStyles.buttonContainer}>
+      {errors.avatar && <Text style={mobileStyles.errorText}>{errors.avatar}</Text>}
+
+      <Text style={mobileStyles.fieldLabel}>NOMBRE DEL PERFIL</Text>
+      <View style={mobileStyles.inputWrap}>
+        <TextInput
+          style={[mobileStyles.input, focusedInput === 'profileName' && mobileStyles.inputFocused, errors.profileName && mobileStyles.inputError]}
+          placeholder="¿Cómo te llamamos?"
+          placeholderTextColor="#bbb"
+          value={profileName}
+          onChangeText={(t) => { setProfileName(t); clearError('profileName'); }}
+          autoCapitalize="words"
+          editable={!loading}
+          onFocus={() => setFocusedInput('profileName')}
+          onBlur={() => setFocusedInput(null)}
+        />
+      </View>
+      {errors.profileName && <Text style={mobileStyles.errorText}>{errors.profileName}</Text>}
+
+      <View style={mobileStyles.buttonRow}>
         <TouchableOpacity style={mobileStyles.backButton} onPress={handleBack}>
-          <Text style={mobileStyles.backButtonText}>Atrás</Text>
+          <Ionicons name="arrow-back" size={16} color="#111" />
+          <Text style={mobileStyles.backButtonText}>ATRÁS</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[mobileStyles.ctaButton, (loading || uploadingImage) && mobileStyles.buttonDisabled]}
+          style={[mobileStyles.createAccountBtn, (loading || uploadingImage) && { opacity: 0.7 }]}
           onPress={handleRegister}
           disabled={loading || uploadingImage}
         >
-          <Text style={mobileStyles.nextButtonText} numberOfLines={1}>
-            {loading || uploadingImage ? 'Creando...' : 'Crear cuenta'}
-          </Text>
+          {loading || uploadingImage ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={mobileStyles.createAccountBtnTxt}>CREAR CUENTA</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -558,23 +590,71 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   }
 
   return (
-    <View style={mobileStyles.container}>
-      <ImageBackground source={require('../assets/fondo login.jpg')} style={mobileStyles.backgroundImage} blurRadius={2}>
-        <LinearGradient colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)']} style={mobileStyles.gradient}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={mobileStyles.keyboardView}>
-            <ScrollView contentContainerStyle={mobileStyles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View style={mobileStyles.logoContainer}>
-                <Text style={mobileStyles.logo}>Pixel No Sekai</Text>
-              </View>
-              <View style={mobileStyles.formContainer}>
-                {renderMobileStepIndicator()}
-                {currentStep === 'email' ? renderMobileEmailStep() : renderMobileProfileStep()}
-              </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </LinearGradient>
-      </ImageBackground>
-    </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={mobileStyles.container}
+    >
+      <ScrollView
+        contentContainerStyle={mobileStyles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
+        {/* ═══ TOP HERO SECTION (Black) ═══ */}
+        <View style={mobileStyles.topHero}>
+          {/* Animated Background */}
+          <View style={StyleSheet.absoluteFillObject}>
+             <AnimatedLeftPanel fullScreenMode={true} />
+          </View>
+          
+          {/* Top Logo */}
+          <View style={mobileStyles.topLogo}>
+            <View style={mobileStyles.logoIconBox}>
+              <Ionicons name="play" size={14} color="#fff" />
+            </View>
+            <Text style={mobileStyles.logoText}>PIXEL NO SEKAI</Text>
+          </View>
+          
+          {/* Branding */}
+          <View style={mobileStyles.brandingBlock}>
+            <View style={mobileStyles.subtitleRow}>
+              <View style={mobileStyles.accentBar} />
+              <Text style={mobileStyles.subtitleText}>TU MUNDO DE ANIME</Text>
+            </View>
+            <Text style={mobileStyles.heroWhite}>PIXEL</Text>
+            <Text style={mobileStyles.heroRed}>NO</Text>
+            <Text style={mobileStyles.heroWhite}>SEKAI</Text>
+          </View>
+
+          {/* Stats on the right side */}
+          <View style={mobileStyles.statsContainer}>
+            <View style={mobileStyles.statRowBox}>
+               <View style={mobileStyles.statIcon}><Ionicons name="play" size={10} color="#E50914"/></View>
+               <Text style={mobileStyles.statVal}>10K+</Text>
+            </View>
+            <View style={mobileStyles.statRowBox}>
+               <View style={mobileStyles.statIcon}><Ionicons name="star" size={10} color="#E50914"/></View>
+               <Text style={mobileStyles.statVal}>4.9</Text>
+            </View>
+            <View style={mobileStyles.statRowBox}>
+               <View style={mobileStyles.statIcon}><Ionicons name="flash" size={10} color="#E50914"/></View>
+               <Text style={mobileStyles.statVal}>HD</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ═══ BOTTOM FORM SECTION (White) ═══ */}
+        <View style={mobileStyles.bottomFormContainer}>
+          {/* Diagonal cut */}
+          <View style={mobileStyles.diagonalCut} />
+          <View style={mobileStyles.decorSquareOuter}>
+            <View style={mobileStyles.decorSquareInner} />
+          </View>
+
+          {currentStep === 'email' ? renderMobileEmailStep() : renderMobileProfileStep()}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -686,45 +766,116 @@ const webStyles = StyleSheet.create({
 // MOBILE STYLES
 // ═══════════════════════════════════════════════════════════════════════════
 const mobileStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
-  backgroundImage: { flex: 1, width: '100%', height: '100%' },
-  gradient: { flex: 1 },
-  keyboardView: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: 20 },
-  logoContainer: { alignItems: 'center', marginBottom: 30, marginTop: 20 },
-  logo: { fontSize: 40, fontWeight: 'bold', color: '#E50914', letterSpacing: 2 },
-  formContainer: { width: '90%', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: 4, padding: 40, maxWidth: 450 },
-  stepIndicator: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
-  stepContainer: { flexDirection: 'row', alignItems: 'center' },
-  stepCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#333333', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#333333' },
-  stepCircleActive: { backgroundColor: '#E50914', borderColor: '#E50914' },
-  stepNumber: { color: '#8c8c8c', fontSize: 14, fontWeight: 'bold' },
-  stepNumberActive: { color: '#FFFFFF' },
-  stepLine: { width: 40, height: 2, backgroundColor: '#333333', marginHorizontal: 8 },
-  stepLineActive: { backgroundColor: '#E50914' },
-  stepContent: { width: '100%' },
-  stepTitle: { fontSize: 28, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 8, textAlign: 'center' },
-  stepSubtitle: { fontSize: 16, color: '#8c8c8c', marginBottom: 32, textAlign: 'center', lineHeight: 22 },
-  inputContainer: { marginBottom: 16 },
-  input: { backgroundColor: '#333333', borderRadius: 4, padding: 16, fontSize: 16, color: '#FFFFFF', borderWidth: 1, borderColor: '#333333' },
+  container: { flex: 1, backgroundColor: '#000' },
+  scrollContent: { flexGrow: 1, minHeight: '100%' },
+  
+  // ── TOP HERO (Black) ──
+  topHero: {
+    height: 320,
+    width: '100%',
+    backgroundColor: '#0a0a0a',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  topLogo: { position: 'absolute', top: 40, left: 24, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 5 },
+  logoIconBox: { width: 24, height: 24, backgroundColor: '#E50914', justifyContent: 'center', alignItems: 'center' },
+  logoText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 1.5 },
+  
+  brandingBlock: { position: 'absolute', bottom: 50, left: 24, zIndex: 5 },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  accentBar: { width: 3, height: 14, backgroundColor: '#E50914' },
+  subtitleText: { color: '#E50914', fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  heroWhite: { color: '#fff', fontSize: 44, fontWeight: '900', letterSpacing: -1, lineHeight: 44 },
+  heroRed: { color: '#E50914', fontSize: 44, fontWeight: '900', letterSpacing: -1, lineHeight: 44 },
+  
+  statsContainer: { position: 'absolute', bottom: 60, right: 24, zIndex: 5, gap: 10 },
+  statRowBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8 },
+  statIcon: { width: 22, height: 22, borderWidth: 1, borderColor: 'rgba(229,9,20,0.4)', justifyContent: 'center', alignItems: 'center' },
+  statVal: { color: '#fff', fontSize: 12, fontWeight: '800' },
+
+  // ── BOTTOM FORM (White) ──
+  bottomFormContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    marginTop: 20, // Negative overlap handled by diagonal cut
+    position: 'relative',
+  },
+  diagonalCut: {
+    position: 'absolute',
+    top: -24,
+    left: -10,
+    right: -10,
+    height: 60,
+    backgroundColor: '#fff',
+    borderTopWidth: 4,
+    borderTopColor: '#E50914',
+    transform: [{ rotate: '-4deg' }],
+    zIndex: 1,
+  },
+  decorSquareOuter: { position: 'absolute', top: 16, right: 0, width: 80, height: 80, backgroundColor: 'rgba(229, 9, 20, 0.05)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
+  decorSquareInner: { width: 40, height: 40, borderWidth: 2, borderColor: 'rgba(229, 9, 20, 0.2)' },
+  
+  formContent: {
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingTop: 40,
+    paddingBottom: 40,
+    zIndex: 10,
+  },
+  badge: { alignSelf: 'flex-start', backgroundColor: '#000', paddingHorizontal: 10, paddingVertical: 4, marginBottom: 16 },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  titleRow: { flexDirection: 'row' },
+  titleBlack: { color: '#111', fontSize: 28, fontWeight: '900', lineHeight: 30 },
+  titleRed: { color: '#E50914', fontSize: 28, fontWeight: '900', lineHeight: 30, marginBottom: 6 },
+  subtitle: { color: '#777', fontSize: 13, marginBottom: 24 },
+  
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  stepCircle: { width: 28, height: 28, borderWidth: 1.5, borderColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
+  stepCircleActive: { width: 28, height: 28, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+  stepCircleCompleted: { width: 28, height: 28, backgroundColor: '#E50914', justifyContent: 'center', alignItems: 'center' },
+  stepNum: { color: '#999', fontSize: 12, fontWeight: '700' },
+  stepNumActive: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  stepLine: { width: 30, height: 2, backgroundColor: '#eee' },
+  stepLineActive: { width: 30, height: 2, backgroundColor: '#E50914' },
+  stepLabel: { color: '#aaa', fontSize: 13, marginLeft: 6 },
+
+  fieldLabel: { color: '#111', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 6, marginTop: 4 },
+  input: { borderWidth: 1, borderColor: '#ddd', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111', marginBottom: 6, backgroundColor: '#fff' },
+  inputFocused: { borderColor: '#E50914' },
   inputError: { borderColor: '#E50914' },
-  errorText: { color: '#E50914', fontSize: 13, marginTop: 6, marginLeft: 4 },
-  nextButton: { backgroundColor: '#E50914', borderRadius: 4, padding: 16, alignItems: 'center', marginTop: 24 },
-  nextButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  ctaButton: { flex: 1, backgroundColor: '#E50914', borderRadius: 4, paddingHorizontal: 16, height: 48, justifyContent: 'center', alignItems: 'center' },
-  googleButton: { backgroundColor: '#FFFFFF', borderRadius: 4, padding: 16, alignItems: 'center', marginTop: 12, flexDirection: 'row', justifyContent: 'center' },
-  googleButtonText: { color: '#000000', fontSize: 14, fontWeight: 'bold' },
-  buttonContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, gap: 16 },
-  backButton: { flex: 1, backgroundColor: '#333333', borderRadius: 4, paddingHorizontal: 16, height: 48, justifyContent: 'center', alignItems: 'center' },
-  backButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  buttonDisabled: { opacity: 0.6 },
-  loginLink: { alignItems: 'center', marginTop: 20 },
-  loginLinkText: { color: '#8c8c8c', fontSize: 16 },
-  label: { color: '#8c8c8c', fontSize: 14, marginBottom: 8 },
-  imagePickerContainer: { width: 120, height: 120, borderRadius: 60, alignSelf: 'center', marginBottom: 16, backgroundColor: '#333333', overflow: 'hidden' },
-  previewImage: { width: '100%', height: '100%' },
-  imagePickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  imagePickerText: { color: '#8c8c8c', fontSize: 12, textAlign: 'center', marginTop: 8, paddingHorizontal: 10 },
+  inputWrap: { position: 'relative', marginBottom: 10 },
+  eyeBtn: { position: 'absolute', right: 14, top: 12 },
+  errorText: { color: '#E50914', fontSize: 12, marginBottom: 10 },
+  
+  primaryBtn: { backgroundColor: '#E50914', paddingVertical: 14, alignItems: 'center', marginBottom: 20, marginTop: 10 },
+  primaryBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 1.5 },
+  
+  separatorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
+  separatorLine: { flex: 1, height: 1, backgroundColor: '#eee' },
+  separatorDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1, borderColor: '#ccc', backgroundColor: '#fff' },
+  
+  googleBtn: { borderWidth: 1, borderColor: '#000', paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 30 },
+  googleBtnTxt: { color: '#000', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  
+  bottomRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' },
+  bottomTxt: { color: '#888', fontSize: 13 },
+  bottomLink: { color: '#111', fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
+
+  // Avatar styles
+  avatarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
+  avatarPicker: { width: 80, height: 80, borderWidth: 2, borderColor: '#ccc', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  avatarPreview: { width: '100%', height: '100%' },
+  avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  avatarPlaceholderText: { color: '#bbb', fontSize: 11, marginTop: 4 },
+  avatarMeta: { marginLeft: 15, gap: 4 },
+  avatarMetaText: { color: '#888', fontSize: 12 },
+
+  // Step 2 buttons
+  buttonRow: { flexDirection: 'row', gap: 12, marginTop: 15 },
+  backButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 2, borderColor: '#111', paddingHorizontal: 16, paddingVertical: 14 },
+  backButtonText: { color: '#111', fontSize: 14, fontWeight: '800' },
+  createAccountBtn: { flex: 1, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
+  createAccountBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
 });
 
 export default RegisterScreen;

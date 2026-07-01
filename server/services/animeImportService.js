@@ -1,9 +1,17 @@
 import axios from 'axios'
-import { createReadStream, existsSync } from 'fs'
+import { createReadStream, existsSync, appendFileSync } from 'fs'
 import { readdir } from 'fs/promises'
 import readline from 'readline'
 import { basename, extname, join, resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
+
+
+function debugLog(...args) {
+  try {
+    const msg = new Date().toISOString() + ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n'
+    appendFileSync(join(__dirname, '..', 'import_debug.log'), msg)
+  } catch(e) {}
+}
 import pool from '../db.js'
 import { enqueueTranscodeJob } from './transcodeQueueService.js'
 
@@ -158,13 +166,13 @@ async function jikanSearch(title, cache) {
   return out
 }
 
-async function processM3uReadable(readable, onItem, { maxItems }) {
+async function processM3uReadable(readable, onItem, { maxItems, signal }) {
   const rl = readline.createInterface({ input: readable, crlfDelay: Infinity })
   let pending = null
   let count = 0
 
   for await (const line of rl) {
-    if (options?.signal?.aborted) { rl.close(); throw new Error('AbortError'); }
+    if (signal?.aborted) { rl.close(); throw new Error('AbortError'); }
 
     const l = String(line || '').trim()
     if (!l) continue
@@ -216,10 +224,10 @@ async function scanFolder(folderPath, onFile, { maxItems, maxDepth = 6 }) {
 }
 
 function resolveAllowedPath(inputPath, allowedRoots) {
-  const abs = resolve(inputPath)
+  const abs = resolve(inputPath).toLowerCase()
   for (const root of allowedRoots) {
-    const r = resolve(root)
-    if (abs === r || abs.startsWith(r + '\\') || abs.startsWith(r + '/')) return abs
+    const r = resolve(root).toLowerCase()
+    if (abs === r || abs.startsWith(r + '\\') || abs.startsWith(r + '/')) return resolve(inputPath)
   }
   return null
 }
@@ -341,7 +349,7 @@ async function upsertEpisode({ animeId, season, episodeNumber, title, videoUrl, 
       episodeNumber,
       title || null,
       videoUrl || null,
-      videoUrl ? 'queued' : 'missing',
+      videoUrl ? (options.transcode ? 'queued' : 'ready') : 'missing',
       videoUrl ? 'external' : 'gdrive',
       quality || '1080p',
     ]
@@ -370,6 +378,8 @@ export async function importAnimeFromSources({
   const selectedTitles = Array.isArray(options.selectedTitles) && options.selectedTitles.length
     ? new Set(options.selectedTitles.map(t => normalizeText(t)))
     : null
+
+  debugLog('Starting importAnimeFromSources:', { dryRun, validateMode, maxItems, m3u, folders })
 
   const allowedRoots = [
     join(__dirname, '..', 'videos'),
@@ -403,12 +413,13 @@ export async function importAnimeFromSources({
       return { ok: !!r, score, enrichment: r?.item || null }
     }
 
-    if (score >= 0.7) return { ok: true, score, enrichment: null }
     const r = await jikanSearch(title, jikanCache)
-    return { ok: !!r, score, enrichment: r?.item || null }
+    if (r) return { ok: true, score, enrichment: r.item }
+    
+    return { ok: score >= 0.6, score, enrichment: null }
   }
 
-  async function ensureAnimeId(title, enrichment) {
+  async function ensureAnimeId(title, enrichment, fallbackLogo) {
     const key = normalizeText(title)
     if (animeIdCache.has(key)) return animeIdCache.get(key)
 
@@ -419,7 +430,7 @@ export async function importAnimeFromSources({
         title_english: enrichment.title_english || null,
         title_japanese: enrichment.title_japanese || null,
         description: enrichment.synopsis || null,
-        poster_url: enrichment.images?.jpg?.image_url || null,
+        poster_url: enrichment.images?.jpg?.image_url || fallbackLogo || null,
         banner_url: enrichment.images?.jpg?.large_image_url || null,
         genres,
         status: mapJikanStatus(enrichment.status),
@@ -451,7 +462,7 @@ export async function importAnimeFromSources({
             title_english: tmdb.name || null,
             title_japanese: tmdb.original_name || null,
             description: tmdb.overview || null,
-            poster_url: tmdb.poster_path ? `https://image.tmdb.org/t/p/w500${tmdb.poster_path}` : null,
+            poster_url: tmdb.poster_path ? `https://image.tmdb.org/t/p/w500${tmdb.poster_path}` : fallbackLogo || null,
             banner_url: tmdb.backdrop_path ? `https://image.tmdb.org/t/p/original${tmdb.backdrop_path}` : null,
             genres: tmdb.genres ? tmdb.genres.map(g => g.name) : null,
             status: tmdb.status || 'Unknown',
@@ -462,6 +473,13 @@ export async function importAnimeFromSources({
         }
       } catch (e) {
         console.warn('[TMDB Fallback Error]', e.message);
+      }
+    }
+    
+    if (!payload && fallbackLogo) {
+      payload = {
+        poster_url: fallbackLogo,
+        banner_url: null
       }
     }
 
@@ -544,17 +562,21 @@ export async function importAnimeFromSources({
     // Si hay filtro de selección, solo importar los seleccionados
     if (selectedTitles && !selectedTitles.has(normalizeText(title))) return
 
-    const animeId = await ensureAnimeId(title, decision.enrichment)
+    const fallbackLogo = attrs?.['tvg-logo'] || null
+    const animeId = await ensureAnimeId(title, decision.enrichment, fallbackLogo)
     const q = parseQuality(name) || parseQuality(url)
     const epNumber = Number.isFinite(episode) ? episode : null
     const epSeason = Number.isFinite(season) ? season : 1
     if (!epNumber) return
 
+    // Clean episode title from season/episode prefix
+    const cleanEpTitle = name ? name.replace(/^(?:S\d+\s*E\d+|\d+\s*x\s*\d+|EP\s*\d+)\s*/i, '').trim() : null;
+
     const up = await upsertEpisode({
       animeId,
       season: epSeason,
       episodeNumber: epNumber,
-      title: name || null,
+      title: cleanEpTitle || null,
       videoUrl: url,
       quality: q,
     })
@@ -564,11 +586,13 @@ export async function importAnimeFromSources({
   }
 
   for (const src of m3u) {
-    if (options.signal?.aborted) break
+    debugLog('Processing source:', src)
+    if (options.signal?.aborted) { debugLog('Aborted before source'); break }
     if (typeof maxItems === 'number' && maxItems > 0 && stats.scanned >= maxItems) break
     try {
       if (src?.type === 'file') {
         const abs = resolveAllowedPath(src.path, allowedRoots)
+        debugLog('Resolved file path:', abs, 'Exists?', abs ? existsSync(abs) : false)
         if (!abs || !existsSync(abs)) continue
         await processM3uReadable(createReadStream(abs, { encoding: 'utf8' }), (item) => onEntry({ ...item }), {
           maxItems,
@@ -578,10 +602,17 @@ export async function importAnimeFromSources({
       }
 
       if (src?.type === 'url') {
-        const r = await axios.get(src.url, { responseType: 'stream', timeout: 30_000 })
+        let fetchUrl = src.url;
+        if (fetchUrl.includes('10.0.2.2')) {
+          fetchUrl = fetchUrl.replace('10.0.2.2', '127.0.0.1');
+        }
+        debugLog('Fetching URL:', fetchUrl)
+        const r = await axios.get(fetchUrl, { responseType: 'stream', timeout: 30_000 })
+        debugLog('Fetched URL, processing readable')
         await processM3uReadable(r.data, (item) => onEntry({ ...item }), { maxItems, signal: options.signal })
       }
     } catch (e) {
+      debugLog('Error processing source:', e.message)
       if (e.message === 'AbortError') throw e;
       stats.errors += 1
     }
@@ -621,7 +652,7 @@ export async function importAnimeFromSources({
     .sort((a, b) => b[1].count - a[1].count)
     .map(([, v]) => ({ title: v.title, count: v.count }))
 
-  return {
+  const finalResult = {
     dryRun,
     scanned: stats.scanned,
     accepted: stats.accepted,
@@ -635,4 +666,6 @@ export async function importAnimeFromSources({
     topAnime: top,
     samples: stats.samples,
   }
+  debugLog('Finished importAnimeFromSources:', finalResult)
+  return finalResult
 }

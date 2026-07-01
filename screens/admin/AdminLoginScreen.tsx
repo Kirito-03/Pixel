@@ -24,20 +24,26 @@ export default function AdminLoginScreen() {
     React.useEffect(() => {
         const tryAutoLogin = async () => {
             if (isAdmin) {
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'AdminDashboard' } as any]
-                });
+                try {
+                    // @ts-ignore
+                    navigation.replace('AdminDashboard');
+                } catch (e) {
+                    console.error('Error navigating to AdminDashboard:', e);
+                    setIsLoading(false);
+                }
                 return;
             }
 
             // Forzar chequeo (que ahora incluye el sync con firebase)
             const success = await checkAdminStatus();
             if (success) {
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'AdminDashboard' } as any]
-                });
+                try {
+                    // @ts-ignore
+                    navigation.replace('AdminDashboard');
+                } catch (e) {
+                    console.error('Error navigating to AdminDashboard:', e);
+                    setIsLoading(false);
+                }
             } else {
                 setIsLoading(false); // Solo mostrar UI si falló el auto-login
             }

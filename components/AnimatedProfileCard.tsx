@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, Image, View, StyleSheet, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Profile {
   id: number;
@@ -61,7 +62,7 @@ export const AnimatedProfileCard: React.FC<AnimatedProfileCardProps> = ({
             />
           ) : (
             <View style={styles.defaultAvatarPlaceholder}>
-              <Text style={styles.defaultAvatarText}>{profile.name.charAt(0).toUpperCase()}</Text>
+              <Ionicons name="person-outline" size={48} color="rgba(255,255,255,0.2)" />
             </View>
           )}
 

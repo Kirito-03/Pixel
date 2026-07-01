@@ -33,7 +33,7 @@ class AdminAuthService {
             const baseUrl = getCurrentBaseURL();
             const response = await axios.post(`${baseUrl}/auth/admin/firebase-login`, {
                 idToken
-            });
+            }, { timeout: 5000 });
 
             const { token, user } = response.data;
             if (token && user) {
@@ -131,7 +131,8 @@ class AdminAuthService {
             const response = await axios.get(`${baseUrl}/auth/admin/me`, {
                 headers: {
                     Authorization: `Bearer ${token}`
-                }
+                },
+                timeout: 5000
             });
 
             return response.data;

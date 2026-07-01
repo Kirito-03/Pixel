@@ -13,7 +13,7 @@ export interface Profile {
 interface ProfileContextType {
   currentProfile: Profile | null;
   setCurrentProfile: (profile: Profile | null) => void;
-  loadCurrentProfile: () => Promise<void>;
+  loadCurrentProfile: () => Promise<Profile | null>;
   clearCurrentProfile: () => Promise<void>;
   // Preferencias por perfil
   adultContentEnabled: boolean;
@@ -55,7 +55,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
     }
   };
 
-  const loadCurrentProfile = async () => {
+  const loadCurrentProfile = async (): Promise<Profile | null> => {
     try {
       console.log('ProfileContext: Loading current profile...');
       const profile = Storage.getObject<Profile>('currentProfile');
@@ -73,11 +73,14 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
         } catch (err) {
           setAdultContentEnabledState(false);
         }
+        return profile;
       } else {
         console.log('ProfileContext: No profile found in storage');
+        return null;
       }
     } catch (error) {
       console.error('Error loading current profile:', error);
+      return null;
     }
   };
 

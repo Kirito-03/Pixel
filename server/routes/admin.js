@@ -928,8 +928,11 @@ router.post('/import/m3u/text', async (req, res) => {
 });
 
 router.post('/import/anime', async (req, res) => {
-    const defaultM3u = join(__dirname, '..', 'videos', 'animes_madre.m3u');
-    const rawM3u = Array.isArray(req.body?.m3u) && req.body.m3u.length ? req.body.m3u : [defaultM3u];
+    const rawM3u = Array.isArray(req.body?.m3u) ? req.body.m3u : [];
+    if (req.body?.useDefaultM3u) {
+        const defaultM3u = join(__dirname, '..', 'videos', 'animes_madre.m3u');
+        rawM3u.push(defaultM3u);
+    }
     const m3u = rawM3u
         .map((v) => {
             if (typeof v === 'string') {

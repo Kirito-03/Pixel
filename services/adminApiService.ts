@@ -56,7 +56,7 @@ class AdminApiService {
     constructor() {
         this.axiosInstance = axios.create({
             baseURL: getCurrentBaseURL() || API_BASE_URL,
-            timeout: 30000,
+            timeout: 120000,
         });
 
         // Add request interceptor to include auth token
@@ -151,6 +151,14 @@ class AdminApiService {
      */
     async createEpisode(data: EpisodeData) {
         const response = await this.axiosInstance.post('/api/admin/episodes', data);
+        return response.data;
+    }
+
+    /**
+     * Mark all queued episodes of an anime as ready
+     */
+    async markAllEpisodesReady(animeId: number) {
+        const response = await this.axiosInstance.post(`/api/admin/anime/${animeId}/episodes/mark-ready`);
         return response.data;
     }
 

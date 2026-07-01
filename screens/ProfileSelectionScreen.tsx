@@ -18,6 +18,7 @@ import { CreateProfileModal } from '../components/modals/CreateProfileModal';
 import { DeleteProfileModal } from '../components/modals/DeleteProfileModal';
 import { AnimatedProfileCard } from '../components/AnimatedProfileCard';
 import AnimatedLeftPanel from '../components/AnimatedLeftPanel';
+import Loader from '../components/Loader';
 
 interface ProfileSelectionScreenProps {
   navigation: any;
@@ -127,13 +128,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
           <AnimatedLeftPanel fullScreenMode={true} />
         </View>
         <View style={styles.loadingContainer}>
-          <View style={styles.loadingBox}>
-            <View style={styles.loadingSpinnerWrap}>
-              <View style={styles.loadingSpinnerCore} />
-            </View>
-            <Text style={styles.loadingText}>INICIALIZANDO</Text>
-            <Text style={styles.loadingSubText}>Sincronizando base de datos central...</Text>
-          </View>
+          <Loader />
         </View>
       </View>
     );
@@ -317,44 +312,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  loadingBox: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(10, 10, 10, 0.8)',
-    paddingHorizontal: 40,
-    paddingVertical: 30,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(229,9,20,0.3)',
-  },
-  loadingSpinnerWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    borderTopColor: '#E50914',
-    borderRightColor: '#E50914',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  loadingSpinnerCore: {
-    width: 10,
-    height: 10,
-    backgroundColor: '#E50914',
-  },
-  loadingText: {
-    color: '#E50914',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 4,
-    marginBottom: 8,
-  },
-  loadingSubText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    letterSpacing: 1,
-  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -384,18 +341,18 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
   },
   titleWhite: {
-    fontSize: 56,
+    fontSize: Platform.OS === 'web' ? 56 : 36,
     fontWeight: '900',
     color: '#fff',
     letterSpacing: -1,
-    lineHeight: 60,
+    lineHeight: Platform.OS === 'web' ? 60 : 40,
   },
   titleRed: {
-    fontSize: 56,
+    fontSize: Platform.OS === 'web' ? 56 : 36,
     fontWeight: '900',
     color: '#E50914',
     letterSpacing: -1,
-    lineHeight: 60,
+    lineHeight: Platform.OS === 'web' ? 60 : 40,
   },
   profilesContainer: {
     flexDirection: 'row',

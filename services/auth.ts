@@ -77,14 +77,16 @@ export const signInWithGoogleAndroid = async () => {
   if (!webClientId) throw new Error('GOOGLE_WEB_CLIENT_ID_MISSING')
 
   try {
-    const { idToken, statusCodes } = await googleSignInAndroid(webClientId)
+    const { idToken } = await googleSignInAndroid(webClientId)
     if (!idToken) throw new Error('GOOGLE_ID_TOKEN_MISSING')
     const credential = GoogleAuthProvider.credential(idToken)
     return await signInWithCredential(auth, credential)
   } catch (e: any) {
-    if (e?.code === statusCodes.SIGN_IN_CANCELLED) throw new Error('GOOGLE_AUTH_CANCELED')
-    if (e?.code === statusCodes.IN_PROGRESS) throw new Error('GOOGLE_AUTH_IN_PROGRESS')
-    if (e?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) throw new Error('GOOGLE_PLAY_SERVICES_NOT_AVAILABLE')
+    // statusCodes values from @react-native-google-signin/google-signin
+    const code = e?.code ?? ''
+    if (code === 'SIGN_IN_CANCELLED' || code === '12501') throw new Error('GOOGLE_AUTH_CANCELED')
+    if (code === 'IN_PROGRESS' || code === '12502') throw new Error('GOOGLE_AUTH_IN_PROGRESS')
+    if (code === 'PLAY_SERVICES_NOT_AVAILABLE' || code === '2') throw new Error('GOOGLE_PLAY_SERVICES_NOT_AVAILABLE')
     throw e
   }
 }
