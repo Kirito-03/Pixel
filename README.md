@@ -1,16 +1,16 @@
-﻿# Proyecto Pixel No Sekai
+# Proyecto Pixel No Sekai
 
-Una aplicación móvil y web que replica la funcionalidad de Pixel, desarrollada con React Native, Expo y Node.js.
+Una aplicación móvil y web de streaming y gestión de Anime y Manga, desarrollada con React Native, Expo y Node.js.
 
 ## 📋 Características
 
 - 🔐 **Autenticación completa**: Registro e inicio de sesión de usuarios
 - 👤 **Gestión de perfiles**: Múltiples perfiles por usuario
-- 🎥 **Catálogo de películas**: Integración con TMDB API para contenido actualizado
+- 🎥 **Catálogo de contenido**: Integración con TMDB API y catálogos de Anime para contenido actualizado
 - 📱 **Responsive**: Funciona en móvil, tablet y web
 - **Mi Lista**: Funcionalidad para guardar películas favoritas
 - **Búsqueda**: Buscar películas por título
-- 🎨 **UI moderna**: Interfaz inspirada en Pixel con gradientes y animaciones
+- 🎨 **UI moderna**: Interfaz inmersiva y dinámica con gradientes y animaciones fluidas
 
 ## Tecnologías utilizadas
 
@@ -346,5 +346,5 @@ Este proyecto es de uso educativo y no tiene fines comerciales.
 
 - [TMDB](https://www.themoviedb.org/) por proporcionar la API de películas
 - [Expo](https://expo.dev/) por facilitar el desarrollo multiplataforma
-- Inspirado en la interfaz de Pixel
+- Inspirado en las mejores plataformas de streaming modernas
 

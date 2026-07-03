@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { readFileSync, mkdirSync } from 'fs';
@@ -8,6 +8,8 @@ import session from 'express-session';
 import passport from 'passport';
 import cookieParser from 'cookie-parser';
 import pool from './db.js';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,9 +47,32 @@ const { default: botRoutes }        = await import('./routes/bot.js');
 // ── Express app ────────────────────────────────────────────────
 const app = express();
 
-// Configuración de CORS más permisiva para desarrollo
+// Seguridad: Cabeceras HTTP
+app.use(helmet({
+  crossOriginResourcePolicy: false, // Permitir que la app móvil acceda a recursos estáticos (imágenes/videos)
+}));
+
+// Seguridad: Rate Limiting Global (1000 peticiones por 15 min por IP)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  message: { message: 'Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde.' }
+});
+app.use(globalLimiter);
+
+// Configuración estricta de CORS
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:8081', 'http://localhost:3000', 'http://localhost:3001'];
+
 app.use(cors({
-  origin: true, // Permitir cualquier origen en desarrollo
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Bloqueado por la política CORS: ' + origin + ' no permitido'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   // Aceptar tanto mayúsculas como minúsculas para el header personalizado
@@ -62,8 +87,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 
 // Session middleware para OAuth
+const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV === 'production' 
+  ? (() => { throw new Error('CRÍTICO: SESSION_SECRET es requerido en producción por seguridad'); })()
+  : 'pixel-session-secret-default');
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'pixel-session-secret-default',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -128,10 +157,18 @@ app.get('/health/db', async (req, res) => {
 });
 
 // ── Montar routers ─────────────────────────────────────────────
+
+// Rate Limiter más estricto para rutas de autenticación
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 30, // 30 intentos por IP
+  message: { message: 'Demasiados intentos de autenticación. Intenta de nuevo en 15 minutos.' }
+});
+
 // User auth (register, login, forgot/reset password) — debe ir ANTES de authRoutes
-app.use('/auth', userAuthRoutes);
+app.use('/auth', authLimiter, userAuthRoutes);
 // Admin auth (Google OAuth, Firebase, admin/me, admin/logout, admin/check)
-app.use('/auth', authRoutes);
+app.use('/auth', authLimiter, authRoutes);
 
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/bot', botRoutes);

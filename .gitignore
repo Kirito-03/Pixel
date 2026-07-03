@@ -47,7 +47,7 @@ expo-env.d.ts
 .env
 .env.*
 !.env.example
-google-services.json
+config/google-services.json
 
 # =============================================
 # OS files
