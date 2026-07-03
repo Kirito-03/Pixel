@@ -89,7 +89,4 @@ yarn-error.*
 *.mp4
 *.mkv
 *.avi
-*.ts
-!*.d.ts
-!*.tsx
-server/videos/
+server/videos/*.ts
