@@ -284,6 +284,41 @@ function MainTabs({ route }: { route: any }) {
   );
 }
 
+const linking = {
+  prefixes: ['https://pixelnosekai.art', 'pixelnosekai://'],
+  config: {
+    screens: {
+      Ingreso: 'login',
+      Registro: 'register',
+      SeleccionPerfil: 'profiles',
+      Principal: {
+        screens: {
+          Inicio: 'home',
+          Buscar: 'search',
+          Noticias: 'news',
+          Emisión: 'airing',
+          Manga: 'manga',
+          MiLista: 'mylist',
+          Perfil: 'profile',
+        },
+      },
+      Apariencia: 'appearance',
+      Descargas: 'downloads',
+      Admin: {
+        screens: {
+          AdminLogin: 'admin/login',
+          AdminDashboard: 'admin/dashboard',
+          AdminImport: 'admin/import',
+          AnimeList: 'admin/anime',
+          AnimeForm: 'admin/anime/form',
+          EpisodeManager: 'admin/episodes',
+          AdminBot: 'admin/bot',
+        }
+      }
+    }
+  }
+};
+
 export default function AppNavigator() {
   const { colors } = useTheme();
   const { user, isLoading } = useAuth();
@@ -364,6 +399,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer
+      linking={linking}
       initialState={initialState}
       onStateChange={(state) => {
         Storage.setObject('NAVIGATION_STATE', state);

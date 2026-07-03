@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  pixel-web:
+    image: nginx:alpine
+    container_name: pixel_web_frontend
+    restart: unless-stopped
+    ports:
+      # Exponer en 8081 para que Cloudflare Zero Trust lo alcance fácilmente
+      - "8081:80"
+    volumes:
+      # Monta la carpeta dist compilada al root de Nginx
+      - ../dist:/usr/share/nginx/html:ro
+      # Monta la configuración personalizada de Nginx
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro

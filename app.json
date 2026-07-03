@@ -20,7 +20,12 @@
       "googleServicesFile": "./config/google-services.json"
     },
     "web": {
-      "favicon": "./assets/icon-arle.png"
+      "favicon": "./assets/icon-arle.png",
+      "name": "Pixel No Sekai",
+      "shortName": "Pixel",
+      "themeColor": "#0a0a0a",
+      "description": "Tu plataforma de streaming de Anime favorita",
+      "lang": "es-MX"
     },
     "plugins": [
       "expo-font",
