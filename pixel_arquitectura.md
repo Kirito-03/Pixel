@@ -1,4 +1,4 @@
-# Pixel no Sekai — Resumen Técnico de Arquitectura
+﻿# Pixel no Sekai — Resumen Técnico de Arquitectura
 
 > **Fecha del análisis:** 2026-07-03  
 > **Nombre del proyecto:** `pixel-no-sekai`  
@@ -57,7 +57,7 @@ pixel/
 │   ├── SearchScreen.tsx          #   Búsqueda unificada
 │   ├── LoginScreen.tsx           #   Login (email/password + Google)
 │   ├── RegisterScreen.tsx        #   Registro de usuario
-│   ├── ProfileSelectionScreen.tsx#   Selector de perfil (estilo Netflix)
+│   ├── ProfileSelectionScreen.tsx#   Selector de perfil (estilo Pixel)
 │   ├── ProfileScreen.tsx         #   Configuración del perfil
 │   ├── CategoryScreen.tsx        #   Vista por categoría
 │   ├── MyListScreen.tsx          #   Mi Lista
@@ -118,7 +118,7 @@ pixel/
     ├── app.js                    #   Express app: middleware, rutas, CORS
     ├── db.js                     #   Pool de PostgreSQL (node-pg)
     ├── Dockerfile                #   Imagen Docker del backend
-    ├── bd_netflix_postgres.sql   #   Schema principal de la BD
+    ├── bd_pixel_postgres.sql   #   Schema principal de la BD
     ├── admin_schema.sql          #   Schema del panel admin (anime_content, anime_episodes)
     ├── migrate_*.sql             #   Migraciones incrementales
     ├── routes/                   #   18 archivos de rutas Express

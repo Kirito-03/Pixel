@@ -1,8 +1,8 @@
--- ========================================
+﻿-- ========================================
 -- Admin Panel Database Schema
 -- ========================================
 -- Tablas para el sistema de gestión de contenido de anime
--- Ejecutar después de bd_netflix_postgres.sql
+-- Ejecutar después de bd_pixel_postgres.sql
 
 -- ========================================
 -- Tabla: admin_users

@@ -1,4 +1,4 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 const { Pool } = pg;
 
 if (!process.env.DB_PASSWORD) {
@@ -11,7 +11,7 @@ const pool = new Pool({
   port: Number(process.env.DB_PORT || 5432),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || undefined,
-  database: process.env.DB_NAME || 'bd_netflix',
+  database: process.env.DB_NAME || 'bd_pixel',
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

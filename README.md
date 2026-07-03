@@ -1,6 +1,6 @@
-# Proyecto Netflix Clone
+﻿# Proyecto Pixel No Sekai
 
-Una aplicación móvil y web que replica la funcionalidad de Netflix, desarrollada con React Native, Expo y Node.js.
+Una aplicación móvil y web que replica la funcionalidad de Pixel, desarrollada con React Native, Expo y Node.js.
 
 ## 📋 Características
 
@@ -10,7 +10,7 @@ Una aplicación móvil y web que replica la funcionalidad de Netflix, desarrolla
 - 📱 **Responsive**: Funciona en móvil, tablet y web
 - **Mi Lista**: Funcionalidad para guardar películas favoritas
 - **Búsqueda**: Buscar películas por título
-- 🎨 **UI moderna**: Interfaz inspirada en Netflix con gradientes y animaciones
+- 🎨 **UI moderna**: Interfaz inspirada en Pixel con gradientes y animaciones
 
 ## Tecnologías utilizadas
 
@@ -44,7 +44,7 @@ La forma más rápida de ejecutar la aplicación es usando Docker. Todo el backe
 **1. Clonar y configurar:**
 ```bash
 git clone <url-del-repositorio>
-cd netflix_app
+cd pixel_no_sekai
 npm install
 ```
 
@@ -74,7 +74,7 @@ npm start
 - **Adminer** (gestión de BD): `http://localhost:8080`
   - Server: `postgres`
   - Username: `root`
-  - Password: `netflix_dev_pass`
+  - Password: `pixel_dev_pass`
 - **PostgreSQL**: `localhost:5432`
 
 ### Comandos útiles
@@ -96,7 +96,7 @@ docker-compose up -d --build
 docker-compose exec backend sh
 
 # Acceder a PostgreSQL CLI
-docker-compose exec postgres psql -U root -d bd_netflix
+docker-compose exec postgres psql -U root -d bd_pixel
 ```
 
 ### Troubleshooting Docker
@@ -141,7 +141,7 @@ sudo systemctl enable --now docker
 ### 2. Clonar el repositorio
 ```bash
 git clone <url-del-repositorio>
-cd netflix_app
+cd pixel_no_sekai
 ```
 
 ### 3. Configurar Variables de Entorno
@@ -171,7 +171,7 @@ Tus servicios estarán corriendo y tu backend estará accesible en el puerto con
 ### 1. Clonar el repositorio
 ```bash
 git clone <url-del-repositorio>
-cd Proyecto_Netflix
+cd pixel_no_sekai
 ```
 
 ### 2. Instalar dependencias
@@ -190,7 +190,7 @@ cd ..
 
 ### 3. Configurar base de datos PostgreSQL
 
-Este proyecto utiliza las siguientes tablas en la base `bd_netflix`:
+Este proyecto utiliza las siguientes tablas en la base `bd_pixel`:
 - `usuarios`: registro y login de usuarios
 - `perfiles`: perfiles de usuario
 - `listas`: contenedor de la lista "Mi lista" por perfil
@@ -198,8 +198,8 @@ Este proyecto utiliza las siguientes tablas en la base `bd_netflix`:
 
 #### Importar el esquema:
 1. Abre psql o tu cliente PostgreSQL preferido
-2. Crea la base de datos `bd_netflix` (si no existe)
-3. Importa el archivo `server/bd_netflix_postgres.sql`
+2. Crea la base de datos `bd_pixel` (si no existe)
+3. Importa el archivo `server/bd_pixel_postgres.sql`
 4. Verifica que se crearon las tablas: `usuarios`, `perfiles`, `listas`, `lista_items`
 
 ### 4. Variables de entorno
@@ -211,7 +211,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=root
 DB_PASSWORD=tu_password_postgres
-DB_NAME=bd_netflix
+DB_NAME=bd_pixel
 
 # Backend
 BACKEND_URL=http://localhost:3001
@@ -270,7 +270,7 @@ Opciones disponibles:
 ## Estructura del proyecto
 
 ```
-Proyecto_Netflix/
+pixel_no_sekai/
 ├── components/          # Componentes reutilizables
 │   ├── Header.tsx
 │   ├── MovieCard.tsx
@@ -289,7 +289,7 @@ Proyecto_Netflix/
 │   └── databaseService.ts
 ├── server/             # Backend Node.js
 │   ├── index.js       # Servidor Express
-│   ├── bd_netflix_postgres.sql # Esquema de BD
+│   ├── bd_pixel_postgres.sql # Esquema de BD
 │   └── package.json
 ├── navigation/         # Configuración de navegación
 ├── assets/            # Recursos (iconos, imágenes)
@@ -323,7 +323,7 @@ Proyecto_Netflix/
 **Error de conexión a la base de datos:**
 - Verifica que PostgreSQL esté ejecutándose
 - Revisa las credenciales en `.env`
-- Confirma que la base `bd_netflix` existe
+- Confirma que la base `bd_pixel` existe
 
 **Problemas con Expo:**
 - Ejecuta `expo doctor` para diagnosticar
@@ -346,5 +346,5 @@ Este proyecto es de uso educativo y no tiene fines comerciales.
 
 - [TMDB](https://www.themoviedb.org/) por proporcionar la API de películas
 - [Expo](https://expo.dev/) por facilitar el desarrollo multiplataforma
-- Inspirado en la interfaz de Netflix
+- Inspirado en la interfaz de Pixel
 

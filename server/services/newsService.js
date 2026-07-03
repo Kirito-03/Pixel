@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+﻿import crypto from 'crypto';
 
 const DEFAULT_ALLOWED_DOMAINS = [
   'somoskudasai.com',
@@ -41,7 +41,7 @@ function classifyCategory(title, excerpt) {
     ['estreno', ['estrena', 'estreno', 'llega', 'se lanza', 'fecha de estreno', 'premiere']],
     ['manga', ['manga', 'tankobon', 'shonen', 'shojo', 'seinen', 'manhwa']],
     ['evento', ['evento', 'convencion', 'convención', 'anime expo', 'jump festa', 'comiket', 'otakon']],
-    ['industria', ['estudio', 'productora', 'distribuidora', 'licencia', 'licenciado', 'plataforma', 'netflix', 'crunchyroll']],
+    ['industria', ['estudio', 'productora', 'distribuidora', 'licencia', 'licenciado', 'plataforma', 'pixel', 'crunchyroll']],
   ];
   for (const [cat, keys] of rules) {
     if (keys.some((k) => t.includes(normalizeText(k)))) return cat;

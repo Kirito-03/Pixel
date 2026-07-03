@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { readFileSync, mkdirSync } from 'fs';
@@ -63,7 +63,7 @@ app.use(cookieParser());
 
 // Session middleware para OAuth
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'netflix-session-secret-default',
+  secret: process.env.SESSION_SECRET || 'pixel-session-secret-default',
   resave: false,
   saveUninitialized: false,
   cookie: {

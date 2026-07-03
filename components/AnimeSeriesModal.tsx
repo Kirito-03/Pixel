@@ -1,4 +1,4 @@
-  import React, { useState, useEffect, useRef } from 'react';
+﻿  import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -114,7 +114,7 @@ export default function AnimeSeriesModal({
 
   useEffect(() => {
     if (visible && currentContent) {
-      // Animación de entrada estilo Netflix
+      // Animación de entrada estilo Pixel
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -818,7 +818,7 @@ export default function AnimeSeriesModal({
         <StatusBar style="light" translucent />
         
         <Animated.View style={[styles.content, { opacity: contentFadeAnim }]}>
-          {/* Botón cerrar estilo Netflix */}
+          {/* Botón cerrar estilo Pixel */}
           {!(trailerDelay && trailerKey && !trailerFinished) && (
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
               <Ionicons name="close" size={28} color="#FFFFFF" />

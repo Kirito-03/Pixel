@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { View, FlatList, StyleSheet, useWindowDimensions, Animated, Platform, PanResponder } from 'react-native';
 import FeaturedMovie from './FeaturedMovie';
 import { MovieDetail, AnimeDetail } from '../types';
@@ -11,7 +11,7 @@ interface Props {
 }
 
 /**
- * Carrusel de películas destacadas estilo Netflix.
+ * Carrusel de películas destacadas estilo Pixel.
  * - Usa FeaturedMovie para cada slide a pantalla completa.
  * - Paginación horizontal con snapping y autoplay.
  * - Indicadores (dots) de la slide actual.

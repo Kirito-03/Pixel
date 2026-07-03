@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+﻿import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -319,7 +319,7 @@ export default function LoginScreen({ navigation }: any) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // MOBILE — Original Netflix-style centered layout
+  // MOBILE — Original Pixel-style centered layout
   // ─────────────────────────────────────────────────────────────────────────
   // ─────────────────────────────────────────────────────────────────────────
   // MOBILE — Custom Angled Layout
@@ -668,7 +668,7 @@ const webStyles = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MOBILE STYLES — Original Netflix-style
+// MOBILE STYLES — Original Pixel-style
 // ═══════════════════════════════════════════════════════════════════════════
 const mobileStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },

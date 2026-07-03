@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import {
     Platform,
     Alert,
@@ -49,7 +49,7 @@ export const useProfileScreenLogic = () => {
     // Función para obtener la URL del avatar, con fallback si es necesario
     const getAvatarUrl = () => {
         if (!currentProfile?.avatar_url) {
-            return appendCacheBust('https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png');
+            return appendCacheBust('https://upload.wikimedia.org/wikipedia/commons/0/0b/Pixel-avatar.png');
         }
 
         if (currentProfile.avatar_url.startsWith('data:')) {

@@ -1,4 +1,4 @@
-# Configuración de Google OAuth - Guía Paso a Paso
+﻿# Configuración de Google OAuth - Guía Paso a Paso
 
 Esta guía te ayudará a obtener las credenciales de Google OAuth necesarias para el panel de administración.
 
@@ -14,7 +14,7 @@ Esta guía te ayudará a obtener las credenciales de Google OAuth necesarias par
 1. Ve a [Google Cloud Console](https://console.cloud.google.com/)
 2. Click en el selector de proyectos (arriba a la izquierda)
 3. Click en **"Nuevo Proyecto"**
-4. Nombre del proyecto: `Netflix Clone Admin`
+4. Nombre del proyecto: `Pixel No Sekai Admin`
 5. Click en **"Crear"**
 
 ---
@@ -38,7 +38,7 @@ Esta guía te ayudará a obtener las credenciales de Google OAuth necesarias par
 1. Click en **"CONFIGURAR PANTALLA DE CONSENTIMIENTO"**
 2. Selecciona **"Externo"** → Click en **"Crear"**
 3. Completa los campos:
-   - **Nombre de la aplicación**: `Netflix Clone Admin Panel`
+   - **Nombre de la aplicación**: `Pixel No Sekai Admin Panel`
    - **Correo de asistencia**: Tu email
    - **Dominio autorizado**: `localhost` (para desarrollo)
    - **Correo del desarrollador**: Tu email
@@ -53,7 +53,7 @@ Esta guía te ayudará a obtener las credenciales de Google OAuth necesarias par
 
 1. Vuelve a **"Credenciales"** → **"+ CREAR CREDENCIALES"** → **"ID de cliente de OAuth"**
 2. Tipo de aplicación: **"Aplicación web"**
-3. Nombre: `Netflix Admin OAuth Client`
+3. Nombre: `Pixel Admin OAuth Client`
 4. **Orígenes de JavaScript autorizados**:
    - `http://localhost:3001`
 5. **URIs de redirección autorizados**:

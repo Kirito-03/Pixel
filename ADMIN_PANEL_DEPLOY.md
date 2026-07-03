@@ -1,4 +1,4 @@
-# 🚀 Despliegue del Admin Panel - Guía Rápida
+﻿# 🚀 Despliegue del Admin Panel - Guía Rápida
 
 Esta guía te ayudará a desplegar el panel de administración paso a paso.
 
@@ -30,7 +30,7 @@ GOOGLE_CLIENT_SECRET=tu-client-secret
 Ejecuta el siguiente comando para crear las tablas del admin panel:
 
 ```bash
-docker exec -i netflix_postgres psql -U root -d bd_netflix < server/admin_schema.sql
+docker exec -i pixel_postgres psql -U root -d bd_pixel < server/admin_schema.sql
 ```
 
 Esto creará las tablas:
@@ -84,7 +84,7 @@ Deberías ver: `{"ok":true,"uptime":...}`
 ### 2. Verificar que las tablas se crearon:
 
 ```bash
-docker exec -it netflix_postgres psql -U root -d bd_netflix -c "\dt"
+docker exec -it pixel_postgres psql -U root -d bd_pixel -c "\dt"
 ```
 
 Deberías ver `anime_content`, `anime_episodes`, y `admin_users` en la lista.
@@ -192,13 +192,13 @@ ls server/admin
 
 ```bash
 # Verificar que el schema se aplicó correctamente
-docker exec -it netflix_postgres psql -U root -d bd_netflix -c "SELECT * FROM anime_content LIMIT 1;"
+docker exec -it pixel_postgres psql -U root -d bd_pixel -c "SELECT * FROM anime_content LIMIT 1;"
 ```
 
 Si da error, vuelve a ejecutar:
 
 ```bash
-docker exec -i netflix_postgres psql -U root -d bd_netflix < server/admin_schema.sql
+docker exec -i pixel_postgres psql -U root -d bd_pixel < server/admin_schema.sql
 ```
 
 ---

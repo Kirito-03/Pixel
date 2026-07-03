@@ -1,4 +1,4 @@
-# 🎬 Netflix Clone - Guía de Inicio Rápido
+﻿# 🎬 Pixel No Sekai - Guía de Inicio Rápido
 
 ## 🚀 Inicio Automático (Recomendado)
 
@@ -92,9 +92,9 @@ npm run web
 ### Credenciales Adminer
 - **System**: PostgreSQL
 - **Server**: postgres
-- **Username**: netflix_user
-- **Password**: netflix_password_2024
-- **Database**: netflix_db
+- **Username**: pixel_user
+- **Password**: pixel_password_2024
+- **Database**: pixel_db
 
 ## 🐛 Troubleshooting
 
@@ -126,7 +126,7 @@ docker-compose up -d
 ## 📁 Estructura
 
 ```
-netflix_app/
+pixel_no_sekai/
 ├── start.bat              # 🚀 Inicio completo
 ├── start-backend.bat      # Backend solo
 ├── stop.bat               # Detener servicios
@@ -134,7 +134,7 @@ netflix_app/
 ├── docker-compose.yml     # Config Docker
 ├── server/                # Backend API
 │   ├── index.js          # Express app
-│   └── bd_netflix_postgres.sql
+│   └── bd_pixel_postgres.sql
 ├── App.tsx                # Frontend Expo
 └── package.json           # Scripts npm
 ```

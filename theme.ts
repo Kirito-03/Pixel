@@ -1,6 +1,6 @@
-// Paletas de color para soportar modo oscuro y claro
+﻿// Paletas de color para soportar modo oscuro y claro
 export const darkColors = {
-  primary: '#E50914',      // Rojo Netflix
+  primary: '#E50914',      // Rojo Pixel
   secondary: '#B20710',    // Rojo oscuro
   background: '#000000',    // Negro
   card: '#141414',         // Gris oscuro

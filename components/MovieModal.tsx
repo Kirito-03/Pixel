@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   Modal,
   View,
@@ -117,7 +117,7 @@ export default function MovieModal({
         return;
       }
       
-      // Animación de entrada estilo Netflix
+      // Animación de entrada estilo Pixel
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -477,7 +477,7 @@ export default function MovieModal({
   };
 
   const handleClose = () => {
-    // Animación de salida estilo Netflix
+    // Animación de salida estilo Pixel
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -551,7 +551,7 @@ export default function MovieModal({
               },
             ]}
           >
-            {/* Botón cerrar estilo Netflix */}
+            {/* Botón cerrar estilo Pixel */}
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
               <Ionicons name="close" size={28} color="#FFFFFF" />
             </TouchableOpacity>
@@ -816,7 +816,7 @@ export default function MovieModal({
   );
 }
 
-// Estilos estilo Netflix
+// Estilos estilo Pixel
 const styles = StyleSheet.create({
   background: {
     flex: 1,

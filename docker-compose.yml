@@ -1,31 +1,31 @@
-version: "3.8"
+﻿version: "3.8"
 
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: netflix_postgres
+    container_name: pixel_postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-root}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-netflix_dev_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-bd_netflix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pixel_dev_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-bd_pixel}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       # Persistencia de datos
       - postgres_data:/var/lib/postgresql/data
       # Auto-inicialización del schema en primer inicio (orden alfabético)
-      - ./server/bd_netflix_postgres.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./server/bd_pixel_postgres.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./server/admin_schema.sql:/docker-entrypoint-initdb.d/02-admin.sql:ro
     networks:
-      - netflix_network
+      - pixel_network
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-bd_netflix}"
+          "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-bd_pixel}"
         ]
       interval: 10s
       timeout: 5s
@@ -37,7 +37,7 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: netflix_backend
+    container_name: pixel_backend
     restart: unless-stopped
     ports:
       - "3001:3001"
@@ -46,8 +46,8 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-root}
-      DB_PASSWORD: ${DB_PASSWORD:-netflix_dev_pass}
-      DB_NAME: ${DB_NAME:-bd_netflix}
+      DB_PASSWORD: ${DB_PASSWORD:-pixel_dev_pass}
+      DB_NAME: ${DB_NAME:-bd_pixel}
       # Server config
       PORT: 3001
       HOST: 0.0.0.0
@@ -61,8 +61,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3001/auth/google/callback}
-      JWT_SECRET: ${JWT_SECRET:-netflix_secret}
-      SESSION_SECRET: ${SESSION_SECRET:-netflix_session}
+      JWT_SECRET: ${JWT_SECRET:-pixel_secret}
+      SESSION_SECRET: ${SESSION_SECRET:-pixel_session}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
       # Cloudflare R2
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
@@ -86,7 +86,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - netflix_network
+      - pixel_network
     healthcheck:
       test:
         [
@@ -103,7 +103,7 @@ services:
   # Adminer - DB Management UI
   adminer:
     image: adminer:latest
-    container_name: netflix_adminer
+    container_name: pixel_adminer
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -113,19 +113,19 @@ services:
     depends_on:
       - postgres
     networks:
-      - netflix_network
+      - pixel_network
 
   # Redis - Caching layer
   redis:
     image: redis:7-alpine
-    container_name: netflix_redis
+    container_name: pixel_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - netflix_network
+      - pixel_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -141,5 +141,5 @@ volumes:
 
 # Red interna para comunicación entre servicios
 networks:
-  netflix_network:
+  pixel_network:
     driver: bridge

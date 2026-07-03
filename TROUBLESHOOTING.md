@@ -1,4 +1,4 @@
-# 🔧 Troubleshooting - Scripts de Inicio
+﻿# 🔧 Troubleshooting - Scripts de Inicio
 
 ## Problema: `start.bat` abre ventana y no hace nada
 
@@ -35,7 +35,7 @@ start.bat
 
 ```bash
 # Abrir terminal en la carpeta del proyecto
-cd c:\Users\ASUS\Documents\Projects\netflix_app
+cd c:\Users\ASUS\Documents\Projects\pixel_no_sekai
 
 # Ejecutar script
 start.bat
@@ -49,12 +49,12 @@ Si los scripts no funcionan, hazlo manualmente:
 
 ```bash
 # Terminal 1: Backend
-cd c:\Users\ASUS\Documents\Projects\netflix_app
+cd c:\Users\ASUS\Documents\Projects\pixel_no_sekai
 docker-compose up -d
 docker-compose logs -f backend
 
 # Terminal 2: Frontend (otra terminal)
-cd c:\Users\ASUS\Documents\Projects\netflix_app
+cd c:\Users\ASUS\Documents\Projects\pixel_no_sekai
 npm start
 ```
 
@@ -82,7 +82,7 @@ docker ps
 ### 2. Backend levantado?
 ```bash
 docker-compose ps
-# Debe mostrar: netflix_backend, netflix_postgres (Up)
+# Debe mostrar: pixel_backend, pixel_postgres (Up)
 ```
 
 ### 3. Backend responde?

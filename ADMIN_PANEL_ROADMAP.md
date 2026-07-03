@@ -1,4 +1,4 @@
-# 🎬 Netflix Clone Admin Panel - Roadmap & Mejoras
+﻿# 🎬 Pixel No Sekai Admin Panel - Roadmap & Mejoras
 
 Este documento detalla el plan de implementación para el **Panel de Administración** y el nuevo sistema de gestión de contenido propio, eliminando la dependencia de APIs inestables.
 

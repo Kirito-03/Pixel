@@ -1,7 +1,7 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 const pool = new pg.Pool({
   host: 'localhost', port: 5432, user: 'root',
-  password: 'netflix_dev_pass', database: 'bd_netflix'
+  password: 'pixel_dev_pass', database: 'bd_pixel'
 });
 
 const r = await pool.query(
