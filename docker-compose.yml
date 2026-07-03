@@ -1,8 +1,65 @@
 version: "3.8"
 
 services:
-  # PostgreSQL Database
-  postgres:
+  # 1. Frontend Web (Nginx) - ÚNICO EXPUESTO AL HOST
+  pixel_frontend:
+    image: nginx:alpine
+    container_name: pixel_frontend
+    restart: unless-stopped
+    ports:
+      # Expuesto al host únicamente en el puerto 4006 para Cloudflare Tunnel
+      - "4006:80"
+    volumes:
+      # Monta la app compilada (dist) generada por Expo
+      - ./dist:/usr/share/nginx/html:ro
+      # Monta el archivo de configuración custom de Nginx
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - pixel_backend
+    networks:
+      - pixel_network
+
+  # 2. Node.js Backend - SIN PUERTOS EXPUESTOS
+  pixel_backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: pixel_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: pixel_postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-root}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-pixel_dev_pass}
+      DB_NAME: ${POSTGRES_DB:-bd_pixel}
+      PORT: 3001
+      HOST: 0.0.0.0
+      NODE_ENV: ${NODE_ENV:-production}
+      REDIS_HOST: pixel_redis
+      REDIS_PORT: 6379
+    env_file:
+      - .env
+    volumes:
+      - /app/node_modules
+      - ./server/uploads:/app/uploads
+      - ./server/videos:/app/videos
+      - ./server/hls:/app/hls
+    depends_on:
+      pixel_postgres:
+        condition: service_healthy
+      pixel_redis:
+        condition: service_started
+    networks:
+      - pixel_network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3001',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 3. PostgreSQL Database - SIN PUERTOS EXPUESTOS
+  pixel_postgres:
     image: postgres:16-alpine
     container_name: pixel_postgres
     restart: unless-stopped
@@ -12,109 +69,20 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-bd_pixel}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
-      # Persistencia de datos
       - postgres_data:/var/lib/postgresql/data
-      # Auto-inicialización del schema en primer inicio (orden alfabético)
       - ./server/bd_pixel_postgres.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./server/admin_schema.sql:/docker-entrypoint-initdb.d/02-admin.sql:ro
     networks:
       - pixel_network
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-bd_pixel}"
-        ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-bd_pixel}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
-  # Node.js Backend
-  backend:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: pixel_backend
-    restart: unless-stopped
-    ports:
-      - "3001:3001"
-    environment:
-      # Database config
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-root}
-      DB_PASSWORD: ${DB_PASSWORD:-pixel_dev_pass}
-      DB_NAME: ${DB_NAME:-bd_pixel}
-      # Server config
-      PORT: 3001
-      HOST: 0.0.0.0
-      NODE_ENV: ${NODE_ENV:-development}
-      # APIs externas (desde .env)
-      TMDB_API_KEY: ${TMDB_API_KEY}
-      NEWSAPI_KEY: ${NEWSAPI_KEY}
-      TRANSLATE_PROVIDER: ${TRANSLATE_PROVIDER:-libre}
-      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
-      # Google OAuth & Auth
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3001/auth/google/callback}
-      JWT_SECRET: ${JWT_SECRET:-pixel_secret}
-      SESSION_SECRET: ${SESSION_SECRET:-pixel_session}
-      ADMIN_EMAILS: ${ADMIN_EMAILS}
-      # Cloudflare R2
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
-      R2_BUCKET_NAME: ${R2_BUCKET_NAME}
-      R2_PUBLIC_URL: ${R2_PUBLIC_URL}
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-    volumes:
-      # Anonymous volume para node_modules (evita conflictos con host)
-      - /app/node_modules
-      # Persistencia de uploads
-      - ./server/uploads:/app/uploads
-      # Persistencia de videos (M3U fuente)
-      - ./server/videos:/app/videos
-      # HLS temporal (se elimina tras subida a R2, pero el dir debe existir)
-      - ./server/hls:/app/hls
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - pixel_network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "require('http').get('http://127.0.0.1:3001',res=>process.exit(res.statusCode < 500 ? 0 : 1)).on('error',()=>process.exit(1))"
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Adminer - DB Management UI
-  adminer:
-    image: adminer:latest
-    container_name: pixel_adminer
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8080:8080"
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-      ADMINER_DESIGN: pepa-linha
-    depends_on:
-      - postgres
-    networks:
-      - pixel_network
-
-  # Redis - Caching layer
-  redis:
+  # 4. Redis Caching - SIN PUERTOS EXPUESTOS
+  pixel_redis:
     image: redis:7-alpine
     container_name: pixel_redis
     restart: unless-stopped
@@ -128,14 +96,26 @@ services:
       timeout: 3s
       retries: 3
 
-# Volumes para persistencia
+  # 5. Adminer DB Manager - SIN PUERTOS EXPUESTOS (Para uso interno o proxy reverso)
+  pixel_adminer:
+    image: adminer:latest
+    container_name: pixel_adminer
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: pixel_postgres
+      ADMINER_DESIGN: pepa-linha
+    depends_on:
+      - pixel_postgres
+    networks:
+      - pixel_network
+
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
 
-# Red interna para comunicación entre servicios
 networks:
   pixel_network:
+    name: pixel_network
     driver: bridge
