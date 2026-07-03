@@ -77,6 +77,7 @@ export function useTabNavigation() {
     const labelToTab: Record<string, string> = {
       'Inicio': 'Inicio',
       'Noticias': 'Noticias',
+      'Emisión': 'Emisión',
       'Manga': 'Manga',
       'Mi Lista': 'MiLista',
       'Buscar': 'Buscar',

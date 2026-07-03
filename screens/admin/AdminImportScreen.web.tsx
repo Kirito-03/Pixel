@@ -30,7 +30,6 @@ export default function AdminImportScreen() {
   const [useDefaultM3u, setUseDefaultM3u] = useState(true)
   const [m3uSources, setM3uSources] = useState('')
   const [m3uText, setM3uText] = useState('')
-  const [folders, setFolders] = useState('')
   const [maxItems, setMaxItems] = useState('600')
   const [maxTranscodes, setMaxTranscodes] = useState('25')
   const [validateMode, setValidateMode] = useState<ValidateMode>('mixed')
@@ -42,22 +41,36 @@ export default function AdminImportScreen() {
   const [jobsSummary, setJobsSummary] = useState<any>(null)
   const [jobs, setJobs] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
+
+  const fetchUploadedFiles = async () => {
+    try {
+      const res = await adminApiService.getUploadedM3uFiles()
+      if (res.ok && res.files) {
+        setUploadedFiles(res.files)
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    fetchUploadedFiles()
+  }, [])
 
   const payloadBase = useMemo(() => {
     const m3u = useDefaultM3u ? [] : linesToArray(m3uSources)
-    const folderArr = linesToArray(folders)
     const mi = Number(maxItems) || undefined
     const mt = Number(maxTranscodes) || undefined
     return {
       m3u,
-      folders: folderArr,
       validateMode,
       maxItems: mi,
       maxTranscodes: mt,
       allowNoEpisode,
       useDefaultM3u,
     }
-  }, [allowNoEpisode, folders, m3uSources, maxItems, maxTranscodes, useDefaultM3u, validateMode])
+  }, [allowNoEpisode, m3uSources, maxItems, maxTranscodes, useDefaultM3u, validateMode])
 
   const refreshJobs = async () => {
     try {
@@ -127,6 +140,7 @@ export default function AdminImportScreen() {
       setUseDefaultM3u(false)
       setM3uSources(current.join('\n') + '\n')
       setM3uText('')
+      fetchUploadedFiles()
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Error subiendo M3U')
     } finally {
@@ -164,6 +178,7 @@ export default function AdminImportScreen() {
       current.push(r.url)
       setUseDefaultM3u(false)
       setM3uSources(current.join('\n') + '\n')
+      fetchUploadedFiles()
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Error subiendo archivo M3U')
     } finally {
@@ -259,15 +274,30 @@ export default function AdminImportScreen() {
               {runningAction === 'upload_file' ? <ActivityIndicator size="small" color={adminColors.text} /> : <Text style={styles.btnInlineSecondaryText}>Buscar archivo .m3u</Text>}
             </TouchableOpacity>
 
-            <Text style={styles.label}>Carpetas (una por línea)</Text>
-            <TextInput
-              value={folders}
-              onChangeText={setFolders}
-              placeholder="c:\\path\\videos"
-              placeholderTextColor={adminColors.textSecondary}
-              style={[styles.input, styles.textareaSm]}
-              multiline
-            />
+            {uploadedFiles.length > 0 && (
+              <View style={{ marginTop: 20 }}>
+                <Text style={styles.label}>Archivos Subidos (Click para agregar)</Text>
+                <View style={{ gap: 8, marginTop: 8 }}>
+                  {uploadedFiles.map((file, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={{ padding: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, borderWidth: 1, borderColor: adminColors.border }}
+                      onPress={() => {
+                        const current = useDefaultM3u ? [] : linesToArray(m3uSources)
+                        current.push(file.url)
+                        setUseDefaultM3u(false)
+                        setM3uSources(current.join('\n') + '\n')
+                      }}
+                    >
+                      <Text style={{ color: adminColors.text, fontWeight: 'bold' }}>{file.name}</Text>
+                      <Text style={{ color: adminColors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                        {new Date(file.createdAt).toLocaleString()} · {(file.size / 1024).toFixed(1)} KB
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
 
             <View style={styles.row}>
               <View style={styles.rowCol}>

@@ -101,12 +101,20 @@ export default function AnimeFormScreen() {
         }
     };
 
+    const mapTMDBStatus = (status: string) => {
+        if (!status) return 'Unknown';
+        const lowerStatus = status.toLowerCase();
+        if (lowerStatus.includes('returning') || lowerStatus.includes('airing')) return 'Airing';
+        if (lowerStatus.includes('ended') || lowerStatus.includes('canceled')) return 'Finished';
+        if (lowerStatus.includes('planned') || lowerStatus.includes('production')) return 'Upcoming';
+        return 'Unknown';
+    };
+
     const selectTMDBResult = async (tmdbId: number) => {
         try {
             setIsSearching(true);
             const data = await adminApiService.getTMDBDetails(tmdbId);
 
-            // Autocompletar formulario con datos de TMDB
             setFormData({
                 ...formData,
                 tmdb_id: tmdbId.toString(),
@@ -132,15 +140,6 @@ export default function AnimeFormScreen() {
         }
     };
 
-    const mapTMDBStatus = (status: string) => {
-        if (!status) return 'Unknown';
-        const lowerStatus = status.toLowerCase();
-        if (lowerStatus.includes('returning') || lowerStatus.includes('airing')) return 'Airing';
-        if (lowerStatus.includes('ended') || lowerStatus.includes('canceled')) return 'Finished';
-        if (lowerStatus.includes('planned') || lowerStatus.includes('production')) return 'Upcoming';
-        return 'Unknown';
-    };
-
     const handleSave = async () => {
         if (!formData.title.trim()) {
             Alert.alert('Error', 'El título es requerido');
@@ -152,7 +151,7 @@ export default function AnimeFormScreen() {
 
             const payload = {
                 ...formData,
-                genres: formData.genres.split(',').map(g => g.trim()).filter(g => g),
+                genres: formData.genres.split(',').map((g: string) => g.trim()).filter((g: string) => g),
                 total_episodes: formData.total_episodes ? parseInt(formData.total_episodes) : 0,
                 rating: formData.rating ? parseFloat(formData.rating) : 0,
                 tmdb_id: formData.tmdb_id ? parseInt(formData.tmdb_id) : undefined,
@@ -160,15 +159,23 @@ export default function AnimeFormScreen() {
 
             if (mode === 'create') {
                 await adminApiService.createAnime(payload);
-                Alert.alert('Éxito', 'Anime creado exitosamente', [
-                    { text: 'OK', onPress: () => navigation.goBack() }
-                ]);
+                if (Platform.OS === 'web') {
+                    navigation.goBack();
+                } else {
+                    Alert.alert('Éxito', 'Anime creado exitosamente', [
+                        { text: 'OK', onPress: () => navigation.goBack() }
+                    ]);
+                }
             } else {
                 if (!animeId) throw new Error('ID de anime no encontrado');
                 await adminApiService.updateAnime(animeId, payload);
-                Alert.alert('Éxito', 'Anime actualizado exitosamente', [
-                    { text: 'OK', onPress: () => navigation.goBack() }
-                ]);
+                if (Platform.OS === 'web') {
+                    navigation.goBack();
+                } else {
+                    Alert.alert('Éxito', 'Anime actualizado exitosamente', [
+                        { text: 'OK', onPress: () => navigation.goBack() }
+                    ]);
+                }
             }
         } catch (error: any) {
             console.error('Error saving anime:', error);
@@ -227,136 +234,138 @@ export default function AnimeFormScreen() {
                             </View>
                         )}
 
-                        {/* Título y Autocomplete */}
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Título *</Text>
-                            <View style={styles.inputContainer}>
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.title}
-                                    onChangeText={(text) => {
-                                        setFormData({ ...formData, title: text });
-                                    }}
-                                    placeholder="Nombre del anime"
-                                    placeholderTextColor="#808080"
-                                />
+                        {/* Title */}
+                        <Text style={styles.sectionTitle}>Información Básica</Text>
+
+                        <Text style={styles.label}>Título *</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.title}
+                            onChangeText={(text) => setFormData({ ...formData, title: text })}
+                            placeholder="Título en español"
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
+
+                        <Text style={styles.label}>Título en inglés</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.title_english}
+                            onChangeText={(text) => setFormData({ ...formData, title_english: text })}
+                            placeholder="Título en inglés"
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
+
+                        <Text style={styles.label}>Título en japonés</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.title_japanese}
+                            onChangeText={(text) => setFormData({ ...formData, title_japanese: text })}
+                            placeholder="Título en japonés"
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
+
+                        <Text style={styles.label}>Descripción</Text>
+                        <TextInput
+                            style={[styles.input, styles.textArea]}
+                            value={formData.description}
+                            onChangeText={(text) => setFormData({ ...formData, description: text })}
+                            placeholder="Sinopsis..."
+                            placeholderTextColor={adminColors.textSecondary}
+                            multiline
+                            numberOfLines={4}
+                        />
+
+                        {/* URLs */}
+                        <Text style={styles.sectionTitle}>Imágenes</Text>
+
+                        <Text style={styles.label}>URL del Poster</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.poster_url}
+                            onChangeText={(text) => setFormData({ ...formData, poster_url: text })}
+                            placeholder="https://..."
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
+
+                        <Text style={styles.label}>URL del Banner</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.banner_url}
+                            onChangeText={(text) => setFormData({ ...formData, banner_url: text })}
+                            placeholder="https://..."
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
+
+                        {/* Details */}
+                        <Text style={styles.sectionTitle}>Detalles</Text>
+
+                        <Text style={styles.label}>Géneros (separados por coma)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.genres}
+                            onChangeText={(text) => setFormData({ ...formData, genres: text })}
+                            placeholder="Action, Adventure, Fantasy"
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
+
+                        <Text style={styles.label}>Estado</Text>
+                        <View style={styles.statusContainer}>
+                            {['Airing', 'Finished', 'Upcoming', 'Unknown'].map((s) => (
                                 <TouchableOpacity
-                                    style={styles.searchIcon}
-                                    onPress={() => {
-                                        setTmdbSearchQuery(formData.title);
-                                        setShowTMDBSearch(true);
-                                        searchTMDB(formData.title);
-                                    }}
+                                    key={s}
+                                    style={[styles.statusChip, formData.status === s && styles.statusChipActive]}
+                                    onPress={() => setFormData({ ...formData, status: s })}
                                 >
-                                    <Ionicons name="cloud-download-outline" size={20} color="#FFFFFF" />
+                                    <Text style={[styles.statusChipText, formData.status === s && styles.statusChipTextActive]}>
+                                        {s}
+                                    </Text>
                                 </TouchableOpacity>
-                            </View>
+                            ))}
                         </View>
 
                         <View style={styles.row}>
-                            {/* Título en Inglés */}
-                            <View style={[styles.formGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>Título en Inglés</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.title_english}
-                                    onChangeText={(text) => setFormData({ ...formData, title_english: text })}
-                                    placeholder="English title"
-                                    placeholderTextColor="#808080"
-                                />
-                            </View>
-
-                            {/* Total Episodios */}
-                            <View style={[styles.formGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>Total de Episodios</Text>
+                            <View style={styles.rowItem}>
+                                <Text style={styles.label}>Total Episodios</Text>
                                 <TextInput
                                     style={styles.input}
                                     value={formData.total_episodes}
-                                    onChangeText={(text) => setFormData({ ...formData, total_episodes: text.replace(/[^0-9]/g, '') })}
-                                    placeholder="12"
-                                    placeholderTextColor="#808080"
+                                    onChangeText={(text) => setFormData({ ...formData, total_episodes: text })}
+                                    placeholder="0"
+                                    placeholderTextColor={adminColors.textSecondary}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                            <View style={styles.rowItem}>
+                                <Text style={styles.label}>Rating</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={formData.rating}
+                                    onChangeText={(text) => setFormData({ ...formData, rating: text })}
+                                    placeholder="8.5"
+                                    placeholderTextColor={adminColors.textSecondary}
                                     keyboardType="numeric"
                                 />
                             </View>
                         </View>
 
-                        {/* Descripción */}
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Descripción</Text>
-                            <TextInput
-                                style={[styles.input, styles.textArea]}
-                                value={formData.description}
-                                onChangeText={(text) => setFormData({ ...formData, description: text })}
-                                placeholder="Sinopsis del anime"
-                                placeholderTextColor="#808080"
-                                multiline
-                                numberOfLines={4}
-                            />
-                        </View>
+                        <Text style={styles.label}>Fecha de estreno</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.release_date}
+                            onChangeText={(text) => setFormData({ ...formData, release_date: text })}
+                            placeholder="2024-01-01"
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
 
-                        <View style={styles.row}>
-                            {/* Poster URL */}
-                            <View style={[styles.formGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>URL del Póster</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.poster_url}
-                                    onChangeText={(text) => setFormData({ ...formData, poster_url: text })}
-                                    placeholder="https://..."
-                                    placeholderTextColor="#808080"
-                                    autoCapitalize="none"
-                                />
-                            </View>
-
-                            {/* Banner URL */}
-                            <View style={[styles.formGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>URL del Banner</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.banner_url}
-                                    onChangeText={(text) => setFormData({ ...formData, banner_url: text })}
-                                    placeholder="https://..."
-                                    placeholderTextColor="#808080"
-                                    autoCapitalize="none"
-                                />
-                            </View>
-                        </View>
-
-                        {/* Géneros */}
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Géneros (separados por coma)</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={formData.genres}
-                                onChangeText={(text) => setFormData({ ...formData, genres: text })}
-                                placeholder="Acción, Aventura, Fantasía"
-                                placeholderTextColor="#808080"
-                            />
-                        </View>
-
-                        {/* Estado */}
-                        <View style={styles.formGroup}>
-                            <Text style={styles.label}>Estado</Text>
-                            <View style={styles.statusButtons}>
-                                {['Airing', 'Finished', 'Upcoming'].map((status) => (
-                                    <TouchableOpacity
-                                        key={status}
-                                        style={[
-                                            styles.statusButton,
-                                            formData.status === status && styles.statusButtonActive
-                                        ]}
-                                        onPress={() => setFormData({ ...formData, status })}
-                                    >
-                                        <Text style={[
-                                            styles.statusButtonText,
-                                            formData.status === status && styles.statusButtonTextActive
-                                        ]}>
-                                            {status}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
+                        <Text style={styles.label}>TMDB ID</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formData.tmdb_id}
+                            onChangeText={(text) => setFormData({ ...formData, tmdb_id: text })}
+                            placeholder="ID de TMDB"
+                            placeholderTextColor={adminColors.textSecondary}
+                            keyboardType="numeric"
+                        />
 
                         {/* Save Button */}
                         <TouchableOpacity
@@ -365,7 +374,7 @@ export default function AnimeFormScreen() {
                             disabled={isSaving}
                         >
                             {isSaving ? (
-                                <ActivityIndicator color="#FFFFFF" />
+                                <ActivityIndicator color="#fff" />
                             ) : (
                                 <Text style={styles.saveButtonText}>
                                     {mode === 'create' ? 'Crear Anime' : 'Guardar Cambios'}
@@ -374,80 +383,70 @@ export default function AnimeFormScreen() {
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
-
-                {/* TMDB Search Modal */}
-                <Modal
-                    visible={showTMDBSearch}
-                    animationType="slide"
-                    transparent={true}
-                    onRequestClose={() => setShowTMDBSearch(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContainer}>
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Buscar en TMDB</Text>
-                                <TouchableOpacity onPress={() => setShowTMDBSearch(false)}>
-                                    <Ionicons name="close" size={28} color={adminColors.text} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.modalSearchContainer}>
-                                <TextInput
-                                    style={styles.modalSearchInput}
-                                    value={tmdbSearchQuery}
-                                    onChangeText={setTmdbSearchQuery}
-                                    placeholder="Buscar anime..."
-                                    placeholderTextColor="#808080"
-                                    onSubmitEditing={() => searchTMDB()}
-                                />
-                                <TouchableOpacity style={styles.modalSearchButton} onPress={() => searchTMDB()}>
-                                    <Ionicons name="search" size={20} color="#FFFFFF" />
-                                </TouchableOpacity>
-                            </View>
-
-                            {isSearching ? (
-                                <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="large" color={adminColors.primary} />
-                                </View>
-                            ) : (
-                                <FlatList
-                                    data={tmdbResults}
-                                    keyExtractor={(item) => item.id.toString()}
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={styles.tmdbResultItem}
-                                            onPress={() => selectTMDBResult(item.id)}
-                                        >
-                                            <Image
-                                                source={{ uri: item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://via.placeholder.com/100x150' }}
-                                                style={styles.tmdbResultImage}
-                                            />
-                                            <View style={styles.tmdbResultInfo}>
-                                                <Text style={styles.tmdbResultTitle}>{item.name || item.original_name}</Text>
-                                                <Text style={styles.tmdbResultOverview} numberOfLines={2}>
-                                                    {item.overview || 'Sin descripción'}
-                                                </Text>
-                                                <Text style={styles.tmdbResultDate}>
-                                                    {item.first_air_date ? `Estreno: ${item.first_air_date}` : ''}
-                                                </Text>
-                                            </View>
-                                            <Ionicons name="chevron-forward" size={20} color={adminColors.textSecondary} />
-                                        </TouchableOpacity>
-                                    )}
-                                    contentContainerStyle={styles.tmdbResultsList}
-                                    ListEmptyComponent={
-                                        tmdbSearchQuery && !isSearching ? (
-                                            <View style={styles.emptyContainer}>
-                                                <Text style={styles.emptyText}>No se encontraron resultados en TMDB</Text>
-                                            </View>
-                                        ) : null
-                                    }
-                                />
-                            )}
-                        </View>
-                    </View>
-                </Modal>
             </SafeAreaView>
+
+            {/* TMDB Search Modal */}
+            <Modal visible={showTMDBSearch} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Buscar en TMDB</Text>
+                            <TouchableOpacity onPress={() => setShowTMDBSearch(false)}>
+                                <Ionicons name="close" size={24} color={adminColors.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.searchRow}>
+                            <TextInput
+                                style={[styles.input, styles.searchInput]}
+                                value={tmdbSearchQuery}
+                                onChangeText={setTmdbSearchQuery}
+                                placeholder="Buscar anime..."
+                                placeholderTextColor={adminColors.textSecondary}
+                                onSubmitEditing={() => searchTMDB()}
+                                returnKeyType="search"
+                            />
+                            <TouchableOpacity
+                                style={styles.searchButton}
+                                onPress={() => searchTMDB()}
+                                disabled={isSearching}
+                            >
+                                {isSearching ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <Ionicons name="search" size={20} color="#fff" />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+
+                        <FlatList
+                            data={tmdbResults}
+                            keyExtractor={(item) => item.id.toString()}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={styles.tmdbResultItem}
+                                    onPress={() => selectTMDBResult(item.id)}
+                                >
+                                    {item.poster_path && (
+                                        <Image
+                                            source={{ uri: `https://image.tmdb.org/t/p/w92${item.poster_path}` }}
+                                            style={styles.tmdbResultImage}
+                                        />
+                                    )}
+                                    <View style={styles.tmdbResultInfo}>
+                                        <Text style={styles.tmdbResultTitle} numberOfLines={2}>
+                                            {item.name || item.title}
+                                        </Text>
+                                        <Text style={styles.tmdbResultDate}>
+                                            {item.first_air_date || item.release_date || 'Sin fecha'}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </AdminShell>
     );
 }
@@ -461,260 +460,219 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: adminColors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 24,
-        paddingBottom: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: adminColors.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: adminColors.border,
     },
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
+        gap: 10,
     },
     backButton: {
-        padding: 4,
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: adminColors.background,
+        borderWidth: 1,
+        borderColor: adminColors.border,
     },
     headerTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '800',
         color: adminColors.text,
-        letterSpacing: -0.5,
     },
     tmdbButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: adminColors.ink,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
-        gap: 8,
+        gap: 6,
+        backgroundColor: '#032541',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
     },
     tmdbButtonText: {
         color: '#FFFFFF',
-        fontWeight: '600',
-        fontSize: 14,
+        fontWeight: '700',
+        fontSize: 13,
     },
     content: {
         flex: 1,
     },
     contentContainer: {
-        paddingHorizontal: 24,
+        padding: 16,
         paddingBottom: 40,
     },
     formCard: {
         backgroundColor: adminColors.surface,
-        borderRadius: 8,
-        padding: 24,
+        borderRadius: 14,
+        padding: 16,
         borderWidth: 1,
         borderColor: adminColors.border,
+    },
+    previewContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+        alignItems: 'flex-start',
+    },
+    bannerPreview: {
+        flex: 1,
+        height: 100,
+        borderRadius: 10,
+    },
+    posterPreview: {
+        width: 70,
+        height: 100,
+        borderRadius: 10,
+    },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: adminColors.text,
+        marginTop: 16,
+        marginBottom: 10,
+    },
+    label: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: adminColors.textSecondary,
+        marginTop: 10,
+        marginBottom: 6,
+    },
+    input: {
+        backgroundColor: adminColors.background,
+        borderWidth: 1,
+        borderColor: adminColors.border,
+        borderRadius: 10,
+        padding: 12,
+        color: adminColors.text,
+        fontSize: 14,
+    },
+    textArea: {
+        minHeight: 100,
+        textAlignVertical: 'top',
+    },
+    statusContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 4,
+    },
+    statusChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.surface,
+    },
+    statusChipActive: {
+        backgroundColor: adminColors.primary,
+        borderColor: adminColors.primary,
+    },
+    statusChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: adminColors.textSecondary,
+    },
+    statusChipTextActive: {
+        color: '#fff',
     },
     row: {
         flexDirection: 'row',
-        gap: 16,
-    },
-    previewContainer: {
-        marginBottom: 32,
-        alignItems: 'center',
-    },
-    bannerPreview: {
-        width: '100%',
-        height: 160,
-        borderRadius: 8,
-        marginBottom: -50,
-        opacity: 0.6,
-    },
-    posterPreview: {
-        width: 120,
-        height: 180,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: adminColors.primary,
-    },
-    formGroup: {
-        marginBottom: 20,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: adminColors.textSecondary,
-        marginBottom: 8,
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    searchIcon: {
-        padding: 12,
-        backgroundColor: adminColors.background,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-    },
-    input: {
-        flex: 1,
-        backgroundColor: adminColors.surface,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-        borderRadius: 12,
-        padding: 12,
-        fontSize: 15,
-        color: adminColors.text,
-    },
-    textArea: {
-        minHeight: 120,
-        textAlignVertical: 'top',
-    },
-    statusButtons: {
-        flexDirection: 'row',
         gap: 12,
     },
-    statusButton: {
+    rowItem: {
         flex: 1,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-        backgroundColor: adminColors.surface,
-        alignItems: 'center',
-    },
-    statusButtonActive: {
-        backgroundColor: 'rgba(117, 2, 15, 0.08)',
-        borderColor: adminColors.primary,
-    },
-    statusButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: adminColors.textSecondary,
-    },
-    statusButtonTextActive: {
-        color: adminColors.primary,
     },
     saveButton: {
+        marginTop: 24,
         backgroundColor: adminColors.primary,
-        padding: 16,
         borderRadius: 12,
+        paddingVertical: 14,
         alignItems: 'center',
-        marginTop: 16,
     },
     saveButtonDisabled: {
         opacity: 0.6,
     },
     saveButtonText: {
-        color: '#FFFFFF',
+        color: '#fff',
+        fontWeight: '900',
         fontSize: 16,
-        fontWeight: '600',
     },
-    // Modal Styles
+    // Modal styles
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'flex-end',
     },
     modalContainer: {
-        width: '100%',
-        maxWidth: 700,
-        maxHeight: '80%',
         backgroundColor: adminColors.surface,
-        borderRadius: 12,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: adminColors.border,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '80%',
+        padding: 16,
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 24,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: adminColors.border,
+        marginBottom: 16,
     },
     modalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '800',
         color: adminColors.text,
     },
-    modalSearchContainer: {
+    searchRow: {
         flexDirection: 'row',
-        paddingHorizontal: 24,
-        paddingBottom: 16,
-        gap: 12,
+        gap: 10,
+        marginBottom: 12,
     },
-    modalSearchInput: {
+    searchInput: {
         flex: 1,
-        backgroundColor: adminColors.background,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-        borderRadius: 12,
-        padding: 12,
-        fontSize: 15,
-        color: adminColors.text,
     },
-    modalSearchButton: {
+    searchButton: {
         backgroundColor: adminColors.primary,
-        width: 48,
-        height: 48,
-        borderRadius: 12,
+        paddingHorizontal: 16,
+        borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    tmdbResultsList: {
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-    },
     tmdbResultItem: {
         flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: adminColors.surface,
+        gap: 12,
         padding: 12,
-        borderRadius: 8,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: adminColors.border,
+        borderBottomWidth: 1,
+        borderBottomColor: adminColors.border,
+        alignItems: 'center',
     },
     tmdbResultImage: {
-        width: 60,
-        height: 90,
-        borderRadius: 4,
-        marginRight: 16,
-        backgroundColor: '#262626',
+        width: 46,
+        height: 70,
+        borderRadius: 6,
     },
     tmdbResultInfo: {
         flex: 1,
-        marginRight: 12,
     },
     tmdbResultTitle: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
         color: adminColors.text,
-        marginBottom: 6,
-    },
-    tmdbResultOverview: {
-        fontSize: 13,
-        color: adminColors.textSecondary,
-        marginBottom: 8,
-        lineHeight: 18,
+        fontSize: 14,
     },
     tmdbResultDate: {
+        color: adminColors.textSecondary,
         fontSize: 12,
-        color: adminColors.textSecondary,
-        fontWeight: '500',
+        marginTop: 4,
     },
-    emptyContainer: {
-        padding: 32,
-        alignItems: 'center',
-    },
-    emptyText: {
-        color: adminColors.textSecondary,
-        fontSize: 15,
-        textAlign: 'center',
-    }
 });

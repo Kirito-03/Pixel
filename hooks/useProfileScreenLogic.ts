@@ -156,8 +156,7 @@ export const useProfileScreenLogic = () => {
                     onPress: async () => {
                         await clearCurrentProfile();
                         await logout();
-                        // @ts-ignore
-                        navigation.replace('Ingreso');
+                        // El navegador condicional redirige automáticamente a 'Ingreso' cuando user=null
                     },
                 },
             ]
@@ -347,8 +346,7 @@ export const useProfileScreenLogic = () => {
         try {
             await clearCurrentProfile();
             await logout();
-            // @ts-ignore
-            navigation.replace('Ingreso');
+            // El navegador condicional redirige automáticamente a 'Ingreso' cuando user=null
         } catch (e) {
             Alert.alert('Error', 'No se pudo cerrar sesión');
         } finally {

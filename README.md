@@ -124,6 +124,43 @@ docker-compose restart
 
 ---
 
+## 🚀 Despliegue en VPS (Producción)
+
+Para desplegar Pixel No Sekai en tu propio VPS (Ubuntu/Debian recomendado), sigue estos pasos:
+
+### 1. Preparar el Servidor
+```bash
+# Actualizar el sistema
+sudo apt update && sudo apt upgrade -y
+
+# Instalar Docker y Docker Compose
+sudo apt install docker.io docker-compose -y
+sudo systemctl enable --now docker
+```
+
+### 2. Clonar el repositorio
+```bash
+git clone <url-del-repositorio>
+cd netflix_app
+```
+
+### 3. Configurar Variables de Entorno
+Crea un archivo `.env.docker` basado en `.env.example`:
+```bash
+cp .env.example .env.docker
+nano .env.docker
+```
+Asegúrate de cambiar las contraseñas, URLs y las claves de API (TMDB, Firebase, R2, etc.).
+
+### 4. Levantar los Servicios
+```bash
+# Iniciar servicios en segundo plano
+sudo docker-compose --env-file .env.docker up -d --build
+```
+Tus servicios estarán corriendo y tu backend estará accesible en el puerto configurado. Para servir la app web, puedes compilar Expo para web y servir los archivos estáticos usando Nginx.
+
+---
+
 ## Instalación y configuración (Manual)
 
 ### Prerrequisitos

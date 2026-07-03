@@ -73,6 +73,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
   const navLinks = [
     { label: 'Inicio', icon: 'home' },
     { label: 'Noticias', icon: 'newspaper' },
+    { label: 'Emisión', icon: 'radio' },
     { label: 'Manga', icon: 'book' },
     { label: 'Mi Lista', icon: 'bookmark' },
   ];

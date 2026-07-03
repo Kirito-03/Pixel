@@ -4,7 +4,7 @@ import pool from '../db.js';
 import { authenticateAdmin } from '../middleware/auth.js';
 import multer from 'multer';
 import { existsSync, mkdirSync } from 'fs';
-import { unlink } from 'fs/promises';
+import { unlink, readdir, stat } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { basename, dirname, join } from 'path';
 import { spawn } from 'child_process';
@@ -897,6 +897,37 @@ router.post('/news/refresh', async (req, res) => {
         return res.json(result);
     } catch (e) {
         return res.status(500).json({ message: 'Error actualizando noticias', error: e.message });
+    }
+});
+
+router.get('/import/files', async (req, res) => {
+    try {
+        await ensureImportsDir();
+        const importsDir = join(__dirname, '..', 'uploads', 'imports');
+        const files = await readdir(importsDir);
+        const m3uFiles = [];
+        
+        for (const file of files) {
+            if (file.endsWith('.m3u') || file.endsWith('.m3u8')) {
+                const filePath = join(importsDir, file);
+                const stats = await stat(filePath);
+                const url = `${req.protocol}://${req.get('host')}/uploads/imports/${encodeURIComponent(file)}`;
+                m3uFiles.push({
+                    name: file,
+                    url,
+                    localPath: filePath,
+                    size: stats.size,
+                    createdAt: stats.birthtime
+                });
+            }
+        }
+        
+        // Ordenar por más reciente primero
+        m3uFiles.sort((a, b) => b.createdAt - a.createdAt);
+        
+        res.json({ ok: true, files: m3uFiles });
+    } catch (e) {
+        res.status(500).json({ ok: false, message: 'Error listando archivos', error: e.message });
     }
 });
 

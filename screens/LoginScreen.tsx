@@ -127,8 +127,7 @@ export default function LoginScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* ═══ DIAGONAL RED DIVIDER — absolute over both panels ═══ */}
-        <View style={webStyles.diagonalDivider} />
+
 
         {/* ═══ LEFT PANEL — Animated 3D background ═══ */}
         <AnimatedLeftPanel />

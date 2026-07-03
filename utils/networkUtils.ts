@@ -33,7 +33,7 @@ const deriveLanURLFromExpo = (): string => {
 
 const BASE_CANDIDATES: string[] = [
   // IP de la laptop en la red local (PRIMERO para dispositivos físicos)
-  'http://192.168.1.224:3001',
+  'http://192.168.1.144:3001',
   // Intento de LAN usando datos de Expo (útil para dispositivo físico en la misma red)
   deriveLanURLFromExpo(),
   // Local en web/iOS simulador
@@ -43,6 +43,7 @@ const BASE_CANDIDATES: string[] = [
   // Emulador Android accede al host con 10.0.2.2
   Platform.OS === 'android' ? 'http://10.0.2.2:3001' : '',
 ].filter(Boolean);
+
 
 /**
  * Almacenamiento dinámico para la URL base actual.

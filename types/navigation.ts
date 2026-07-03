@@ -4,6 +4,7 @@ export type AdminStackParamList = {
     AdminLogin: undefined;
     AdminDashboard: undefined;
     AdminImport: undefined;
+    AdminBot: undefined;
     AnimeList: undefined;
     AnimeForm: {
         mode: 'create' | 'edit';

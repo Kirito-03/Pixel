@@ -40,6 +40,7 @@ const { default: downloadsRoutes }  = await import('./routes/downloads.js');
 const { default: proxyRoutes }      = await import('./routes/proxy.js');
 const { default: uploadsRoutes }    = await import('./routes/uploads.js');
 const { default: contentRoutes }    = await import('./routes/content.js');
+const { default: botRoutes }        = await import('./routes/bot.js');
 
 // ── Express app ────────────────────────────────────────────────
 const app = express();
@@ -133,6 +134,7 @@ app.use('/auth', userAuthRoutes);
 app.use('/auth', authRoutes);
 
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/bot', botRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/news', newsRoutes);

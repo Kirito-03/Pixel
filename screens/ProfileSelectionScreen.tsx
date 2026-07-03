@@ -154,7 +154,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
             style={[styles.logoutButton, logoutHovered && styles.logoutButtonHover]}
             onPress={async () => {
               await logout();
-              navigation.replace('Ingreso');
+              // El navegador condicional redirige automáticamente cuando user=null
             }}
             // @ts-ignore
             onHoverIn={() => setLogoutHovered(true)}

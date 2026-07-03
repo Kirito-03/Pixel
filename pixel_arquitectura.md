@@ -1,6 +1,6 @@
 # Pixel no Sekai — Resumen Técnico de Arquitectura
 
-> **Fecha del análisis:** 2026-06-12  
+> **Fecha del análisis:** 2026-07-03  
 > **Nombre del proyecto:** `pixel-no-sekai`  
 > **Versión:** 1.0.0
 
@@ -518,7 +518,23 @@ SafeAreaProvider
 | **Madurez** | En crecimiento rápido — refactorizaciones grandes en cada versión |
 | **Modularidad backend** | Buena (18 archivos de rutas, 11 servicios, middleware aislado) |
 | **Modularidad frontend** | Media (componentes grandes como `AnimeSeriesModal` de 82KB) |
-| **Testing** | No se detectan tests automatizados |
-| **CI/CD** | No se detecta pipeline configurado |
+| **Testing** | No se incluyen tests en el repositorio actual para facilitar despliegues |
+| **CI/CD** | Listo para ser clonado y desplegado vía Docker Compose |
 | **Dockerización** | Completa para backend, PostgreSQL, Redis y Adminer |
+| **Despliegue** | Orientado a VPS (Ubuntu/Debian) usando contenedores |
 | **Deuda técnica** | Dos sistemas de listas paralelos, rutas legacy en `app.js`, logs de debug en producción |
+
+---
+
+## 6. Topología de Despliegue en Producción (VPS)
+
+El sistema está diseñado para ser desplegado fácilmente en un **Virtual Private Server (VPS)** usando Docker Compose:
+
+1. **Proxy Inverso (Nginx/Traefik)**: Se recomienda para manejar certificados SSL (HTTPS) y enrutar el tráfico al puerto expuesto por el backend Node.js y a los estáticos compilados de Expo Web.
+2. **Contenedores de Backend**:
+   - `backend`: Servidor Express Node.js.
+   - `postgres`: Base de datos relacional.
+   - `redis`: Servidor de caché en memoria.
+3. **Frontend Móvil**: Compilado localmente o mediante EAS Build (Expo Application Services) generando los APKs o bundles iOS que apuntan a la URL pública del VPS.
+
+El proceso de preparación para producción incluye remover archivos de pruebas y utilidades innecesarias del repositorio, asegurando un clonado limpio y rápido en el servidor de destino.

@@ -28,6 +28,8 @@ const EpisodePlayer: React.FC<any> = ({
       return;
     }
 
+    const isIframe = source.includes('jkanime.net/jkplayer') || source.includes('iframe');
+    
     // Convert relative backend paths to absolute URLs
     if (source.startsWith('/')) {
       const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
@@ -53,12 +55,19 @@ const EpisodePlayer: React.FC<any> = ({
       return () => {
         hls.destroy();
       };
-    } else {
+    } else if (!isIframe) {
       video.src = source;
       video.load();
       video.play().catch(e => console.log('Auto-play prevented:', e));
     }
   }, [episode]);
+
+  let source = episode?.url || episode?.stream_url || episode?.video_url || '';
+  if (source.startsWith('/')) {
+    const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
+    source = `${baseUrl}${source}`;
+  }
+  const isIframe = source.includes('jkanime.net/jkplayer') || source.includes('iframe');
 
   return (
     <View style={styles.container}>
@@ -76,6 +85,23 @@ const EpisodePlayer: React.FC<any> = ({
       {error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : isIframe ? (
+        <View style={styles.iframeContainer}>
+          <iframe
+            src={source}
+            style={styles.video as any}
+            allowFullScreen
+            frameBorder="0"
+            referrerPolicy="no-referrer"
+          />
+          <TouchableOpacity 
+            style={styles.externalButton}
+            onPress={() => window.open(source, '_blank')}
+          >
+            <Ionicons name="open-outline" size={20} color="#fff" />
+            <Text style={styles.externalButtonText}>¿Pantalla en negro? Abrir en nueva pestaña</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <video 
@@ -147,6 +173,29 @@ const styles = StyleSheet.create({
     color: '#ff4444',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  iframeContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  externalButton: {
+    position: 'absolute',
+    bottom: 80,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(231, 76, 60, 0.9)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    gap: 8,
+    zIndex: 20,
+  },
+  externalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   controlsRow: {
     position: 'absolute',

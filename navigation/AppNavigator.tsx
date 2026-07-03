@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Storage } from '../services/storage';
 
 import LoginScreen from '../screens/LoginScreen';
@@ -21,6 +22,7 @@ import MangaScreen from '../screens/MangaScreen';
 import MangaDetailScreen from '../screens/MangaDetailScreen';
 import MangaReaderScreen from '../screens/MangaReaderScreen';
 import AppearanceScreen from '../screens/AppearanceScreen';
+import AiringScreen from '../screens/AiringScreen';
 
 // ── Admin Screens: code-split on web, static on native ─────────
 // React.lazy only works on web (React DOM). On native, React Native
@@ -32,6 +34,7 @@ let AdminImportScreen: React.ComponentType<any>;
 let AnimeListScreen: React.ComponentType<any>;
 let AnimeFormScreen: React.ComponentType<any>;
 let EpisodeManagerScreen: React.ComponentType<any>;
+let AdminBotScreen: React.ComponentType<any>;
 
 if (Platform.OS === 'web') {
   // Web: lazy-load admin screens → separate JS chunks
@@ -42,6 +45,7 @@ if (Platform.OS === 'web') {
   AnimeListScreen = React.lazy(() => import('../screens/admin/AnimeListScreen'));
   AnimeFormScreen = React.lazy(() => import('../screens/admin/AnimeFormScreen'));
   EpisodeManagerScreen = React.lazy(() => import('../screens/admin/EpisodeManagerScreen'));
+  AdminBotScreen = React.lazy(() => import('../screens/admin/AdminBotScreen'));
 } else {
   // Native: static imports (no code splitting support)
   AdminLoginScreen = require('../screens/admin/AdminLoginScreen').default;
@@ -50,6 +54,7 @@ if (Platform.OS === 'web') {
   AnimeListScreen = require('../screens/admin/AnimeListScreen').default;
   AnimeFormScreen = require('../screens/admin/AnimeFormScreen').default;
   EpisodeManagerScreen = require('../screens/admin/EpisodeManagerScreen').default;
+  AdminBotScreen = require('../screens/admin/AdminBotScreen').default;
 }
 
 import { useTheme } from '../contexts/ThemeContext';
@@ -86,6 +91,7 @@ function AdminNavigator() {
       <AdminStack.Screen name="AnimeList" component={AnimeListScreen as any} />
       <AdminStack.Screen name="AnimeForm" component={AnimeFormScreen as any} />
       <AdminStack.Screen name="EpisodeManager" component={EpisodeManagerScreen as any} />
+      <AdminStack.Screen name="AdminBot" component={AdminBotScreen as any} />
     </AdminStack.Navigator>
   );
 
@@ -124,6 +130,7 @@ function MainTabs({ route }: { route: any }) {
   const { colors } = useTheme();
   const { selectedProfile, userId } = route.params || {};
   const { isAdmin } = useAdmin();
+  const insets = useSafeAreaInsets();
 
   const { setCurrentProfile, currentProfile } = useProfile();
 
@@ -174,8 +181,8 @@ function MainTabs({ route }: { route: any }) {
         backgroundColor: '#0a0a0a',
         borderTopColor: 'rgba(255, 255, 255, 0.08)',
         borderTopWidth: 1,
-        height: Platform.OS === 'android' ? 60 : 85,
-        paddingBottom: Platform.OS === 'android' ? 8 : 28,
+        height: Platform.OS === 'android' ? 60 + insets.bottom : 85,
+        paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 8) : 28,
         paddingTop: 8,
         elevation: 20,
         shadowColor: '#000',
@@ -228,6 +235,16 @@ function MainTabs({ route }: { route: any }) {
             <Ionicons name={focused ? 'newspaper' : 'newspaper-outline'} size={22} color={color} />
           ),
           tabBarLabel: 'Noticias',
+        }}
+      />
+      <Tab.Screen
+        name="Emisión"
+        component={AiringScreen}
+        options={{
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'radio' : 'radio-outline'} size={22} color={color} />
+          ),
+          tabBarLabel: 'En Emisión',
         }}
       />
       <Tab.Screen

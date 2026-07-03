@@ -51,7 +51,7 @@ interface DashboardStats {
 }
 
 class AdminApiService {
-    private axiosInstance: AxiosInstance;
+    public axiosInstance: AxiosInstance;
 
     constructor() {
         this.axiosInstance = axios.create({
@@ -260,6 +260,11 @@ class AdminApiService {
 
     async retryImportJob(id: number) {
         const response = await this.axiosInstance.post(`/api/admin/import/jobs/${id}/retry`);
+        return response.data;
+    }
+
+    async getUploadedM3uFiles(): Promise<{ ok: boolean; files: Array<{ name: string; url: string; localPath: string; size: number; createdAt: string }> }> {
+        const response = await this.axiosInstance.get('/api/admin/import/files');
         return response.data;
     }
 
