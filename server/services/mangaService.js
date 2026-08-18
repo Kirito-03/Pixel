@@ -54,7 +54,8 @@ function relationshipAll(entity, type) {
 function buildCoverUrl(mangaId, coverRel) {
   const fileName = String(coverRel?.attributes?.fileName || '').trim();
   if (!mangaId || !fileName) return null;
-  return `${MANGADEX_UPLOADS}/covers/${mangaId}/${fileName}.512.jpg`;
+  const originalUrl = `${MANGADEX_UPLOADS}/covers/${mangaId}/${fileName}.512.jpg`;
+  return `/api/proxy/manga-cover?url=${encodeURIComponent(originalUrl)}`;
 }
 
 function toIsoOrNull(v) {

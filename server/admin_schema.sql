@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_admin_users_email ON admin_users(email);
-CREATE INDEX idx_admin_users_google_id ON admin_users(google_id);
+CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email);
+CREATE INDEX IF NOT EXISTS idx_admin_users_google_id ON admin_users(google_id);
 
 -- ========================================
 -- Tabla: anime_content
@@ -46,11 +46,11 @@ CREATE TABLE IF NOT EXISTS anime_content (
 );
 
 -- Índices para performance
-CREATE INDEX idx_anime_content_tmdb ON anime_content(tmdb_id);
-CREATE INDEX idx_anime_content_franchise ON anime_content(franchise_key);
-CREATE INDEX idx_anime_content_active ON anime_content(is_active);
-CREATE INDEX idx_anime_content_title ON anime_content(title);
-CREATE INDEX idx_anime_content_created ON anime_content(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_anime_content_tmdb ON anime_content(tmdb_id);
+CREATE INDEX IF NOT EXISTS idx_anime_content_franchise ON anime_content(franchise_key);
+CREATE INDEX IF NOT EXISTS idx_anime_content_active ON anime_content(is_active);
+CREATE INDEX IF NOT EXISTS idx_anime_content_title ON anime_content(title);
+CREATE INDEX IF NOT EXISTS idx_anime_content_created ON anime_content(created_at DESC);
 
 -- ========================================
 -- Tabla: anime_episodes
@@ -77,9 +77,9 @@ CREATE TABLE IF NOT EXISTS anime_episodes (
 );
 
 -- Índices para performance
-CREATE INDEX idx_anime_episodes_anime ON anime_episodes(anime_id);
-CREATE INDEX idx_anime_episodes_season_ep ON anime_episodes(anime_id, season, episode_number);
-CREATE INDEX idx_anime_episodes_active ON anime_episodes(is_active);
+CREATE INDEX IF NOT EXISTS idx_anime_episodes_anime ON anime_episodes(anime_id);
+CREATE INDEX IF NOT EXISTS idx_anime_episodes_season_ep ON anime_episodes(anime_id, season, episode_number);
+CREATE INDEX IF NOT EXISTS idx_anime_episodes_active ON anime_episodes(is_active);
 
 -- ========================================
 -- Trigger para actualizar updated_at automáticamente
@@ -92,11 +92,25 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_anime_content_updated_at BEFORE UPDATE ON anime_content
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'update_anime_content_updated_at'
+  ) THEN
+    CREATE TRIGGER update_anime_content_updated_at BEFORE UPDATE ON anime_content
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;
 
-CREATE TRIGGER update_anime_episodes_updated_at BEFORE UPDATE ON anime_episodes
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'update_anime_episodes_updated_at'
+  ) THEN
+    CREATE TRIGGER update_anime_episodes_updated_at BEFORE UPDATE ON anime_episodes
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;
 
 -- ========================================
 -- Datos de prueba (opcional - comentar en producción)

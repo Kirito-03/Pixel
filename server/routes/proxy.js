@@ -126,4 +126,30 @@ router.post('/anilist', async (req, res) => {
   }
 });
 
+// Proxy de imágenes para MangaDex (evita bloqueo por hotlinking)
+router.get('/manga-cover', async (req, res) => {
+  const { url } = req.query;
+  if (!url || typeof url !== 'string' || !url.startsWith('https://uploads.mangadex.org/')) {
+    return res.status(400).send('URL inválida o no permitida');
+  }
+
+  try {
+    const response = await axios.get(url, {
+      responseType: 'stream',
+      headers: {
+        'Referer': 'https://mangadex.org/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      timeout: 15000
+    });
+
+    res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400'); // Cachear por 1 día
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Error proxy manga cover:', error.message);
+    res.status(error.response?.status || 500).send('Error obteniendo imagen de MangaDex');
+  }
+});
+
 export default router;
