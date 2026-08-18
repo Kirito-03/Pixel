@@ -41,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 RUN chmod +x /app/index.js
 
 # Comando de inicio
-CMD ["node", "index.js"]
+CMD ["npm", "start"]
