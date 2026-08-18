@@ -1,4 +1,4 @@
-﻿-- ========================================
+-- ========================================
 -- Admin Panel Database Schema
 -- ========================================
 -- Tablas para el sistema de gestión de contenido de anime
