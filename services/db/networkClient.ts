@@ -14,8 +14,10 @@ const getInitialBaseURL = (): string => {
     }
     return 'http://localhost:3001';
   }
-  // En producción, usar la URL pública del API
-  return process.env.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_SERVER_BASE_URL || 'https://pixelnosekai.art/api';
+  // En producción: usar el dominio raiz para que nginx haga el proxy correctamente.
+  // EXPO_PUBLIC_API_URL = 'https://pixelnosekai.art/api' → solo queremos 'https://pixelnosekai.art'
+  const apiUrl = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/api\/?$/, '').trim();
+  return apiUrl || process.env.EXPO_PUBLIC_SERVER_BASE_URL || 'https://pixelnosekai.art';
 };
 
 let BASE_URL = getInitialBaseURL();
