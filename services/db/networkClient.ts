@@ -14,7 +14,8 @@ const getInitialBaseURL = (): string => {
     }
     return 'http://localhost:3001';
   }
-  return 'http://localhost:3001';
+  // En producción, usar la URL pública del API
+  return process.env.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_SERVER_BASE_URL || 'https://pixelnosekai.art/api';
 };
 
 let BASE_URL = getInitialBaseURL();
