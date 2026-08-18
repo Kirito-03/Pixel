@@ -6,9 +6,6 @@ services:
     image: nginx:alpine
     container_name: pixel_frontend
     restart: unless-stopped
-    ports:
-      # Expuesto al host únicamente en el puerto 4006 para Cloudflare Tunnel
-      - "4006:80"
     volumes:
       # Monta la app compilada (dist) generada por Expo
       - ./dist:/usr/share/nginx/html:ro

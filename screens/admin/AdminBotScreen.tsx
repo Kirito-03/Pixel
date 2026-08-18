@@ -39,6 +39,8 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminBotScreen() {
   const [animeId, setAnimeId] = useState('')
   const [jkSlug, setJkSlug] = useState('')
+  const [av1Slug, setAv1Slug] = useState('')
+  const [source, setSource] = useState<'auto' | 'jkanime' | 'animeav1'>('auto')
   const [fromEp, setFromEp] = useState('1')
   const [toEp, setToEp] = useState('')
   const [season, setSeason] = useState('1')
@@ -46,7 +48,9 @@ export default function AdminBotScreen() {
   const [jobs, setJobs] = useState<BotJob[]>([])
   const [loading, setLoading] = useState<string | null>(null)
   const [previewData, setPreviewData] = useState<any>(null)
+  const [previewAv1Data, setPreviewAv1Data] = useState<any>(null)
   const [slugResult, setSlugResult] = useState<string | null | undefined>(undefined)
+  const [slugAv1Result, setSlugAv1Result] = useState<string | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -77,6 +81,8 @@ export default function AdminBotScreen() {
       } else if (action === 'scrape') {
         const res = await adminApiService.axiosInstance.post(`/api/admin/bot/scrape/${animeId}`, {
           jkSlug: jkSlug || undefined,
+          av1Slug: av1Slug || undefined,
+          source,
           fromEpisode: parseInt(fromEp) || 1,
           toEpisode: toEp ? parseInt(toEp) : undefined,
           season: parseInt(season) || 1,
@@ -85,6 +91,8 @@ export default function AdminBotScreen() {
       } else if (action === 'both') {
         const res = await adminApiService.axiosInstance.post(`/api/admin/bot/metadata-and-scrape/${animeId}`, {
           jkSlug: jkSlug || undefined,
+          av1Slug: av1Slug || undefined,
+          source,
           fromEpisode: parseInt(fromEp) || 1,
           toEpisode: toEp ? parseInt(toEp) : undefined,
           season: parseInt(season) || 1,
@@ -94,6 +102,8 @@ export default function AdminBotScreen() {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/create-and-scrape', {
           title: previewTitle,
           jkSlug: jkSlug || undefined,
+          av1Slug: av1Slug || undefined,
+          source,
           fromEpisode: parseInt(fromEp) || 1,
           toEpisode: toEp ? parseInt(toEp) : undefined,
           season: parseInt(season) || 1,
@@ -106,9 +116,16 @@ export default function AdminBotScreen() {
       } else if (action === 'findSlug') {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/find-slug', { title: previewTitle })
         setSlugResult(res.data.slug || null)
+      } else if (action === 'findSlugAv1') {
+        const res = await adminApiService.axiosInstance.post('/api/admin/bot/find-slug-av1', { title: previewTitle })
+        setSlugAv1Result(res.data.slug || null)
       } else if (action === 'previewAnilist') {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/preview-anilist', { title: previewTitle })
         setPreviewData(res.data.data || null)
+        if (!res.data.ok) setError(res.data.message)
+      } else if (action === 'previewAv1') {
+        const res = await adminApiService.axiosInstance.post('/api/admin/bot/preview-av1', { slug: previewTitle })
+        setPreviewAv1Data(res.data.data || null)
         if (!res.data.ok) setError(res.data.message)
       }
       await fetchJobs()
@@ -157,14 +174,52 @@ export default function AdminBotScreen() {
               keyboardType="numeric"
             />
 
-            <Text style={styles.label}>Slug JKAnime (opcional — se detecta automático)</Text>
-            <TextInput
-              style={styles.input}
-              value={jkSlug}
-              onChangeText={setJkSlug}
-              placeholder="Ej: black-clover"
-              placeholderTextColor={adminColors.textSecondary}
-            />
+            {/* Selector de fuente */}
+            <Text style={styles.label}>Fuente de Episodios</Text>
+            <View style={styles.sourceRow}>
+              {(['auto', 'jkanime', 'animeav1'] as const).map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.sourceBtn, source === s && styles.sourceBtnActive]}
+                  onPress={() => setSource(s)}
+                >
+                  <Text style={[styles.sourceBtnText, source === s && styles.sourceBtnTextActive]}>
+                    {s === 'auto' ? '⚡ Auto' : s === 'jkanime' ? 'JKAnime' : '🎌 AV1'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {source === 'auto' && (
+              <Text style={styles.sourceHint}>Intenta JKAnime primero; si falla, usa AnimeAV1 automáticamente.</Text>
+            )}
+
+            {/* Slug JKAnime (solo si no es solo animeav1) */}
+            {source !== 'animeav1' && (
+              <>
+                <Text style={styles.label}>Slug JKAnime (opcional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={jkSlug}
+                  onChangeText={setJkSlug}
+                  placeholder="Ej: black-clover"
+                  placeholderTextColor={adminColors.textSecondary}
+                />
+              </>
+            )}
+
+            {/* Slug AnimeAV1 (solo si no es solo jkanime) */}
+            {source !== 'jkanime' && (
+              <>
+                <Text style={styles.label}>Slug AnimeAV1 (opcional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={av1Slug}
+                  onChangeText={setAv1Slug}
+                  placeholder="Ej: tenkou-saki-no-seiso-karen..."
+                  placeholderTextColor={adminColors.textSecondary}
+                />
+              </>
+            )}
 
             <View style={styles.row}>
               <View style={styles.rowCol}>
@@ -299,9 +354,22 @@ export default function AdminBotScreen() {
                 {loading === 'findSlug' ? (
                   <ActivityIndicator size="small" color={adminColors.text} />
                 ) : (
-                  <Text style={styles.btnToolText}>Buscar Slug JKAnime</Text>
+                  <Text style={styles.btnToolText}>🔍 Slug JKAnime</Text>
                 )}
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnTool, !previewTitle && styles.btnDisabled]}
+                onPress={() => handleAction('findSlugAv1')}
+                disabled={!previewTitle || !!loading}
+              >
+                {loading === 'findSlugAv1' ? (
+                  <ActivityIndicator size="small" color={adminColors.text} />
+                ) : (
+                  <Text style={styles.btnToolText}>🎌 Slug AV1</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+            <View style={styles.toolRow}>
               <TouchableOpacity
                 style={[styles.btn, styles.btnTool, !previewTitle && styles.btnDisabled]}
                 onPress={() => handleAction('previewAnilist')}
@@ -311,6 +379,17 @@ export default function AdminBotScreen() {
                   <ActivityIndicator size="small" color={adminColors.text} />
                 ) : (
                   <Text style={styles.btnToolText}>Preview AniList</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnTool, !previewTitle && styles.btnDisabled]}
+                onPress={() => handleAction('previewAv1')}
+                disabled={!previewTitle || !!loading}
+              >
+                {loading === 'previewAv1' ? (
+                  <ActivityIndicator size="small" color={adminColors.text} />
+                ) : (
+                  <Text style={styles.btnToolText}>Preview AV1</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -334,9 +413,18 @@ export default function AdminBotScreen() {
 
             {slugResult !== undefined && (
               <View style={styles.resultBox}>
-                <Text style={styles.resultLabel}>Slug encontrado:</Text>
+                <Text style={styles.resultLabel}>Slug JKAnime encontrado:</Text>
                 <Text style={[styles.resultValue, !slugResult && { color: '#ef4444' }]}>
                   {slugResult || 'No encontrado'}
+                </Text>
+              </View>
+            )}
+
+            {slugAv1Result !== undefined && (
+              <View style={styles.resultBox}>
+                <Text style={styles.resultLabel}>Slug AnimeAV1 encontrado:</Text>
+                <Text style={[styles.resultValue, !slugAv1Result && { color: '#ef4444' }]}>
+                  {slugAv1Result || 'No encontrado'}
                 </Text>
               </View>
             )}
@@ -350,6 +438,18 @@ export default function AdminBotScreen() {
                 <Text style={styles.resultKey}>Episodios: <Text style={styles.resultValue}>{previewData.total_episodes || '—'}</Text></Text>
                 <Text style={styles.resultKey}>Estado: <Text style={styles.resultValue}>{previewData.status || '—'}</Text></Text>
                 <Text style={styles.resultKey}>Géneros: <Text style={styles.resultValue}>{previewData.genres?.join(', ') || '—'}</Text></Text>
+              </View>
+            )}
+
+            {previewAv1Data && (
+              <View style={[styles.resultBox, { borderColor: '#6366f140' }]}>
+                <Text style={styles.resultLabel}>🎌 AnimeAV1 devolvería:</Text>
+                <Text style={styles.resultKey}>Título: <Text style={styles.resultValue}>{previewAv1Data.title}</Text></Text>
+                <Text style={styles.resultKey}>Score: <Text style={styles.resultValue}>{previewAv1Data.score?.toFixed(2) || '—'}</Text></Text>
+                <Text style={styles.resultKey}>Episodios: <Text style={styles.resultValue}>{previewAv1Data.episodesCount || '—'}</Text></Text>
+                <Text style={styles.resultKey}>Estado: <Text style={styles.resultValue}>{previewAv1Data.status || '—'}</Text></Text>
+                <Text style={styles.resultKey}>Géneros: <Text style={styles.resultValue}>{previewAv1Data.genres?.join(', ') || '—'}</Text></Text>
+                <Text style={styles.resultKey}>MAL ID: <Text style={styles.resultValue}>{previewAv1Data.malId || '—'}</Text></Text>
               </View>
             )}
           </View>
@@ -397,7 +497,7 @@ export default function AdminBotScreen() {
                       <Text style={styles.jobMsg}>
                         {job.type === 'metadata'
                           ? `${job.result.updated} campos actualizados`
-                          : `${job.result.inserted} insertados, ${job.result.updated} actualizados de ${job.result.totalFound}`}
+                          : `${job.result.inserted} insertados, ${job.result.updated} actualizados de ${job.result.totalFound} · ${job.result.source ? `[${job.result.source}]` : ''}`}
                       </Text>
                     )}
                     {job.status === 'error' && (
@@ -455,6 +555,16 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, marginTop: 6 },
   rowCol: { flex: 1 },
   actionGrid: { flexDirection: 'row', gap: 8, marginTop: 16, flexWrap: 'wrap' },
+  sourceRow: { flexDirection: 'row', gap: 6, marginTop: 6, marginBottom: 2 },
+  sourceBtn: {
+    flex: 1, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 6,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: adminColors.background, borderWidth: 1, borderColor: adminColors.border,
+  },
+  sourceBtnActive: { backgroundColor: adminColors.primary + '20', borderColor: adminColors.primary },
+  sourceBtnText: { fontSize: 11, fontWeight: '700', color: adminColors.textSecondary },
+  sourceBtnTextActive: { color: adminColors.primary },
+  sourceHint: { fontSize: 11, color: adminColors.textSecondary, marginTop: 4, fontStyle: 'italic' },
   toolRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   btn: {
     flex: 1, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12,

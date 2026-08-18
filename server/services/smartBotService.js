@@ -9,6 +9,7 @@
 import pool from '../db.js';
 import { searchAniListMetadata } from './anilistService.js';
 import { findJkAnimeSlug, scrapeAnimeEpisodes, scrapeAiringAnimes } from './jkanimeScraper.js';
+import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData } from './animeav1Scraper.js';
 import { downloadAndUploadEpisode } from './videoDownloaderService.js';
 import pLimit from 'p-limit';
 
@@ -273,6 +274,7 @@ async function runMetadataJob(job, animeId) {
  * @param {number} options.fromEpisode - Episodio desde el que empezar
  * @param {number} options.toEpisode - Episodio hasta el que llegar
  * @param {number} options.season - Temporada a la que asignar los episodios (default: 1)
+ * @param {string} options.source - Fuente de episodios: 'jkanime' | 'animeav1' | 'auto' (default: 'auto')
  */
 export async function scrapeEpisodes(animeId, options = {}) {
   const job = createJob('scrape', animeId);
@@ -288,43 +290,72 @@ export async function scrapeEpisodes(animeId, options = {}) {
 
 async function runScrapeJob(job, animeId, options) {
   try {
-    const { jkSlug = null, fromEpisode = 1, toEpisode = null, season = 1 } = options;
+    const { jkSlug = null, av1Slug = null, fromEpisode = 1, toEpisode = null, season = 1, source = 'auto' } = options;
 
     // Obtener datos del anime
     const animeResult = await pool.query('SELECT id, title, title_english, total_episodes FROM anime_content WHERE id = $1', [animeId]);
     if (!animeResult.rows.length) throw new Error(`Anime ${animeId} no encontrado`);
 
     const anime = animeResult.rows[0];
-    job.progress.message = `Buscando "${anime.title}" en JKAnime...`;
-
-    // Buscar slug si no se proporcionó
-    let slug = jkSlug;
-    if (!slug) {
-      slug = await findJkAnimeSlug(anime.title_english || anime.title);
-    }
-
-    if (!slug) {
-      throw new Error(`No se encontró "${anime.title}" en JKAnime. Intenta pasar el slug manualmente.`);
-    }
-
-    job.progress.message = `Scrapeando episodios del slug "${slug}"...`;
-
-    // Scrape de episodios
-    // Si no se especificó hasta qué episodio, usa el total de la BD. Si no hay total, usa 1000 como límite superior (se detendrá al primer 404).
+    const searchTitle = anime.title_english || anime.title;
     const maxEp = toEpisode || anime.total_episodes || 1000;
-    
-    const episodes = await scrapeAnimeEpisodes(slug, {
-      fromEpisode,
-      toEpisode: maxEp,
-      onProgress: (current, total) => {
-        job.progress.current = current;
-        job.progress.total = total;
-        job.progress.message = `Procesando episodio ${current}/${total}...`;
-      },
-    });
+
+    let episodes = [];
+    let usedSource = null;
+
+    // --- Intentar JKAnime ---
+    if (source === 'jkanime' || source === 'auto') {
+      job.progress.message = `Buscando "${anime.title}" en JKAnime...`;
+      let slug = jkSlug;
+      if (!slug) slug = await findJkAnimeSlug(searchTitle);
+
+      if (slug) {
+        job.progress.message = `Scrapeando episodios del slug JK "${slug}"...`;
+        episodes = await scrapeAnimeEpisodes(slug, {
+          fromEpisode,
+          toEpisode: maxEp,
+          onProgress: (current, total) => {
+            job.progress.current = current;
+            job.progress.total = total;
+            job.progress.message = `[JKAnime] Episodio ${current}/${total}...`;
+          },
+        });
+        if (episodes.length > 0) usedSource = 'jkanime';
+      }
+
+      if (source === 'jkanime' && episodes.length === 0) {
+        const reason = jkSlug ? `no se encontraron episodios para el slug "${jkSlug}"` : `no se encontró slug para "${anime.title}"`;        
+        throw new Error(`JKAnime: ${reason}`);
+      }
+    }
+
+    // --- Fallback / forzar AnimeAV1 ---
+    if ((source === 'animeav1' || (source === 'auto' && episodes.length === 0))) {
+      job.progress.message = `Buscando "${anime.title}" en AnimeAV1...`;
+      let slug = av1Slug;
+      if (!slug) slug = await findAnimeAv1Slug(searchTitle);
+
+      if (!slug && source === 'animeav1') {
+        throw new Error(`AnimeAV1: no se encontró slug para "${anime.title}". Pasa el slug manualmente con av1Slug.`);
+      }
+
+      if (slug) {
+        job.progress.message = `Scrapeando episodios del slug AV1 "${slug}"...`;
+        episodes = await scrapeAnimeAv1Episodes(slug, {
+          fromEpisode,
+          toEpisode: maxEp,
+          onProgress: (current, total) => {
+            job.progress.current = current;
+            job.progress.total = total;
+            job.progress.message = `[AnimeAV1] Episodio ${current}/${total}...`;
+          },
+        });
+        if (episodes.length > 0) usedSource = 'animeav1';
+      }
+    }
 
     if (episodes.length === 0) {
-      throw new Error(`No se encontraron episodios para el slug "${slug}"`);
+      throw new Error(`No se encontraron episodios para "${anime.title}" en ninguna fuente.`);
     }
 
     job.progress.message = `Guardando ${episodes.length} episodios en la BD...`;
@@ -391,14 +422,14 @@ async function runScrapeJob(job, animeId, options) {
 
     job.status = 'done';
     job.result = {
-      slug,
+      source: usedSource,
       totalFound: episodes.length,
       inserted,
       updated,
       skipped: episodes.length - inserted - updated,
     };
     job.finishedAt = new Date().toISOString();
-    console.log(`[SmartBot] Scrape completado para ${anime.title}: ${inserted} insertados, ${updated} actualizados`);
+    console.log(`[SmartBot] Scrape completado para ${anime.title} (${usedSource}): ${inserted} insertados, ${updated} actualizados`);
   } catch (error) {
     job.status = 'error';
     job.errors.push(error.message);

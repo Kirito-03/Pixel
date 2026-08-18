@@ -14,6 +14,7 @@ import {
 } from '../services/smartBotService.js';
 import { findJkAnimeSlug } from '../services/jkanimeScraper.js';
 import { searchAniListMetadata } from '../services/anilistService.js';
+import { findAnimeAv1Slug, getAnimeAv1PageData } from '../services/animeav1Scraper.js';
 
 const router = express.Router();
 router.use(authenticateAdmin);
@@ -67,11 +68,13 @@ router.post('/scrape/:animeId', async (req, res) => {
   const animeId = parseInt(req.params.animeId);
   if (!animeId) return res.status(400).json({ ok: false, message: 'animeId inválido' });
 
-  const { jkSlug, fromEpisode, toEpisode, season } = req.body || {};
+  const { jkSlug, av1Slug, source, fromEpisode, toEpisode, season } = req.body || {};
 
   try {
     const { jobId, status } = await scrapeEpisodes(animeId, {
       jkSlug: jkSlug || null,
+      av1Slug: av1Slug || null,
+      source: source || 'auto',
       fromEpisode: fromEpisode ? parseInt(fromEpisode) : 1,
       toEpisode: toEpisode ? parseInt(toEpisode) : null,
       season: season ? parseInt(season) : 1,
@@ -95,12 +98,14 @@ router.post('/metadata-and-scrape/:animeId', async (req, res) => {
   const animeId = parseInt(req.params.animeId);
   if (!animeId) return res.status(400).json({ ok: false, message: 'animeId inválido' });
 
-  const { jkSlug, fromEpisode, toEpisode, season } = req.body || {};
+  const { jkSlug, av1Slug, source, fromEpisode, toEpisode, season } = req.body || {};
 
   try {
     const metaJob = await autoFillMetadata(animeId);
     const scrapeJob = await scrapeEpisodes(animeId, {
       jkSlug: jkSlug || null,
+      av1Slug: av1Slug || null,
+      source: source || 'auto',
       fromEpisode: fromEpisode ? parseInt(fromEpisode) : 1,
       toEpisode: toEpisode ? parseInt(toEpisode) : null,
       season: season ? parseInt(season) : 1,
@@ -156,7 +161,7 @@ router.post('/preview-anilist', async (req, res) => {
  * Crea un anime solo con el título y lanza todo el bot.
  */
 router.post('/create-and-scrape', async (req, res) => {
-  const { title, jkSlug, fromEpisode, toEpisode, season } = req.body || {};
+  const { title, jkSlug, av1Slug, source, fromEpisode, toEpisode, season } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, message: 'Título requerido' });
 
   try {
@@ -171,6 +176,8 @@ router.post('/create-and-scrape', async (req, res) => {
     const metaJob = await autoFillMetadata(newAnimeId);
     const scrapeJob = await scrapeEpisodes(newAnimeId, {
       jkSlug: jkSlug || null,
+      av1Slug: av1Slug || null,
+      source: source || 'auto',
       fromEpisode: fromEpisode ? parseInt(fromEpisode) : 1,
       toEpisode: toEpisode ? parseInt(toEpisode) : null,
       season: season ? parseInt(season) : 1,
@@ -205,3 +212,74 @@ router.post('/sync-airing', async (req, res) => {
 });
 
 export default router;
+
+/**
+ * POST /api/admin/bot/find-slug-av1
+ * Busca el slug de un anime en AnimeAV1 sin guardarlo.
+ * Body: { title: string }
+ */
+router.post('/find-slug-av1', async (req, res) => {
+  const { title } = req.body || {};
+  if (!title) return res.status(400).json({ ok: false, message: 'title requerido' });
+
+  try {
+    const slug = await findAnimeAv1Slug(title);
+    res.json({ ok: true, slug, found: !!slug });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/scrape-av1/:animeId
+ * Fuerza el scrape desde AnimeAV1 exclusivamente.
+ * Body (opcional):
+ *   - av1Slug: string (slug en AnimeAV1 si ya se conoce)
+ *   - fromEpisode: number (default: 1)
+ *   - toEpisode: number (default: auto-detect)
+ *   - season: number (default: 1)
+ */
+router.post('/scrape-av1/:animeId', async (req, res) => {
+  const animeId = parseInt(req.params.animeId);
+  if (!animeId) return res.status(400).json({ ok: false, message: 'animeId inválido' });
+
+  const { av1Slug, fromEpisode, toEpisode, season } = req.body || {};
+
+  try {
+    const { jobId, status } = await scrapeEpisodes(animeId, {
+      av1Slug: av1Slug || null,
+      source: 'animeav1',
+      fromEpisode: fromEpisode ? parseInt(fromEpisode) : 1,
+      toEpisode: toEpisode ? parseInt(toEpisode) : null,
+      season: season ? parseInt(season) : 1,
+    });
+    res.json({
+      ok: true,
+      jobId,
+      status,
+      message: 'Scrape AnimeAV1 iniciado. Consulta /job/:jobId para el progreso.',
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/preview-av1
+ * Previsualiza los metadatos de AnimeAV1 para un slug dado.
+ * Body: { slug: string }
+ */
+router.post('/preview-av1', async (req, res) => {
+  const { slug } = req.body || {};
+  if (!slug) return res.status(400).json({ ok: false, message: 'slug requerido' });
+
+  try {
+    const data = await getAnimeAv1PageData(slug);
+    if (!data || !data.title) {
+      return res.json({ ok: false, message: `No se pudo obtener datos para el slug "${slug}"` });
+    }
+    res.json({ ok: true, data });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});

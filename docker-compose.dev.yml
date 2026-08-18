@@ -1,0 +1,9 @@
+services:
+  pixel_backend:
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+  pixel_adminer:
+    ports:
+      - "8080:8080"

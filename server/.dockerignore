@@ -40,6 +40,11 @@ tmp
 temp
 *.tmp
 
+# Media content (volumes)
+hls
+videos
+uploads
+
 # Documentation (no necesario en container)
 README.md
 *.md
