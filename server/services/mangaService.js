@@ -108,7 +108,7 @@ export function mapMangaDexManga(entity) {
   };
 }
 
-async function fetchJson(url, { timeoutMs = 8000 } = {}) {
+async function fetchJson(url, { timeoutMs = 15000 } = {}) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
