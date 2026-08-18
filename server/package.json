@@ -9,9 +9,8 @@
     "dev": "nodemon index.js",
     "proxy": "node proxy.js",
     "proxy-dev": "nodemon proxy.js",
-    "migrate:up": "node-pg-migrate up --config-file .migrate.cjs",
-    "migrate:down": "node-pg-migrate down --config-file .migrate.cjs",
-    "migrate:create": "node-pg-migrate create --config-file .migrate.cjs"
+    "migrate:up": "node run-migrations.js up",
+    "migrate:down": "node run-migrations.js down"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1028.0",
