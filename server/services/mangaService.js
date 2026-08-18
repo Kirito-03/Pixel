@@ -243,7 +243,9 @@ async function queryMangaCache(pool, { page, limit, status, search, order }) {
       id: r.manga_id,
       title: r.title,
       description: r.description,
-      cover_url: r.cover_url,
+      cover_url: r.cover_url?.startsWith('https://uploads.mangadex.org')
+        ? `/api/manga-cover?url=${encodeURIComponent(r.cover_url)}`
+        : r.cover_url,
       status: r.status,
       tags: Array.isArray(r.tags) ? r.tags : [],
       content_rating: r.content_rating,
@@ -356,7 +358,9 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
         id: r.manga_id,
         title: r.title,
         description: r.description,
-        cover_url: r.cover_url,
+        cover_url: r.cover_url?.startsWith('https://uploads.mangadex.org')
+          ? `/api/manga-cover?url=${encodeURIComponent(r.cover_url)}`
+          : r.cover_url,
         status: r.status,
         tags: Array.isArray(r.tags) ? r.tags : [],
         content_rating: r.content_rating,
@@ -402,7 +406,9 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
       id: r.manga_id,
       title: r.title,
       description: r.description,
-      cover_url: r.cover_url,
+      cover_url: r.cover_url?.startsWith('https://uploads.mangadex.org')
+        ? `/api/manga-cover?url=${encodeURIComponent(r.cover_url)}`
+        : r.cover_url,
       status: r.status,
       tags: Array.isArray(r.tags) ? r.tags : [],
       content_rating: r.content_rating,
@@ -442,7 +448,9 @@ export async function getMangaDetail(pool, id) {
         id: r.manga_id,
         title: r.title,
         description: r.description || defaultDescription(r.title),
-        cover_url: r.cover_url,
+        cover_url: r.cover_url?.startsWith('https://uploads.mangadex.org')
+          ? `/api/manga-cover?url=${encodeURIComponent(r.cover_url)}`
+          : r.cover_url,
         status: r.status,
         tags: Array.isArray(r.tags) ? r.tags : [],
         content_rating: r.content_rating,
