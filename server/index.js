@@ -34,6 +34,13 @@ const HOST = process.env.HOST || '0.0.0.0';
     console.error('Error iniciando worker de transcode:', e.message);
   }
 
+  try {
+    const { startBotSchedulers } = await import('./cron.js');
+    startBotSchedulers();
+  } catch (e) {
+    console.error('Error iniciando scheduler del bot:', e.message);
+  }
+
   // Arrancar servidor
   app.listen(PORT, HOST, () => {
     console.log(`Backend escuchando en http://${HOST}:${PORT}`);

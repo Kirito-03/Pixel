@@ -65,6 +65,72 @@ export async function autoFillMetadata(animeId) {
 }
 
 /**
+ * Revisa todos los animes del catálogo en emisión y busca nuevos episodios.
+ */
+export async function updateOngoingAnimes() {
+  const jobId = `bot-${Date.now()}-update`;
+  const job = {
+    id: jobId,
+    type: 'update_ongoing',
+    animeId: null,
+    status: 'running',
+    progress: { current: 0, total: 0, message: 'Buscando animes en emisión en BD...' },
+    errors: [],
+    result: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+  };
+  botJobs.set(jobId, job);
+
+  runUpdateOngoingJob(job).catch(err => {
+    job.status = 'error';
+    job.errors.push(err.message);
+    job.finishedAt = new Date().toISOString();
+  });
+
+  return { jobId, status: 'started' };
+}
+
+async function runUpdateOngoingJob(job) {
+  try {
+    const res = await pool.query(`SELECT id, title, title_english FROM anime_content WHERE status IN ('Releasing', 'Ongoing')`);
+    const animes = res.rows;
+    if (animes.length === 0) {
+      job.status = 'done';
+      job.progress.message = 'No hay animes en emisión en el catálogo.';
+      job.finishedAt = new Date().toISOString();
+      return;
+    }
+
+    job.progress.total = animes.length;
+    let processed = 0;
+    
+    for (const anime of animes) {
+      processed++;
+      job.progress.current = processed;
+      job.progress.message = `Buscando episodios de ${anime.title} (${processed}/${animes.length})...`;
+
+      try {
+        const scrapeJob = createJob('scrape', anime.id);
+        // source 'auto' buscará en JKAnime y luego AnimeAV1
+        await runScrapeJob(scrapeJob, anime.id, { source: 'auto', fromEpisode: 1, toEpisode: null, season: 1 });
+      } catch (err) {
+        job.errors.push(`Error en ${anime.title}: ${err.message}`);
+      }
+    }
+
+    job.status = 'done';
+    job.progress.message = `Actualización terminada. Se revisaron ${animes.length} animes.`;
+    job.result = { total: animes.length };
+    job.finishedAt = new Date().toISOString();
+  } catch (err) {
+    job.status = 'error';
+    job.errors.push(err.message);
+    job.finishedAt = new Date().toISOString();
+  }
+}
+
+/**
  * Escanea animes en emisión, los crea si no existen y extrae sus episodios.
  */
 export async function syncAiringAnimes() {
@@ -141,7 +207,7 @@ async function runSyncAiringJob(job) {
         job.progress.message = `Scrapeando episodios de ${slug}...`;
         const scrapeJob = createJob('scrape', animeId);
         // Sobrescribimos el onProgress local para no ensuciar el job de sync, pero sí correrlo
-        await processEpisodes(scrapeJob, animeId, { jkSlug: slug, fromEpisode: 1, toEpisode: null, season: 1 });
+        await runScrapeJob(scrapeJob, animeId, { jkSlug: slug, fromEpisode: 1, toEpisode: null, season: 1, source: 'auto' });
 
       } catch (err) {
         console.error(`[SmartBot] Error sincronizando ${slug}:`, err.message);
