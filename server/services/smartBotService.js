@@ -11,6 +11,13 @@ import { searchAniListMetadata, searchAniListByMalId } from './anilistService.js
 import { findJkAnimeSlug, scrapeAnimeEpisodes } from './jkanimeScraper.js';
 import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData, scrapeAiringAnimesAv1 } from './animeav1Scraper.js';
 
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const MEMORY_FILE = path.join(__dirname, '..', 'uploads', 'bot_memory.json');
 
 // Estado en memoria del bot (jobs activos)
 const botJobs = new Map(); // jobId → { status, progress, errors, result }
@@ -696,4 +703,49 @@ export function listBotJobs() {
   return Array.from(botJobs.values()).sort(
     (a, b) => new Date(b.startedAt) - new Date(a.startedAt)
   );
+}
+
+export async function syncNextCatalogPage() {
+  console.log('[Cron] Ejecutando scraper incremental de catálogo...');
+  
+  let currentPage = 1;
+  const MAX_PAGE = 120; // Ajustar si el catálogo crece más
+  
+  try {
+    if (fs.existsSync(MEMORY_FILE)) {
+      const data = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
+      if (data && data.lastCatalogPage) {
+        currentPage = data.lastCatalogPage;
+      }
+    }
+  } catch (e) {
+    console.warn('[SmartBot] No se pudo leer bot_memory.json, empezando desde la página 1');
+  }
+
+  console.log(`[SmartBot] Scrapeando catálogo incremental: Página ${currentPage}`);
+  
+  // Creamos un job en memoria falso para reutilizar runSyncAllCatalogJob
+  const fakeJob = {
+    id: `cron-catalog-${Date.now()}`,
+    progress: {},
+    errors: []
+  };
+
+  try {
+    // Usamos runSyncAllCatalogJob pero solo para 1 página
+    await runSyncAllCatalogJob(fakeJob, currentPage, currentPage);
+    console.log(`[SmartBot] Página ${currentPage} escaneada exitosamente.`);
+    
+    // Avanzar de página
+    currentPage++;
+    if (currentPage > MAX_PAGE) {
+      currentPage = 1;
+      console.log(`[SmartBot] Se llegó a la última página del catálogo, reiniciando a la página 1.`);
+    }
+
+    // Guardar memoria
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify({ lastCatalogPage: currentPage }));
+  } catch (err) {
+    console.error(`[SmartBot] Error en scraper incremental de catálogo (página ${currentPage}):`, err.message);
+  }
 }

@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { syncAiringAnimes, updateOngoingAnimes } from './services/smartBotService.js';
+import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage } from './services/smartBotService.js';
 import pool from './db.js';
 
 export function startBotSchedulers() {
@@ -27,9 +27,20 @@ export function startBotSchedulers() {
     }
   });
 
+  // Tarea 3: Scraper incremental de catálogo (Cada 10 minutos)
+  // '*/10 * * * *' -> cada 10 minutos
+  cron.schedule('*/10 * * * *', async () => {
+    try {
+      await syncNextCatalogPage();
+    } catch (e) {
+      console.error('[Cron] Error en syncNextCatalogPage:', e.message);
+    }
+  });
+
   console.log('[Cron] Tareas del bot configuradas:');
   console.log(' - Update Ongoing: Cada 4 horas');
   console.log(' - Sync Airing: Diario a las 02:00 AM');
+  console.log(' - Sync Catalog Incremental: Cada 10 minutos');
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {
