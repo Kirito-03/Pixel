@@ -16,7 +16,10 @@ const name = process.env.DB_NAME || 'bd_pixel';
 
 const databaseUrl = process.env.DATABASE_URL || `postgres://${user}:${password}@${host}:${port}/${name}`;
 
-const command = process.argv[2] === 'down' ? 'node-pg-migrate down' : 'node-pg-migrate up';
+// Usar ruta local del binario para que funcione en Docker sin modificar PATH
+const pgMigrateBin = join(__dirname, 'node_modules', '.bin', 'node-pg-migrate');
+const direction = process.argv[2] === 'down' ? 'down' : 'up';
+const command = `node "${pgMigrateBin}" ${direction}`;
 
 try {
   console.log(`Running: ${command}`);

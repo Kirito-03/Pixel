@@ -1,11 +1,13 @@
 version: "3.8"
 
 services:
-  # 1. Frontend Web (Nginx) - ÚNICO EXPUESTO AL HOST
+  # 1. Frontend Web (Nginx) - accedido por Cloudflare Tunnel via Docker DNS
   pixel_frontend:
     image: nginx:alpine
     container_name: pixel_frontend
     restart: unless-stopped
+    # Sin ports: el Cloudflare Tunnel (vns_tunnel) accede directamente
+    # usando DNS interno de Docker: http://pixel_frontend:80
     volumes:
       # Monta la app compilada (dist) generada por Expo
       - ./dist:/usr/share/nginx/html:ro
@@ -93,7 +95,7 @@ services:
       timeout: 3s
       retries: 3
 
-  # 5. Adminer DB Manager - SIN PUERTOS EXPUESTOS (Para uso interno o proxy reverso)
+  # 5. Adminer DB Manager - SIN PUERTOS EXPUESTOS (acceso via Cloudflare Tunnel o SSH)
   pixel_adminer:
     image: adminer:latest
     container_name: pixel_adminer

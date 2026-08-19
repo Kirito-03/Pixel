@@ -16,8 +16,8 @@ RUN apk add --no-cache ffmpeg
 COPY package*.json ./
 
 # Instalar dependencias de producción
-# Usar npm install en lugar de ci para permitir cambios en package.json sin actualizar lockfile manualmente
-RUN npm install --only=production && \
+# --omit=dev: instala todo excepto devDependencies (nodemon)
+RUN npm install --omit=dev && \
   npm cache clean --force
 
 # Copiar el resto del código fuente
@@ -26,6 +26,9 @@ COPY . .
 # Crear directorios necesarios para uploads y contenido
 RUN mkdir -p uploads/avatars hls videos && \
   chown -R node:node /app
+
+# Dar permisos de ejecución al entrypoint (ANTES de cambiar a usuario no-root)
+RUN chmod +x /app/index.js
 
 # Cambiar a usuario no-root por seguridad
 USER node
@@ -36,9 +39,6 @@ EXPOSE 3001
 # Health check interno (Docker lo usa para verificar container health)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD wget --spider -q http://localhost:3001/health || exit 1
-
-# Dar permisos de ejecución al entrypoint
-RUN chmod +x /app/index.js
 
 # Comando de inicio
 CMD ["npm", "start"]
