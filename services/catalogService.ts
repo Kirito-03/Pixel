@@ -74,9 +74,9 @@ export const catalogService = {
   async getHomeSections() {
     const limit = 20;
     const [airing, finished, upcoming] = await Promise.all([
-      http.get('/api/catalog/anime', { params: { status: 'Airing', page: 1, limit } }),
+      http.get('/api/catalog/anime', { params: { status: 'Releasing', page: 1, limit } }),
       http.get('/api/catalog/anime', { params: { status: 'Finished', page: 1, limit } }),
-      http.get('/api/catalog/anime', { params: { status: 'Upcoming', page: 1, limit } }),
+      http.get('/api/catalog/anime', { params: { status: '', page: 1, limit } }),
     ]);
 
     return {
