@@ -364,11 +364,10 @@ export async function scrapeAiringAnimesAv1() {
 
     const html = response.data;
 
-    // Extraer slugs de las cards del horario
-    // Formato href="/media/{slug}" o href="/media/{slug}/{ep}"
-    const hrefMatches = [...html.matchAll(/href="\/media\/([^/"]+)(?:\/\d+)?"/g)];
+    // Extraer slugs del JSON de SvelteKit
+    const slugMatches = [...html.matchAll(/slug:"([^"]+)"/g)];
 
-    for (const match of hrefMatches) {
+    for (const match of slugMatches) {
       const slug = match[1];
       if (slug && !slugs.has(slug)) {
         slugs.add(slug);
