@@ -1,26 +1,29 @@
-// Baseline migration — representa el schema existente en producción.
-// NO ejecuta SQL porque la DB ya tiene todas las tablas iniciales.
-// Este archivo existe para que node-pg-migrate sepa que el estado "cero"
-// ya está aplicado en producción.
+// Baseline migration — aplica el schema core en instalaciones frescas.
+// Usa los archivos SQL con IF NOT EXISTS / IF NOT EXISTS para ser idempotente
+// en producción (las tablas ya existen → no hace nada).
+const fs = require('fs');
+const path = require('path');
 
 exports.up = (pgm) => {
-  // Schema inicial ya existente en producción:
-  // - usuarios
-  // - perfiles  
-  // - listas
-  // - lista_items
-  // - descargas
-  // - descarga_items
-  // - contenido
-  // - imagenes
-  // - password_resets
-  // - anime_content
-  // - anime_episodes
-  // - anime_genres
-  // - anime_content_genres
-  //
-  // Referencia completa: server/sql/bd_netflix_postgres.sql
-  console.log('Baseline migration: schema inicial ya presente en producción.');
+  // Aplicar schema core (anime_content, anime_episodes, etc.)
+  // IF NOT EXISTS en cada CREATE TABLE hace esto seguro en producción.
+  const bdSqlPath = path.join(__dirname, '../bd_pixel_postgres.sql');
+  if (fs.existsSync(bdSqlPath)) {
+    const bdSql = fs.readFileSync(bdSqlPath, 'utf8');
+    pgm.sql(bdSql);
+    console.log('Baseline: bd_pixel_postgres.sql aplicado.');
+  } else {
+    console.warn('Baseline: bd_pixel_postgres.sql no encontrado, saltando.');
+  }
+
+  const adminSqlPath = path.join(__dirname, '../admin_schema.sql');
+  if (fs.existsSync(adminSqlPath)) {
+    const adminSql = fs.readFileSync(adminSqlPath, 'utf8');
+    pgm.sql(adminSql);
+    console.log('Baseline: admin_schema.sql aplicado.');
+  } else {
+    console.warn('Baseline: admin_schema.sql no encontrado, saltando.');
+  }
 };
 
 exports.down = (pgm) => {
