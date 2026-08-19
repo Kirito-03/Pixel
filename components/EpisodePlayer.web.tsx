@@ -91,13 +91,6 @@ const EpisodePlayer: React.FC<any> = ({
             frameBorder="0"
             referrerPolicy="no-referrer"
           />
-          <TouchableOpacity 
-            style={styles.externalButton}
-            onPress={() => window.open(source, '_blank')}
-          >
-            <Ionicons name="open-outline" size={20} color="#fff" />
-            <Text style={styles.externalButtonText}>¿Pantalla en negro? Abrir en nueva pestaña</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <video 
@@ -193,24 +186,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'relative',
-  },
-  externalButton: {
-    position: 'absolute',
-    bottom: 140,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(231, 76, 60, 0.9)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    gap: 8,
-    zIndex: 20,
-  },
-  externalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
   },
   serverSelector: {
     position: 'absolute',
