@@ -48,6 +48,9 @@ const { default: schedulesRoutes }  = await import('./routes/schedules.js');
 // ── Express app ────────────────────────────────────────────────
 const app = express();
 
+// Confiar en el proxy (Cloudflare/Traefik) para express-rate-limit
+app.set('trust proxy', 1);
+
 // Seguridad: Cabeceras HTTP
 app.use(helmet({
   crossOriginResourcePolicy: false, // Permitir que la app móvil acceda a recursos estáticos (imágenes/videos)
