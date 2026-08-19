@@ -308,3 +308,67 @@ function titleSimilarity(a, b) {
   const union = A.size + B.size - inter;
   return union ? inter / union : 0;
 }
+
+/**
+ * Scrapea los animes actualmente en emisión desde animeav1.com/catalogo.
+ * Equivalente a scrapeAiringAnimes de JKAnime, retorna lista de slugs.
+ * @param {number} maxPages - Páginas del catálogo a revisar (default: 3)
+ * @returns {Promise<string[]>} Lista de slugs de animes en emisión
+ */
+export async function scrapeAiringAnimesAv1(maxPages = 3) {
+  const slugs = new Set();
+
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      // Filtrar por estado "Releasing" (status=2 en animeav1) y ordenar por recientes
+      const url = `${BASE_URL}/catalogo?page=${page}&status=2&order=updated`;
+      console.log(`[AV1Scraper] Scrapeando catálogo página ${page}: ${url}`);
+
+      const response = await axios.get(url, {
+        headers: BROWSER_HEADERS,
+        timeout: TIMEOUT,
+      });
+
+      const html = response.data;
+
+      // Extraer slugs de las cards del catálogo
+      // Formato href="/media/{slug}" o href="/media/{slug}/{ep}"
+      const hrefMatches = [...html.matchAll(/href="\/media\/([^/"]+)(?:\/\d+)?"/g)];
+      let pageCount = 0;
+
+      for (const match of hrefMatches) {
+        const slug = match[1];
+        if (slug && !slugs.has(slug)) {
+          slugs.add(slug);
+          pageCount++;
+        }
+      }
+
+      // También intentar extraer del JSON de SvelteKit si está disponible
+      const jsonMatches = [...html.matchAll(/slug:"([^"]+)"/g)];
+      for (const match of jsonMatches) {
+        const slug = match[1];
+        if (slug && !slugs.has(slug)) {
+          slugs.add(slug);
+          pageCount++;
+        }
+      }
+
+      console.log(`[AV1Scraper] Página ${page}: ${pageCount} slugs encontrados`);
+
+      if (pageCount === 0) {
+        console.log(`[AV1Scraper] Página ${page} vacía, deteniendo.`);
+        break;
+      }
+
+      if (page < maxPages) await sleep(DELAY_MS);
+    } catch (error) {
+      console.error(`[AV1Scraper] Error en página ${page}:`, error.message);
+      break;
+    }
+  }
+
+  const result = Array.from(slugs);
+  console.log(`[AV1Scraper] Total animes en emisión encontrados: ${result.length}`);
+  return result;
+}

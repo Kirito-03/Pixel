@@ -8,8 +8,8 @@
  */
 import pool from '../db.js';
 import { searchAniListMetadata } from './anilistService.js';
-import { findJkAnimeSlug, scrapeAnimeEpisodes, scrapeAiringAnimes } from './jkanimeScraper.js';
-import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData } from './animeav1Scraper.js';
+import { findJkAnimeSlug, scrapeAnimeEpisodes } from './jkanimeScraper.js';
+import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData, scrapeAiringAnimesAv1 } from './animeav1Scraper.js';
 import { downloadAndUploadEpisode } from './videoDownloaderService.js';
 import pLimit from 'p-limit';
 
@@ -159,7 +159,8 @@ export async function syncAiringAnimes() {
 
 async function runSyncAiringJob(job) {
   try {
-    const slugs = await scrapeAiringAnimes();
+    // Usar animeav1.com como fuente principal de animes en emisión
+    const slugs = await scrapeAiringAnimesAv1(3);
     if (!slugs || slugs.length === 0) {
       throw new Error('No se encontraron animes en emisión.');
     }
