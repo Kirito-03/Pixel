@@ -219,13 +219,35 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
           console.error(`[SmartBot] Error fetch AV1 page data para ${slug}:`, e.message);
         }
 
-        // Buscar si ya existe por titulo o algo similar
-        const existCheck = await pool.query(
-          `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
-          [`%${titleQuery}%`]
-        );
+        // --- PREVENCIÓN DE DUPLICADOS ---
+        // Obtener títulos oficiales de AniList para buscar en BD de forma robusta
+        let titlesToCheck = [titleQuery];
+        if (extractedMalId) {
+          try {
+            const aniListMeta = await searchAniListByMalId(extractedMalId);
+            if (aniListMeta) {
+              if (aniListMeta.title) titlesToCheck.push(aniListMeta.title);
+              if (aniListMeta.title_english) titlesToCheck.push(aniListMeta.title_english);
+            }
+          } catch(e) {}
+        }
         
-        if (existCheck.rows.length > 0) {
+        titlesToCheck = [...new Set(titlesToCheck.filter(Boolean))];
+        let animeId = null;
+
+        // Buscar si ya existe por cualquiera de las variaciones del título
+        for (const t of titlesToCheck) {
+          const existCheck = await pool.query(
+            `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
+            [`%${t}%`]
+          );
+          if (existCheck.rows.length > 0) {
+            animeId = existCheck.rows[0].id;
+            break;
+          }
+        }
+        
+        if (animeId) {
           skipped++;
           continue; // Ya existe, lo saltamos para no sobrecargar
         }
@@ -302,15 +324,33 @@ async function runSyncAiringJob(job) {
           console.error(`[SmartBot] Error fetch AV1 page data para ${slug}:`, e.message);
         }
 
-        // 1. Buscar si ya existe por titulo o algo similar (búsqueda burda por ILIKE)
-        let animeId = null;
-        const existCheck = await pool.query(
-          `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
-          [`%${titleQuery}%`]
-        );
+        // --- PREVENCIÓN DE DUPLICADOS ---
+        let titlesToCheck = [titleQuery];
+        if (extractedMalId) {
+          try {
+            const aniListMeta = await searchAniListByMalId(extractedMalId);
+            if (aniListMeta) {
+              if (aniListMeta.title) titlesToCheck.push(aniListMeta.title);
+              if (aniListMeta.title_english) titlesToCheck.push(aniListMeta.title_english);
+            }
+          } catch(e) {}
+        }
         
-        if (existCheck.rows.length > 0) {
-          animeId = existCheck.rows[0].id;
+        titlesToCheck = [...new Set(titlesToCheck.filter(Boolean))];
+        let animeId = null;
+
+        for (const t of titlesToCheck) {
+          const existCheck = await pool.query(
+            `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
+            [`%${t}%`]
+          );
+          if (existCheck.rows.length > 0) {
+            animeId = existCheck.rows[0].id;
+            break;
+          }
+        }
+        
+        if (animeId) {
           updatedAnimes++;
         } else {
           // 2. Si no existe, crearlo con datos fallback si existen
@@ -499,6 +539,21 @@ async function runScrapeJob(job, animeId, options) {
     const searchTitle = anime.title_english || anime.title;
     const maxEp = toEpisode || anime.total_episodes || 1000;
 
+    let startEp = fromEpisode;
+
+    // Si empezamos desde el episodio 1, verificar si podemos hacer un scraping incremental
+    if (fromEpisode === 1) {
+      const highestEpResult = await pool.query(
+        'SELECT MAX(episode_number) as max_ep FROM anime_episodes WHERE anime_id = $1 AND season = $2',
+        [animeId, season]
+      );
+      if (highestEpResult.rows[0].max_ep !== null) {
+        startEp = highestEpResult.rows[0].max_ep + 1;
+        job.progress.message = `Scraping incremental: saltando hasta el ep ${startEp}...`;
+        console.log(`[SmartBot] Scraping incremental para anime ${animeId}: empezando desde ep ${startEp}`);
+      }
+    }
+
     let episodes = [];
     let usedSource = null;
 
@@ -509,9 +564,9 @@ async function runScrapeJob(job, animeId, options) {
       if (!slug) slug = await findAnimeAv1Slug(searchTitle);
 
       if (slug) {
-        job.progress.message = `Scrapeando episodios del slug AV1 "${slug}"...`;
+        job.progress.message = `Scrapeando episodios del slug AV1 "${slug}" (desde ep ${startEp})...`;
         episodes = await scrapeAnimeAv1Episodes(slug, {
-          fromEpisode,
+          fromEpisode: startEp,
           toEpisode: maxEp,
           onProgress: (current, total) => {
             job.progress.current = current;
@@ -539,9 +594,9 @@ async function runScrapeJob(job, animeId, options) {
       }
 
       if (slug) {
-        job.progress.message = `Scrapeando episodios del slug JK "${slug}"...`;
+        job.progress.message = `Scrapeando episodios del slug JK "${slug}" (desde ep ${startEp})...`;
         episodes = await scrapeAnimeEpisodes(slug, {
-          fromEpisode,
+          fromEpisode: startEp,
           toEpisode: maxEp,
           onProgress: (current, total) => {
             job.progress.current = current;
