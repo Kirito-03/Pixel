@@ -36,6 +36,9 @@ export default function AnimeFormScreen() {
     const [tmdbResults, setTmdbResults] = useState<any[]>([]);
     const [tmdbSearchQuery, setTmdbSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const [tmdbSelectionModalVisible, setTmdbSelectionModalVisible] = useState(false);
+    const [tmdbFetchedData, setTmdbFetchedData] = useState<any>(null);
+    const [selectedFields, setSelectedFields] = useState<Record<string, boolean>>({});
 
     const [formData, setFormData] = useState({
         title: '',
@@ -115,8 +118,7 @@ export default function AnimeFormScreen() {
             setIsSearching(true);
             const data = await adminApiService.getTMDBDetails(tmdbId);
 
-            setFormData({
-                ...formData,
+            const parsedData = {
                 tmdb_id: tmdbId.toString(),
                 title: data.name || data.original_name || '',
                 title_english: data.name || '',
@@ -128,10 +130,26 @@ export default function AnimeFormScreen() {
                 rating: data.vote_average?.toString() || '',
                 release_date: data.first_air_date || '',
                 status: mapTMDBStatus(data.status),
+            };
+
+            setTmdbFetchedData(parsedData);
+            
+            // Auto-check only empty fields
+            setSelectedFields({
+                title: !formData.title.trim(),
+                title_english: !formData.title_english.trim(),
+                description: !formData.description.trim(),
+                poster_url: !formData.poster_url.trim(),
+                banner_url: !formData.banner_url.trim(),
+                genres: !formData.genres.trim(),
+                total_episodes: !formData.total_episodes.trim(),
+                rating: !formData.rating.trim(),
+                release_date: !formData.release_date.trim(),
+                status: formData.status === 'Unknown',
             });
 
             setShowTMDBSearch(false);
-            Alert.alert('Éxito', 'Datos importados desde TMDB');
+            setTmdbSelectionModalVisible(true);
         } catch (error) {
             console.error('Error getting TMDB details:', error);
             Alert.alert('Error', 'No se pudieron obtener los detalles');
@@ -139,6 +157,48 @@ export default function AnimeFormScreen() {
             setIsSearching(false);
         }
     };
+
+    const applyTMDBSelection = () => {
+        if (!tmdbFetchedData) return;
+
+        const updatedData = { ...formData };
+        if (selectedFields.title) updatedData.title = tmdbFetchedData.title;
+        if (selectedFields.title_english) updatedData.title_english = tmdbFetchedData.title_english;
+        if (selectedFields.description) updatedData.description = tmdbFetchedData.description;
+        if (selectedFields.poster_url) updatedData.poster_url = tmdbFetchedData.poster_url;
+        if (selectedFields.banner_url) updatedData.banner_url = tmdbFetchedData.banner_url;
+        if (selectedFields.genres) updatedData.genres = tmdbFetchedData.genres;
+        if (selectedFields.total_episodes) updatedData.total_episodes = tmdbFetchedData.total_episodes;
+        if (selectedFields.rating) updatedData.rating = tmdbFetchedData.rating;
+        if (selectedFields.release_date) updatedData.release_date = tmdbFetchedData.release_date;
+        if (selectedFields.status) updatedData.status = tmdbFetchedData.status;
+        
+        updatedData.tmdb_id = tmdbFetchedData.tmdb_id;
+
+        setFormData(updatedData);
+        setTmdbSelectionModalVisible(false);
+        setTmdbFetchedData(null);
+        Alert.alert('Éxito', 'Campos seleccionados importados desde TMDB');
+    };
+
+    const CheckboxItem = ({ label, field }: { label: string, field: string }) => (
+        <TouchableOpacity 
+            style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8, gap: 10 }} 
+            onPress={() => setSelectedFields(prev => ({ ...prev, [field]: !prev[field] }))}
+        >
+            <Ionicons 
+                name={selectedFields[field] ? 'checkbox' : 'square-outline'} 
+                size={24} 
+                color={selectedFields[field] ? adminColors.primary : adminColors.border} 
+            />
+            <Text style={{ color: adminColors.text, fontSize: 15, fontWeight: '500' }}>{label}</Text>
+            {tmdbFetchedData?.[field] && (
+                <Text style={{ color: adminColors.textSecondary, fontSize: 12, flex: 1 }} numberOfLines={1}>
+                    ({tmdbFetchedData[field]})
+                </Text>
+            )}
+        </TouchableOpacity>
+    );
 
     const handleSave = async () => {
         if (!formData.title.trim()) {
@@ -444,6 +504,45 @@ export default function AnimeFormScreen() {
                                 </TouchableOpacity>
                             )}
                         />
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal de Selección de TMDB */}
+            <Modal
+                visible={tmdbSelectionModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setTmdbSelectionModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContainer, { maxHeight: '90%' }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>¿Qué campos importar?</Text>
+                            <TouchableOpacity onPress={() => setTmdbSelectionModalVisible(false)}>
+                                <Ionicons name="close" size={24} color={adminColors.text} />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={{ color: adminColors.textSecondary, marginBottom: 15, fontSize: 13 }}>
+                            Los campos que ya tenías llenos están desmarcados por defecto para no sobrescribirlos. Marca los que desees reemplazar.
+                        </Text>
+                        
+                        <ScrollView style={{ marginBottom: 20 }}>
+                            <CheckboxItem label="Título" field="title" />
+                            <CheckboxItem label="Título en Inglés" field="title_english" />
+                            <CheckboxItem label="Descripción" field="description" />
+                            <CheckboxItem label="Póster" field="poster_url" />
+                            <CheckboxItem label="Banner" field="banner_url" />
+                            <CheckboxItem label="Géneros" field="genres" />
+                            <CheckboxItem label="Episodios Totales" field="total_episodes" />
+                            <CheckboxItem label="Calificación (Rating)" field="rating" />
+                            <CheckboxItem label="Fecha de Estreno" field="release_date" />
+                            <CheckboxItem label="Estado de Emisión" field="status" />
+                        </ScrollView>
+
+                        <TouchableOpacity style={[styles.searchButton, { paddingVertical: 14 }]} onPress={applyTMDBSelection}>
+                            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Aplicar Selección</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
