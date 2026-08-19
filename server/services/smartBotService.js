@@ -7,7 +7,7 @@
  *  - PostgreSQL para persistencia
  */
 import pool from '../db.js';
-import { searchAniListMetadata } from './anilistService.js';
+import { searchAniListMetadata, searchAniListByMalId } from './anilistService.js';
 import { findJkAnimeSlug, scrapeAnimeEpisodes } from './jkanimeScraper.js';
 import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData, scrapeAiringAnimesAv1 } from './animeav1Scraper.js';
 
@@ -201,8 +201,24 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
       job.progress.message = `Procesando catálogo: ${slug} (${processed}/${slugs.length})...`;
 
       try {
-        const titleQuery = slug.replace(/-/g, ' ');
-        
+        let titleQuery = slug.replace(/-/g, ' ');
+        let fallbackPoster = null;
+        let fallbackBanner = null;
+        let extractedMalId = null;
+
+        // Intentar obtener datos precisos desde AnimeAV1 antes de crear
+        try {
+          const pageData = await getAnimeAv1PageData(slug);
+          if (pageData && pageData.media) {
+            titleQuery = pageData.media.title || titleQuery;
+            extractedMalId = pageData.media.malId;
+            fallbackPoster = pageData.media.poster || pageData.media.backdrop;
+            fallbackBanner = pageData.media.backdrop;
+          }
+        } catch (e) {
+          console.error(`[SmartBot] Error fetch AV1 page data para ${slug}:`, e.message);
+        }
+
         // Buscar si ya existe por titulo o algo similar
         const existCheck = await pool.query(
           `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
@@ -216,8 +232,8 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
 
         // Si no existe, crearlo
         const insertResult = await pool.query(
-          `INSERT INTO anime_content (title, status, is_active) VALUES ($1, 'Finished', true) RETURNING id`,
-          [titleQuery]
+          `INSERT INTO anime_content (title, poster_url, banner_url, status, is_active) VALUES ($1, $2, $3, 'Finished', true) RETURNING id`,
+          [titleQuery, fallbackPoster, fallbackBanner]
         );
         const animeId = insertResult.rows[0].id;
         newAnimes++;
@@ -225,7 +241,7 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
         // Ejecutar metadatos
         job.progress.message = `[NUEVO] Autocompletando metadatos de ${slug}...`;
         const metaJob = createJob('metadata', animeId);
-        await runMetadataJob(metaJob, animeId);
+        await runMetadataJob(metaJob, animeId, extractedMalId);
 
         // Scrapear episodios
         job.progress.message = `[NUEVO] Scrapeando episodios de ${slug}...`;
@@ -268,9 +284,24 @@ async function runSyncAiringJob(job) {
       job.progress.message = `Procesando ${slug} (${processed}/${slugs.length})...`;
 
       try {
-        // Crear título aproximado: "black-clover" -> "black clover"
-        const titleQuery = slug.replace(/-/g, ' ');
-        
+        let titleQuery = slug.replace(/-/g, ' ');
+        let fallbackPoster = null;
+        let fallbackBanner = null;
+        let extractedMalId = null;
+
+        // Intentar obtener datos precisos desde AnimeAV1 antes de crear
+        try {
+          const pageData = await getAnimeAv1PageData(slug);
+          if (pageData && pageData.media) {
+            titleQuery = pageData.media.title || titleQuery;
+            extractedMalId = pageData.media.malId;
+            fallbackPoster = pageData.media.poster || pageData.media.backdrop;
+            fallbackBanner = pageData.media.backdrop;
+          }
+        } catch (e) {
+          console.error(`[SmartBot] Error fetch AV1 page data para ${slug}:`, e.message);
+        }
+
         // 1. Buscar si ya existe por titulo o algo similar (búsqueda burda por ILIKE)
         let animeId = null;
         const existCheck = await pool.query(
@@ -282,10 +313,10 @@ async function runSyncAiringJob(job) {
           animeId = existCheck.rows[0].id;
           updatedAnimes++;
         } else {
-          // 2. Si no existe, crearlo
+          // 2. Si no existe, crearlo con datos fallback si existen
           const insertResult = await pool.query(
-            `INSERT INTO anime_content (title, status, is_active) VALUES ($1, 'Releasing', true) RETURNING id`,
-            [titleQuery]
+            `INSERT INTO anime_content (title, poster_url, banner_url, status, is_active) VALUES ($1, $2, $3, 'Releasing', true) RETURNING id`,
+            [titleQuery, fallbackPoster, fallbackBanner]
           );
           animeId = insertResult.rows[0].id;
           newAnimes++;
@@ -293,7 +324,7 @@ async function runSyncAiringJob(job) {
           // 3. Ejecutar metadatos (esperar a que termine para tener los campos listos)
           job.progress.message = `Autocompletando metadatos de ${slug}...`;
           const metaJob = createJob('metadata', animeId);
-          await runMetadataJob(metaJob, animeId);
+          await runMetadataJob(metaJob, animeId, extractedMalId);
         }
 
         // 4. Scrapear episodios
@@ -319,7 +350,7 @@ async function runSyncAiringJob(job) {
   }
 }
 
-async function runMetadataJob(job, animeId) {
+async function runMetadataJob(job, animeId, forceMalId = null) {
   try {
     job.progress.message = 'Buscando anime en BD...';
 
@@ -334,10 +365,19 @@ async function runMetadataJob(job, animeId) {
     }
 
     const anime = animeResult.rows[0];
-    job.progress.message = `Buscando "${anime.title}" en AniList...`;
+    let metadata = null;
 
-    // Buscar en AniList
-    const metadata = await searchAniListMetadata(anime.title_english || anime.title);
+    // Buscar en AniList usando el ID exacto (100% de precisión)
+    if (forceMalId) {
+      job.progress.message = `Buscando MAL ID ${forceMalId} en AniList...`;
+      metadata = await searchAniListByMalId(forceMalId);
+    }
+
+    // Fallback a buscar por título
+    if (!metadata) {
+      job.progress.message = `Buscando "${anime.title}" en AniList...`;
+      metadata = await searchAniListMetadata(anime.title_english || anime.title);
+    }
 
     if (!metadata) {
       throw new Error(`No se encontró "${anime.title}" en AniList`);
