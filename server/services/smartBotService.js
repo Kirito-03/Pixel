@@ -462,41 +462,11 @@ async function runScrapeJob(job, animeId, options) {
     let episodes = [];
     let usedSource = null;
 
-    // --- Intentar JKAnime ---
-    if (source === 'jkanime' || source === 'auto') {
-      job.progress.message = `Buscando "${anime.title}" en JKAnime...`;
-      let slug = jkSlug;
-      if (!slug) slug = await findJkAnimeSlug(searchTitle);
-
-      if (slug) {
-        job.progress.message = `Scrapeando episodios del slug JK "${slug}"...`;
-        episodes = await scrapeAnimeEpisodes(slug, {
-          fromEpisode,
-          toEpisode: maxEp,
-          onProgress: (current, total) => {
-            job.progress.current = current;
-            job.progress.total = total;
-            job.progress.message = `[JKAnime] Episodio ${current}/${total}...`;
-          },
-        });
-        if (episodes.length > 0) usedSource = 'jkanime';
-      }
-
-      if (source === 'jkanime' && episodes.length === 0) {
-        const reason = jkSlug ? `no se encontraron episodios para el slug "${jkSlug}"` : `no se encontró slug para "${anime.title}"`;        
-        throw new Error(`JKAnime: ${reason}`);
-      }
-    }
-
-    // --- Fallback / forzar AnimeAV1 ---
-    if ((source === 'animeav1' || (source === 'auto' && episodes.length === 0))) {
+    // --- Intentar AnimeAV1 ---
+    if (source === 'animeav1' || source === 'auto') {
       job.progress.message = `Buscando "${anime.title}" en AnimeAV1...`;
       let slug = av1Slug;
       if (!slug) slug = await findAnimeAv1Slug(searchTitle);
-
-      if (!slug && source === 'animeav1') {
-        throw new Error(`AnimeAV1: no se encontró slug para "${anime.title}". Pasa el slug manualmente con av1Slug.`);
-      }
 
       if (slug) {
         job.progress.message = `Scrapeando episodios del slug AV1 "${slug}"...`;
@@ -510,6 +480,36 @@ async function runScrapeJob(job, animeId, options) {
           },
         });
         if (episodes.length > 0) usedSource = 'animeav1';
+      }
+
+      if (source === 'animeav1' && episodes.length === 0) {
+        const reason = av1Slug ? `no se encontraron episodios para el slug "${av1Slug}"` : `no se encontró slug para "${anime.title}"`;        
+        throw new Error(`AnimeAV1: ${reason}`);
+      }
+    }
+
+    // --- Fallback / forzar JKAnime ---
+    if ((source === 'jkanime' || (source === 'auto' && episodes.length === 0))) {
+      job.progress.message = `Buscando "${anime.title}" en JKAnime...`;
+      let slug = jkSlug;
+      if (!slug) slug = await findJkAnimeSlug(searchTitle);
+
+      if (!slug && source === 'jkanime') {
+        throw new Error(`JKAnime: no se encontró slug para "${anime.title}". Pasa el slug manualmente con jkSlug.`);
+      }
+
+      if (slug) {
+        job.progress.message = `Scrapeando episodios del slug JK "${slug}"...`;
+        episodes = await scrapeAnimeEpisodes(slug, {
+          fromEpisode,
+          toEpisode: maxEp,
+          onProgress: (current, total) => {
+            job.progress.current = current;
+            job.progress.total = total;
+            job.progress.message = `[JKAnime] Episodio ${current}/${total}...`;
+          },
+        });
+        if (episodes.length > 0) usedSource = 'jkanime';
       }
     }
 
