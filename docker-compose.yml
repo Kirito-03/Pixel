@@ -39,7 +39,8 @@ services:
     env_file:
       - .env
     volumes:
-      - /app/node_modules
+      # NOTA: NO montar /app/node_modules — el volumen anónimo sobreescribiría
+      # los node_modules instalados en el build de la imagen Docker.
       - ./server/uploads:/app/uploads
       - ./server/videos:/app/videos
       - ./server/hls:/app/hls
