@@ -300,7 +300,7 @@ async function runSyncAiringJob(job) {
         job.progress.message = `Scrapeando episodios de ${slug}...`;
         const scrapeJob = createJob('scrape', animeId);
         // Sobrescribimos el onProgress local para no ensuciar el job de sync, pero sí correrlo
-        await runScrapeJob(scrapeJob, animeId, { jkSlug: slug, fromEpisode: 1, toEpisode: null, season: 1, source: 'auto' });
+        await runScrapeJob(scrapeJob, animeId, { av1Slug: slug, fromEpisode: 1, toEpisode: null, season: 1, source: 'animeav1' });
 
       } catch (err) {
         console.error(`[SmartBot] Error sincronizando ${slug}:`, err.message);
