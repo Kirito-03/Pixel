@@ -30,9 +30,9 @@ const BROWSER_HEADERS = {
 
 /**
  * Prioridad de servidores de video.
- * HLS primero (stream directo), luego embeds conocidos.
+ * Voe, MP4Upload y Mega primero porque permiten embed sin Referer.
  */
-const SERVER_PRIORITY = ['HLS', 'Voe', 'MP4Upload', 'Mega', 'Byse'];
+const SERVER_PRIORITY = ['Voe', 'MP4Upload', 'Mega', 'Byse', 'HLS'];
 
 /**
  * Selecciona la mejor URL de video según la prioridad de servidores.
