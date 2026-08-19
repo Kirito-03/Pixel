@@ -264,7 +264,7 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
           `INSERT INTO anime_content (title, poster_url, banner_url, status, is_active) VALUES ($1, $2, $3, 'Finished', true) RETURNING id`,
           [titleQuery, fallbackPoster, fallbackBanner]
         );
-        const animeId = insertResult.rows[0].id;
+        animeId = insertResult.rows[0].id;
         newAnimes++;
         
         // Ejecutar metadatos
