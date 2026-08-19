@@ -16,8 +16,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const MEMORY_FILE = path.join(__dirname, '..', 'uploads', 'bot_memory.json');
+const MEMORY_FILE = '/tmp/bot_memory.json';
 
 // Estado en memoria del bot (jobs activos)
 const botJobs = new Map(); // jobId → { status, progress, errors, result }
