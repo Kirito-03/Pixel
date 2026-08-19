@@ -1,7 +1,79 @@
 // Tablas runtime de Pixel No Sekai.
-// Usa CREATE TABLE IF NOT EXISTS para ser seguro en producción (ya existen).
+// Crea las tablas core de anime (IF NOT EXISTS) primero para garantizar
+// que las FK funcionen en instalaciones frescas sin initdb.
 
 exports.up = (pgm) => {
+  // ── CORE: admin_users ── (necesaria antes de cualquier join de admin)
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id SERIAL PRIMARY KEY,
+      google_id VARCHAR(255) UNIQUE NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      name VARCHAR(255),
+      picture VARCHAR(500),
+      last_login TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // ── CORE: anime_content ── (referenciada por anime_title_aliases FK)
+  pgm.sql(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'content_type_enum') THEN
+        CREATE TYPE content_type_enum AS ENUM ('movie', 'tv', 'anime');
+      END IF;
+    END $$;
+  `);
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS anime_content (
+      id SERIAL PRIMARY KEY,
+      tmdb_id INTEGER,
+      title VARCHAR(255) NOT NULL,
+      franchise_key VARCHAR(80),
+      title_english VARCHAR(255),
+      title_japanese VARCHAR(255),
+      description TEXT,
+      poster_url VARCHAR(500),
+      banner_url VARCHAR(500),
+      genres TEXT[],
+      status VARCHAR(50) DEFAULT 'Unknown',
+      total_episodes INTEGER DEFAULT 0,
+      rating DECIMAL(3,1) DEFAULT 0.0,
+      release_date DATE,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS idx_anime_content_tmdb ON anime_content(tmdb_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS idx_anime_content_franchise ON anime_content(franchise_key);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS idx_anime_content_active ON anime_content(is_active);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS idx_anime_content_title ON anime_content(title);`);
+
+  // ── CORE: anime_episodes ── (referenciada por transcode_jobs y stream_url ALTER)
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS anime_episodes (
+      id SERIAL PRIMARY KEY,
+      anime_id INTEGER NOT NULL REFERENCES anime_content(id) ON DELETE CASCADE,
+      season INTEGER DEFAULT 1,
+      episode_number INTEGER NOT NULL,
+      title VARCHAR(255),
+      video_url VARCHAR(1000),
+      status VARCHAR(50) DEFAULT 'missing',
+      storage_type VARCHAR(50) DEFAULT 'local',
+      duration INTEGER DEFAULT 0,
+      thumbnail_url VARCHAR(500),
+      file_size BIGINT DEFAULT 0,
+      quality VARCHAR(50) DEFAULT '1080p',
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS idx_anime_episodes_anime_id ON anime_episodes(anime_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS idx_anime_episodes_status ON anime_episodes(status);`);
+
   // ── pns_my_list_items ──
   pgm.sql(`
     CREATE TABLE IF NOT EXISTS pns_my_list_items (
