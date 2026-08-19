@@ -10,8 +10,7 @@ import pool from '../db.js';
 import { searchAniListMetadata } from './anilistService.js';
 import { findJkAnimeSlug, scrapeAnimeEpisodes } from './jkanimeScraper.js';
 import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData, scrapeAiringAnimesAv1 } from './animeav1Scraper.js';
-import { downloadAndUploadEpisode } from './videoDownloaderService.js';
-import pLimit from 'p-limit';
+
 
 // Estado en memoria del bot (jobs activos)
 const botJobs = new Map(); // jobId → { status, progress, errors, result }
@@ -155,6 +154,99 @@ export async function syncAiringAnimes() {
   });
 
   return { jobId, status: 'started' };
+}
+
+/**
+ * Explora el catálogo completo y añade los animes que no existan.
+ */
+export async function syncAllCatalog(startPage = 1, endPage = 10) {
+  const jobId = `sync-all-${Date.now()}`;
+  const job = {
+    type: 'sync-all',
+    status: 'running',
+    progress: { current: 0, total: 0, message: `Obteniendo catálogo completo (Páginas ${startPage}-${endPage})...` },
+    errors: [],
+    result: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+  };
+  botJobs.set(jobId, job);
+
+  runSyncAllCatalogJob(job, startPage, endPage).catch(err => {
+    job.status = 'error';
+    job.errors.push(err.message);
+    job.finishedAt = new Date().toISOString();
+  });
+
+  return { jobId, status: 'started' };
+}
+
+async function runSyncAllCatalogJob(job, startPage, endPage) {
+  try {
+    const { scrapeFullCatalogAv1 } = await import('./animeav1Scraper.js');
+    const slugs = await scrapeFullCatalogAv1(startPage, endPage);
+    
+    if (!slugs || slugs.length === 0) {
+      throw new Error('No se encontraron animes en el catálogo.');
+    }
+
+    job.progress.total = slugs.length;
+    let processed = 0;
+    let newAnimes = 0;
+    let skipped = 0;
+
+    for (const slug of slugs) {
+      processed++;
+      job.progress.current = processed;
+      job.progress.message = `Procesando catálogo: ${slug} (${processed}/${slugs.length})...`;
+
+      try {
+        const titleQuery = slug.replace(/-/g, ' ');
+        
+        // Buscar si ya existe por titulo o algo similar
+        const existCheck = await pool.query(
+          `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
+          [`%${titleQuery}%`]
+        );
+        
+        if (existCheck.rows.length > 0) {
+          skipped++;
+          continue; // Ya existe, lo saltamos para no sobrecargar
+        }
+
+        // Si no existe, crearlo
+        const insertResult = await pool.query(
+          `INSERT INTO anime_content (title, status, is_active) VALUES ($1, 'Finished', true) RETURNING id`,
+          [titleQuery]
+        );
+        const animeId = insertResult.rows[0].id;
+        newAnimes++;
+        
+        // Ejecutar metadatos
+        job.progress.message = `[NUEVO] Autocompletando metadatos de ${slug}...`;
+        const metaJob = createJob('metadata', animeId);
+        await runMetadataJob(metaJob, animeId);
+
+        // Scrapear episodios
+        job.progress.message = `[NUEVO] Scrapeando episodios de ${slug}...`;
+        const scrapeJob = createJob('scrape', animeId);
+        await runScrapeJob(scrapeJob, animeId, { av1Slug: slug, fromEpisode: 1, toEpisode: null, season: 1, source: 'animeav1' });
+
+      } catch (err) {
+        console.error(`[SmartBot] Error sincronizando catálogo ${slug}:`, err.message);
+        job.errors.push(`Error en ${slug}: ${err.message}`);
+      }
+    }
+
+    job.status = 'done';
+    job.progress.message = `¡Crawl de catálogo terminado!`;
+    job.result = { total: slugs.length, newAnimes, skipped };
+    job.finishedAt = new Date().toISOString();
+  } catch (err) {
+    job.status = 'error';
+    job.errors.push(err.message);
+    job.finishedAt = new Date().toISOString();
+  }
 }
 
 async function runSyncAiringJob(job) {
@@ -432,60 +524,34 @@ async function runScrapeJob(job, animeId, options) {
     let updated = 0;
     const episodesToDownload = [];
 
-    job.progress.message = `Insertando ${episodes.length} episodios a la BD...`;
+    job.progress.message = `Insertando ${episodes.length} episodios a la BD (modo scraping)...`;
 
     for (const ep of episodes) {
+      const externalServersJson = JSON.stringify(ep.all_servers || []);
+      
       const existing = await pool.query(
-        'SELECT id, video_url FROM anime_episodes WHERE anime_id = $1 AND episode_number = $2 AND season = $3',
+        'SELECT id FROM anime_episodes WHERE anime_id = $1 AND episode_number = $2 AND season = $3',
         [animeId, ep.episode_number, season]
       );
 
       if (existing.rows.length > 0) {
         const row = existing.rows[0];
-        if (!row.video_url || row.video_url.includes('jkanime')) {
-          await pool.query(
-            `UPDATE anime_episodes SET video_url = $1, status = 'processing', updated_at = NOW() WHERE id = $2`,
-            [ep.video_url, row.id]
-          );
-          updated++;
-          if (ep.video_url && !ep.video_url.includes('jkplayer')) {
-            episodesToDownload.push({ epId: row.id, videoUrl: ep.video_url, epNumber: ep.episode_number });
-          }
-        }
-      } else {
-        const insertResult = await pool.query(
-          `INSERT INTO anime_episodes (anime_id, season, episode_number, title, video_url, status, is_active, storage_type)
-           VALUES ($1, $2, $3, $4, $5, 'processing', true, 'external') RETURNING id`,
-          [animeId, season, ep.episode_number, `Episodio ${ep.episode_number}`, ep.video_url]
+        await pool.query(
+          `UPDATE anime_episodes 
+           SET video_url = $1, stream_url = $1, external_servers = $2, status = 'ready', storage_type = 'external', updated_at = NOW() 
+           WHERE id = $3`,
+          [ep.video_url, externalServersJson, row.id]
         );
-        const newEpId = insertResult.rows[0].id;
+        updated++;
+      } else {
+        await pool.query(
+          `INSERT INTO anime_episodes (anime_id, season, episode_number, title, video_url, stream_url, external_servers, status, is_active, storage_type)
+           VALUES ($1, $2, $3, $4, $5, $5, $6, 'ready', true, 'external')`,
+          [animeId, season, ep.episode_number, `Episodio ${ep.episode_number}`, ep.video_url, externalServersJson]
+        );
         inserted++;
-        if (ep.video_url && !ep.video_url.includes('jkplayer')) {
-          episodesToDownload.push({ epId: newEpId, videoUrl: ep.video_url, epNumber: ep.episode_number });
-        }
       }
     }
-
-    job.progress.message = `Iniciando descarga concurrente de ${episodesToDownload.length} episodios...`;
-
-    // Procesamiento en lote concurrente (máximo 3 a la vez)
-    const limitFn = pLimit(3);
-    const downloadPromises = episodesToDownload.map((item) => limitFn(async () => {
-      try {
-        job.progress.message = `Descargando Ep ${item.epNumber} a R2...`;
-        const r2Url = await downloadAndUploadEpisode(item.epId, item.videoUrl, anime.title_english || anime.title, item.epNumber);
-        
-        await pool.query(
-          `UPDATE anime_episodes SET video_url = $1, status = 'ready', storage_type = $2, updated_at = NOW() WHERE id = $3`,
-          [r2Url, r2Url.includes('r2') ? 'r2' : 'external', item.epId]
-        );
-      } catch (err) {
-        console.error(`[SmartBot] Error descargando ep ${item.epNumber}:`, err.message);
-        await pool.query(`UPDATE anime_episodes SET status = 'error', updated_at = NOW() WHERE id = $1`, [item.epId]);
-      }
-    }));
-
-    await Promise.all(downloadPromises);
 
     job.status = 'done';
     job.result = {

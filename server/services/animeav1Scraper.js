@@ -372,3 +372,65 @@ export async function scrapeAiringAnimesAv1(maxPages = 3) {
   console.log(`[AV1Scraper] Total animes en emisión encontrados: ${result.length}`);
   return result;
 }
+
+/**
+ * Scrapea el catálogo completo de animeav1.com sin filtros de estado.
+ * Se usa para sincronizar animes antiguos.
+ * @param {number} startPage - Página inicial
+ * @param {number} endPage - Página final
+ * @returns {Promise<string[]>} Lista de slugs
+ */
+export async function scrapeFullCatalogAv1(startPage = 1, endPage = 10) {
+  const slugs = new Set();
+
+  for (let page = startPage; page <= endPage; page++) {
+    try {
+      // order=updated para obtener los más recientes o order=added para los nuevos
+      const url = `${BASE_URL}/catalogo?page=${page}&order=updated`;
+      console.log(`[AV1Scraper] Scrapeando catálogo completo página ${page}: ${url}`);
+
+      const response = await axios.get(url, {
+        headers: BROWSER_HEADERS,
+        timeout: TIMEOUT,
+      });
+
+      const html = response.data;
+      const hrefMatches = [...html.matchAll(/href="\/media\/([^/"]+)(?:\/\d+)?"/g)];
+      let pageCount = 0;
+
+      for (const match of hrefMatches) {
+        const slug = match[1];
+        if (slug && !slugs.has(slug)) {
+          slugs.add(slug);
+          pageCount++;
+        }
+      }
+
+      const jsonMatches = [...html.matchAll(/slug:"([^"]+)"/g)];
+      for (const match of jsonMatches) {
+        const slug = match[1];
+        if (slug && !slugs.has(slug)) {
+          slugs.add(slug);
+          pageCount++;
+        }
+      }
+
+      console.log(`[AV1Scraper] Página ${page}: ${pageCount} slugs encontrados`);
+
+      if (pageCount === 0) {
+        console.log(`[AV1Scraper] Página ${page} vacía, deteniendo.`);
+        break;
+      }
+
+      if (page < endPage) await sleep(DELAY_MS);
+    } catch (error) {
+      console.error(`[AV1Scraper] Error en página ${page}:`, error.message);
+      break;
+    }
+  }
+
+  const result = Array.from(slugs);
+  console.log(`[AV1Scraper] Total animes encontrados en catálogo (páginas ${startPage}-${endPage}): ${result.length}`);
+  return result;
+}
+

@@ -11,6 +11,7 @@ import {
   autoFillMetadata,
   scrapeEpisodes,
   syncAiringAnimes,
+  syncAllCatalog,
 } from '../services/smartBotService.js';
 import { findJkAnimeSlug } from '../services/jkanimeScraper.js';
 import { searchAniListMetadata } from '../services/anilistService.js';
@@ -205,6 +206,25 @@ router.post('/sync-airing', async (req, res) => {
       ok: true,
       jobId: syncJob.jobId,
       message: 'Sincronización de animes en emisión iniciada.',
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/sync-all
+ * Inicia el proceso de crawl masivo del catálogo (solo animes nuevos).
+ * Body: { startPage: number, endPage: number }
+ */
+router.post('/sync-all', async (req, res) => {
+  const { startPage = 1, endPage = 10 } = req.body || {};
+  try {
+    const syncJob = await syncAllCatalog(parseInt(startPage), parseInt(endPage));
+    res.json({
+      ok: true,
+      jobId: syncJob.jobId,
+      message: \`Crawl masivo iniciado (páginas \${startPage}-\${endPage}).\`,
     });
   } catch (e) {
     res.status(500).json({ ok: false, message: e.message });

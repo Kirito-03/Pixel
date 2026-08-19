@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Hls from 'hls.js';
 import { getCurrentBaseURL } from '../services/databaseService';
@@ -16,29 +16,32 @@ const EpisodePlayer: React.FC<any> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState('');
+  const [serverIndex, setServerIndex] = useState(0);
+
+  // Fallback to episode.url if external_servers is empty
+  const servers = episode?.external_servers || [];
+  
+  // Resolve source based on serverIndex or default
+  let source = '';
+  if (servers.length > 0 && servers[serverIndex]) {
+    source = servers[serverIndex].url;
+  } else {
+    source = episode?.url || episode?.stream_url || episode?.video_url || '';
+  }
+
+  if (source.startsWith('/')) {
+    const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
+    source = `${baseUrl}${source}`;
+  } else if (!source.startsWith('http')) {
+    const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
+    source = `${baseUrl}/api/video/stream/${episode?.id}`;
+  }
+
+  const isIframe = source.includes('jkanime.net/jkplayer') || source.includes('iframe') || servers.length > 0;
 
   useEffect(() => {
-    if (!episode || !videoRef.current) return;
+    if (!episode || !videoRef.current || isIframe) return;
     const video = videoRef.current;
-    
-    // Determine the video source URL
-    let source = episode.url || episode.stream_url || episode.video_url;
-    if (!source) {
-      setError('No hay fuente de video disponible');
-      return;
-    }
-
-    const isIframe = source.includes('jkanime.net/jkplayer') || source.includes('iframe');
-    
-    // Convert relative backend paths to absolute URLs
-    if (source.startsWith('/')) {
-      const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
-      source = `${baseUrl}${source}`;
-    } else if (!source.startsWith('http')) {
-      // Local backend stream endpoint
-      const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
-      source = `${baseUrl}/api/video/stream/${episode.id}`;
-    }
 
     if (source.includes('.m3u8') && Hls.isSupported()) {
       const hls = new Hls();
@@ -55,19 +58,12 @@ const EpisodePlayer: React.FC<any> = ({
       return () => {
         hls.destroy();
       };
-    } else if (!isIframe) {
+    } else {
       video.src = source;
       video.load();
       video.play().catch(e => console.log('Auto-play prevented:', e));
     }
-  }, [episode]);
-
-  let source = episode?.url || episode?.stream_url || episode?.video_url || '';
-  if (source.startsWith('/')) {
-    const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
-    source = `${baseUrl}${source}`;
-  }
-  const isIframe = source.includes('jkanime.net/jkplayer') || source.includes('iframe');
+  }, [episode, serverIndex, source, isIframe]);
 
   return (
     <View style={styles.container}>
@@ -113,6 +109,25 @@ const EpisodePlayer: React.FC<any> = ({
         />
       )}
       
+      {/* Server Selector */}
+      {servers.length > 0 && (
+        <View style={styles.serverSelector}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
+            {servers.map((srv: any, idx: number) => (
+              <TouchableOpacity
+                key={idx}
+                style={[styles.serverButton, serverIndex === idx && styles.serverButtonActive]}
+                onPress={() => setServerIndex(idx)}
+              >
+                <Text style={[styles.serverButtonText, serverIndex === idx && styles.serverButtonTextActive]}>
+                  {srv.server}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Navigation Controls */}
       <View style={styles.controlsRow}>
          {hasPreviousEpisode && (
@@ -181,7 +196,7 @@ const styles = StyleSheet.create({
   },
   externalButton: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 140,
     alignSelf: 'center',
     backgroundColor: 'rgba(231, 76, 60, 0.9)',
     flexDirection: 'row',
@@ -197,9 +212,39 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
+  serverSelector: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  serverButton: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  serverButtonActive: {
+    backgroundColor: 'rgba(231, 76, 60, 0.9)',
+    borderColor: '#fff',
+  },
+  serverButtonText: {
+    color: '#ccc',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  serverButtonTextActive: {
+    color: '#fff',
+  },
   controlsRow: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 20,
     left: 0,
     right: 0,
     flexDirection: 'row',

@@ -124,7 +124,8 @@ router.get('/anime/:id/episodes', async (req, res) => {
           duration,
           status,
           video_url,
-          stream_url
+          stream_url,
+          external_servers
         FROM anime_episodes
         WHERE anime_id = $1 AND is_active = true
         ORDER BY season ASC, episode_number ASC

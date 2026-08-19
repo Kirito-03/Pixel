@@ -54,6 +54,7 @@ export default function AnimeSeriesModalWrapper({
             title: ep.title || `Episodio ${ep.episode_number}`,
             url,
             downloadUrl: ep.video_url || undefined,
+            external_servers: ep.external_servers || undefined,
           };
           const list = grouped.get(season) || [];
           list.push(episodeItem);

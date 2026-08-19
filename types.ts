@@ -117,6 +117,7 @@ export interface AnimeEpisode {
   url?: string;
   downloadUrl?: string;
   sources?: VideoSource[];
+  external_servers?: { server: string; title: string; url: string }[];
 }
 
 export interface VideoSource {
