@@ -35,13 +35,13 @@ const BROWSER_HEADERS = {
 const SERVER_PRIORITY = ['Voe', 'MP4Upload', 'Mega', 'Byse', 'HLS'];
 
 /**
- * Verifica de forma asíncrona si la URL responde correctamente (no está bloqueada por Cloudflare/404).
- * Retorna la primera URL que funcione según la prioridad.
+ * Verifica de forma concurrente si las URLs responden correctamente.
+ * Retorna la mejor URL y la lista de todos los servidores que funcionan según prioridad.
  * @param {Array<{server: string, url: string}>} servers
- * @returns {Promise<string|null>}
+ * @returns {Promise<{bestUrl: string|null, validServers: Array}>}
  */
-async function pickWorkingServer(servers) {
-  if (!servers || servers.length === 0) return null;
+async function filterWorkingServers(servers) {
+  if (!servers || servers.length === 0) return { bestUrl: null, validServers: [] };
   
   const ordered = [];
   for (const preferred of SERVER_PRIORITY) {
@@ -52,21 +52,29 @@ async function pickWorkingServer(servers) {
     if (!ordered.find(o => o.server === s.server)) ordered.push(s);
   }
 
-  for (const server of ordered) {
-    try {
+  // Verificar todos los servidores concurrentemente
+  const results = await Promise.allSettled(
+    ordered.map(async (server) => {
       await axios.get(server.url, {
         headers: BROWSER_HEADERS,
         timeout: 3000,
         validateStatus: status => status >= 200 && status < 400
       });
-      return server.url;
-    } catch (e) {
-      console.log(`[AV1Scraper] Servidor ${server.server} descartado: ${e.message}`);
-    }
+      return server;
+    })
+  );
+
+  const validServers = results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value);
+
+  // Si ninguno funcionó, hacer fallback a la lista original para no dejar el ep vacío
+  if (validServers.length === 0) {
+    console.log(`[AV1Scraper] Todos los servidores fallaron validación, guardando todos como fallback.`);
+    return { bestUrl: ordered[0]?.url || null, validServers: ordered };
   }
-  
-  // Fallback si todos fallan
-  return ordered[0]?.url || null;
+
+  return { bestUrl: validServers[0].url, validServers };
 }
 
 /**
@@ -260,11 +268,11 @@ export async function getAnimeAv1EpisodeServers(slug, episodeNumber) {
       return { video_url: null, all_servers: [], downloads: [] };
     }
 
-    const video_url = await pickWorkingServer(embeds.SUB);
+    const { bestUrl, validServers } = await filterWorkingServers(embeds.SUB);
 
     return {
-      video_url,
-      all_servers: embeds.SUB,
+      video_url: bestUrl,
+      all_servers: validServers,
       downloads: downloads?.SUB || [],
     };
   } catch (error) {
