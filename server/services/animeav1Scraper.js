@@ -336,59 +336,41 @@ function titleSimilarity(a, b) {
 }
 
 /**
- * Scrapea los animes actualmente en emisión desde animeav1.com/catalogo.
- * Equivalente a scrapeAiringAnimes de JKAnime, retorna lista de slugs.
- * @param {number} maxPages - Páginas del catálogo a revisar (default: 3)
+ * Extrae los slugs de los animes en emisión desde la página de horario de AnimeAV1.
+ * Retorna la lista única de slugs.
  * @returns {Promise<string[]>} Lista de slugs de animes en emisión
  */
-export async function scrapeAiringAnimesAv1(maxPages = 3) {
+export async function scrapeAiringAnimesAv1() {
   const slugs = new Set();
 
-  for (let page = 1; page <= maxPages; page++) {
-    try {
-      // Filtrar por estado "Releasing" (status=2 en animeav1) y ordenar por recientes
-      const url = `${BASE_URL}/catalogo?page=${page}&status=2&order=updated`;
-      console.log(`[AV1Scraper] Scrapeando catálogo página ${page}: ${url}`);
+  try {
+    const url = `${BASE_URL}/horario`;
+    console.log(`[AV1Scraper] Scrapeando horario semanal: ${url}`);
 
-      const response = await axios.get(url, {
-        headers: BROWSER_HEADERS,
-        timeout: TIMEOUT,
-      });
+    const response = await axios.get(url, {
+      headers: BROWSER_HEADERS,
+      timeout: TIMEOUT,
+    });
 
-      const html = response.data;
+    const html = response.data;
 
-      // Extraer slugs de las cards del catálogo
-      // Formato href="/media/{slug}" o href="/media/{slug}/{ep}"
-      const hrefMatches = [...html.matchAll(/href="\/media\/([^/"]+)(?:\/\d+)?"/g)];
-      let pageCount = 0;
+    // Extraer slugs de las cards del horario
+    // Formato href="/media/{slug}" o href="/media/{slug}/{ep}"
+    const hrefMatches = [...html.matchAll(/href="\/media\/([^/"]+)(?:\/\d+)?"/g)];
 
-      for (const match of hrefMatches) {
-        const slug = match[1];
-        if (slug && !slugs.has(slug)) {
-          slugs.add(slug);
-          pageCount++;
-        }
+    for (const match of hrefMatches) {
+      const slug = match[1];
+      if (slug && !slugs.has(slug)) {
+        slugs.add(slug);
       }
-
-      // Solo usamos hrefMatches porque el JSON de SvelteKit incluye slugs de géneros y categorías
-
-      console.log(`[AV1Scraper] Página ${page}: ${pageCount} slugs encontrados`);
-
-      if (pageCount === 0) {
-        console.log(`[AV1Scraper] Página ${page} vacía, deteniendo.`);
-        break;
-      }
-
-      if (page < maxPages) await sleep(DELAY_MS);
-    } catch (error) {
-      console.error(`[AV1Scraper] Error en página ${page}:`, error.message);
-      break;
     }
+
+    console.log(`[AV1Scraper] Horario semanal: ${slugs.size} animes en emisión encontrados`);
+  } catch (error) {
+    console.error(`[AV1Scraper] Error escaneando horario:`, error.message);
   }
 
-  const result = Array.from(slugs);
-  console.log(`[AV1Scraper] Total animes en emisión encontrados: ${result.length}`);
-  return result;
+  return Array.from(slugs);
 }
 
 /**
