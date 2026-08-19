@@ -90,6 +90,7 @@ const EpisodePlayer: React.FC<any> = ({
             allowFullScreen
             frameBorder="0"
             referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-presentation"
           />
         </View>
       ) : (
@@ -147,16 +148,15 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
+    top: 0,
+    left: 0,
+    right: 0,
     zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 15,
   },
   titleText: {
     color: '#fff',

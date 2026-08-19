@@ -45,11 +45,13 @@ async function filterWorkingServers(servers) {
   
   const ordered = [];
   for (const preferred of SERVER_PRIORITY) {
-    const found = servers.find(s => s.server === preferred);
+    const found = servers.find(s => s.server === preferred && !s.url.includes('zilla-networks'));
     if (found) ordered.push(found);
   }
   for (const s of servers) {
-    if (!ordered.find(o => o.server === s.server)) ordered.push(s);
+    if (!s.url.includes('zilla-networks') && !ordered.find(o => o.server === s.server)) {
+      ordered.push(s);
+    }
   }
 
   // Verificar todos los servidores concurrentemente
