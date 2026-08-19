@@ -166,16 +166,26 @@ router.post('/create-and-scrape', async (req, res) => {
   if (!title) return res.status(400).json({ ok: false, message: 'Título requerido' });
 
   try {
-    // 1. Crear el anime en la BD
-    const result = await pool.query(
-      `INSERT INTO anime_content (title, status, is_active) VALUES ($1, 'Ongoing', true) RETURNING id`,
-      [title]
+    // 1. Buscar si ya existe en la BD o crearlo
+    let targetAnimeId;
+    const existing = await pool.query(
+      `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
+      [`%${title}%`]
     );
-    const newAnimeId = result.rows[0].id;
+
+    if (existing.rows.length > 0) {
+      targetAnimeId = existing.rows[0].id;
+    } else {
+      const result = await pool.query(
+        `INSERT INTO anime_content (title, status, is_active) VALUES ($1, 'Ongoing', true) RETURNING id`,
+        [title]
+      );
+      targetAnimeId = result.rows[0].id;
+    }
 
     // 2. Lanzar los jobs
-    const metaJob = await autoFillMetadata(newAnimeId);
-    const scrapeJob = await scrapeEpisodes(newAnimeId, {
+    const metaJob = await autoFillMetadata(targetAnimeId);
+    const scrapeJob = await scrapeEpisodes(targetAnimeId, {
       jkSlug: jkSlug || null,
       av1Slug: av1Slug || null,
       source: source || 'auto',
@@ -186,9 +196,9 @@ router.post('/create-and-scrape', async (req, res) => {
 
     res.json({
       ok: true,
-      animeId: newAnimeId,
+      animeId: targetAnimeId,
       jobs: [metaJob, scrapeJob],
-      message: 'Anime creado y bot lanzado exitosamente.',
+      message: 'Anime procesado y bot lanzado exitosamente.',
     });
   } catch (e) {
     res.status(500).json({ ok: false, message: e.message });
