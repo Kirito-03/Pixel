@@ -224,7 +224,7 @@ router.post('/sync-all', async (req, res) => {
     res.json({
       ok: true,
       jobId: syncJob.jobId,
-      message: \`Crawl masivo iniciado (páginas \${startPage}-\${endPage}).\`,
+      message: `Crawl masivo iniciado (páginas ${startPage}-${endPage}).`,
     });
   } catch (e) {
     res.status(500).json({ ok: false, message: e.message });
