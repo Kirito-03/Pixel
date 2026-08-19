@@ -1,0 +1,1 @@
+const fs = require('fs'); const html = fs.readFileSync('test.html', 'utf8'); const matches = [...html.matchAll(/href="/media\/([^\/"]+)(?:\/\d+)?"/g)]; console.log(matches.map(m => m[1]).slice(0, 50));

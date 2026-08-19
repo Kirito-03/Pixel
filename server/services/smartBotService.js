@@ -207,16 +207,23 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
         let extractedMalId = null;
 
         // Intentar obtener datos precisos desde AnimeAV1 antes de crear
+        let pageData = null;
         try {
-          const pageData = await getAnimeAv1PageData(slug);
-          if (pageData && pageData.media) {
-            titleQuery = pageData.media.title || titleQuery;
-            extractedMalId = pageData.media.malId;
-            fallbackPoster = pageData.media.poster || pageData.media.backdrop;
-            fallbackBanner = pageData.media.backdrop;
+          pageData = await getAnimeAv1PageData(slug);
+          if (pageData) {
+            titleQuery = pageData.title || titleQuery;
+            extractedMalId = pageData.malId;
+            fallbackPoster = pageData.poster || pageData.backdrop;
+            fallbackBanner = pageData.backdrop;
           }
         } catch (e) {
           console.error(`[SmartBot] Error fetch AV1 page data para ${slug}:`, e.message);
+        }
+
+        // --- FILTRO DE FALSOS ANIMES ---
+        if (!pageData) {
+          console.log(`[SmartBot] Ignorando "${slug}": no es un anime válido (probablemente un género listado por error en AnimeAV1).`);
+          continue;
         }
 
         // --- PREVENCIÓN DE DUPLICADOS ---
@@ -312,16 +319,24 @@ async function runSyncAiringJob(job) {
         let extractedMalId = null;
 
         // Intentar obtener datos precisos desde AnimeAV1 antes de crear
+        let pageData = null;
         try {
-          const pageData = await getAnimeAv1PageData(slug);
-          if (pageData && pageData.media) {
-            titleQuery = pageData.media.title || titleQuery;
-            extractedMalId = pageData.media.malId;
-            fallbackPoster = pageData.media.poster || pageData.media.backdrop;
-            fallbackBanner = pageData.media.backdrop;
+          pageData = await getAnimeAv1PageData(slug);
+          if (pageData) {
+            titleQuery = pageData.title || titleQuery;
+            extractedMalId = pageData.malId;
+            fallbackPoster = pageData.poster || pageData.backdrop;
+            fallbackBanner = pageData.backdrop;
           }
         } catch (e) {
           console.error(`[SmartBot] Error fetch AV1 page data para ${slug}:`, e.message);
+        }
+
+        // --- FILTRO DE FALSOS ANIMES ---
+        // Si no se obtuvo pageData (dio 404), es un género o una película inválida en el catálogo
+        if (!pageData) {
+          console.log(`[SmartBot] Ignorando "${slug}": no es un anime válido (probablemente un género listado por error en AnimeAV1).`);
+          continue;
         }
 
         // --- PREVENCIÓN DE DUPLICADOS ---

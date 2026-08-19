@@ -228,10 +228,15 @@ export async function getAnimeAv1PageData(slug) {
     const url = `${BASE_URL}/media/${slug}/1`;
     const response = await axios.get(url, { headers: BROWSER_HEADERS, timeout: TIMEOUT });
     const { media } = parseEpisodePage(response.data);
-    return media || { slug, title: null, episodesCount: null };
+    return media || null;
   } catch (error) {
-    console.error(`[AV1Scraper] Error obteniendo datos de "${slug}":`, error.message);
-    return { slug, title: null, episodesCount: null };
+    // Si da 404, significa que la página no existe (es un falso anime o género)
+    if (error.response && error.response.status === 404) {
+      console.warn(`[AV1Scraper] El slug "${slug}" dio 404. Es un falso anime o un género incrustado por error en el catálogo de AnimeAV1.`);
+    } else {
+      console.error(`[AV1Scraper] Error obteniendo datos de "${slug}":`, error.message);
+    }
+    return null;
   }
 }
 
