@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import { catalogService, CatalogAnime } from '../services/catalogService';
+import { getCurrentBaseURL } from '../services/databaseService';
 import { animeToContentItem } from '../services/api';
 import Header from '../components/Header';
 import { useTabNavigation } from '../hooks/useTabNavigation';
@@ -52,10 +53,12 @@ export default function AiringScreen({ navigation }: any) {
   const fetchCalendar = async (day: string) => {
     try {
       setCalendarLoading(true);
-      const res = await axios.get(`https://api.jikan.moe/v4/schedules?filter=${day}`);
+      // Llamamos al backend proxy para evitar CORS en web
+      const baseURL = getCurrentBaseURL() || 'http://localhost:3001';
+      const res = await axios.get(`${baseURL}/api/schedules?filter=${day}`);
       setCalendarData(res.data.data || []);
     } catch (err) {
-      console.error(err);
+      console.error('[AiringScreen] Error cargando calendario:', err);
     } finally {
       setCalendarLoading(false);
     }

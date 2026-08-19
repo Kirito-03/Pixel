@@ -43,6 +43,7 @@ const { default: proxyRoutes }      = await import('./routes/proxy.js');
 const { default: uploadsRoutes }    = await import('./routes/uploads.js');
 const { default: contentRoutes }    = await import('./routes/content.js');
 const { default: botRoutes }        = await import('./routes/bot.js');
+const { default: schedulesRoutes }  = await import('./routes/schedules.js');
 
 // ── Express app ────────────────────────────────────────────────
 const app = express();
@@ -178,6 +179,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/manga', mangaRoutes);
 app.use('/transcode', transcodeRoutes);
 app.use('/my-list', myListRoutes);
+app.use('/api/schedules', schedulesRoutes);
 app.use('/progress', progressRoutes);
 app.use('/continue-watching', continueWatchingRoutes);
 app.use('/resume-target', resumeTargetRoutes);
