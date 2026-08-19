@@ -35,17 +35,38 @@ const BROWSER_HEADERS = {
 const SERVER_PRIORITY = ['Voe', 'MP4Upload', 'Mega', 'Byse', 'HLS'];
 
 /**
- * Selecciona la mejor URL de video según la prioridad de servidores.
+ * Verifica de forma asíncrona si la URL responde correctamente (no está bloqueada por Cloudflare/404).
+ * Retorna la primera URL que funcione según la prioridad.
  * @param {Array<{server: string, url: string}>} servers
- * @returns {string|null}
+ * @returns {Promise<string|null>}
  */
-function pickBestServer(servers) {
+async function pickWorkingServer(servers) {
   if (!servers || servers.length === 0) return null;
+  
+  const ordered = [];
   for (const preferred of SERVER_PRIORITY) {
     const found = servers.find(s => s.server === preferred);
-    if (found) return found.url;
+    if (found) ordered.push(found);
   }
-  return servers[0]?.url || null;
+  for (const s of servers) {
+    if (!ordered.find(o => o.server === s.server)) ordered.push(s);
+  }
+
+  for (const server of ordered) {
+    try {
+      await axios.get(server.url, {
+        headers: BROWSER_HEADERS,
+        timeout: 3000,
+        validateStatus: status => status >= 200 && status < 400
+      });
+      return server.url;
+    } catch (e) {
+      console.log(`[AV1Scraper] Servidor ${server.server} descartado: ${e.message}`);
+    }
+  }
+  
+  // Fallback si todos fallan
+  return ordered[0]?.url || null;
 }
 
 /**
@@ -234,7 +255,7 @@ export async function getAnimeAv1EpisodeServers(slug, episodeNumber) {
       return { video_url: null, all_servers: [], downloads: [] };
     }
 
-    const video_url = pickBestServer(embeds.SUB);
+    const video_url = await pickWorkingServer(embeds.SUB);
 
     return {
       video_url,
