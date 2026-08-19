@@ -365,15 +365,7 @@ export async function scrapeAiringAnimesAv1(maxPages = 3) {
         }
       }
 
-      // También intentar extraer del JSON de SvelteKit si está disponible
-      const jsonMatches = [...html.matchAll(/slug:"([^"]+)"/g)];
-      for (const match of jsonMatches) {
-        const slug = match[1];
-        if (slug && !slugs.has(slug)) {
-          slugs.add(slug);
-          pageCount++;
-        }
-      }
+      // Solo usamos hrefMatches porque el JSON de SvelteKit incluye slugs de géneros y categorías
 
       console.log(`[AV1Scraper] Página ${page}: ${pageCount} slugs encontrados`);
 
@@ -427,14 +419,7 @@ export async function scrapeFullCatalogAv1(startPage = 1, endPage = 10) {
         }
       }
 
-      const jsonMatches = [...html.matchAll(/slug:"([^"]+)"/g)];
-      for (const match of jsonMatches) {
-        const slug = match[1];
-        if (slug && !slugs.has(slug)) {
-          slugs.add(slug);
-          pageCount++;
-        }
-      }
+      // Solo usamos hrefMatches porque el JSON incluye slugs de géneros (como "accion")
 
       console.log(`[AV1Scraper] Página ${page}: ${pageCount} slugs encontrados`);
 
