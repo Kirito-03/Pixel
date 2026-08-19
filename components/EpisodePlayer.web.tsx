@@ -90,7 +90,6 @@ const EpisodePlayer: React.FC<any> = ({
             allowFullScreen
             frameBorder="0"
             referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin allow-presentation"
           />
         </View>
       ) : (
