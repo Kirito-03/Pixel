@@ -134,8 +134,14 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
             scrollEventThrottle={16}
             style={{ overflow: 'visible' as any }}
           >
-            {movies.map((item) => (
-              <MovieCard key={item.id} movie={item} onPress={() => onMoviePress(item.id)} />
+            {movies.map((item, index) => (
+              <MovieCard 
+                key={item.id} 
+                movie={item} 
+                onPress={() => onMoviePress(item.id)} 
+                isFirst={index === 0}
+                isLast={index === movies.length - 1}
+              />
             ))}
           </ScrollView>
         ) : (
@@ -145,8 +151,13 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <MovieCard movie={item} onPress={() => onMoviePress(item.id)} />
+            renderItem={({ item, index }) => (
+              <MovieCard 
+                movie={item} 
+                onPress={() => onMoviePress(item.id)} 
+                isFirst={index === 0}
+                isLast={index === movies.length - 1}
+              />
             )}
             contentContainerStyle={styles.listContent}
             onScroll={handleScroll}

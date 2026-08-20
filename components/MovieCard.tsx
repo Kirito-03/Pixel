@@ -17,9 +17,11 @@ import { colors, badgeStyles } from '../theme';
 interface Props {
   movie: Movie | TVShow | ContentItem;
   onPress: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
-export default function MovieCard({ movie, onPress }: Props) {
+export default function MovieCard({ movie, onPress, isFirst = false, isLast = false }: Props) {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
@@ -145,8 +147,8 @@ export default function MovieCard({ movie, onPress }: Props) {
             styles.popup,
             {
               width: POPUP_WIDTH,
-              // Centrar popup horizontalmente sobre la card
-              left: -(POPUP_WIDTH - CARD_WIDTH) / 2,
+              // Si es el primero, lo alineamos a la izquierda; si es el último, a la derecha; si no, al centro
+              left: isFirst ? 0 : isLast ? -(POPUP_WIDTH - CARD_WIDTH) : -(POPUP_WIDTH - CARD_WIDTH) / 2,
               // Empezar 60px arriba de la card para que quede centrado verticalmente
               top: -60,
             },
