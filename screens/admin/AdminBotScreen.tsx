@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 24, paddingBottom: 40 },
   maxWidthContainer: {
     width: '100%',
-    maxWidth: 1100,
+    maxWidth: 1600,
     marginHorizontal: 'auto',
     alignSelf: 'center',
   },
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   },
   rightCol: {
     flex: 1,
-    minHeight: 500,
+    minHeight: 600,
   },
 
   card: {
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#050505',
     borderWidth: 1,
     borderColor: '#333',
-    minHeight: 500,
+    height: 600,
     shadowColor: darkColors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
