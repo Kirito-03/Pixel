@@ -4,7 +4,7 @@ import pool from '../db.js';
 const router = express.Router();
 
 router.get('/anime', async (req, res) => {
-  const { page = '1', limit = '20', search = '', status = '', franchise = '' } = req.query;
+  const { page = '1', limit = '20', search = '', status = '', franchise = '', sort = 'created_at' } = req.query;
 
   const safePage = Math.max(parseInt(String(page), 10) || 1, 1);
   const safeLimit = Math.min(Math.max(parseInt(String(limit), 10) || 20, 1), 50);
@@ -16,8 +16,15 @@ router.get('/anime', async (req, res) => {
     let i = 1;
 
     if (status) {
-      where += ` AND status = $${i++}`;
-      params.push(status);
+      // Manejar múltiples estados equivalentes de forma insensible a mayúsculas
+      if (status.toLowerCase() === 'releasing' || status.toLowerCase() === 'airing') {
+        where += ` AND (status ILIKE $${i} OR status ILIKE $${i+1})`;
+        params.push('%releasing%', '%airing%');
+        i += 2;
+      } else {
+        where += ` AND status ILIKE $${i++}`;
+        params.push(`%${status}%`);
+      }
     }
 
     if (franchise) {
@@ -35,6 +42,13 @@ router.get('/anime', async (req, res) => {
     const countResult = await pool.query(countQuery, params);
     const total = countResult.rows?.[0]?.count || 0;
     const totalPages = Math.max(Math.ceil(total / safeLimit), 1);
+
+    let orderBy = 'ORDER BY created_at DESC';
+    if (sort === 'rating') {
+      orderBy = 'ORDER BY rating DESC NULLS LAST, created_at DESC';
+    } else if (sort === 'title') {
+      orderBy = 'ORDER BY title ASC';
+    }
 
     const listQuery = `
       SELECT
@@ -55,7 +69,7 @@ router.get('/anime', async (req, res) => {
         created_at
       FROM anime_content
       ${where}
-      ORDER BY created_at DESC
+      ${orderBy}
       LIMIT $${i} OFFSET $${i + 1}
     `;
 
