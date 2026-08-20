@@ -122,7 +122,8 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
           contentContainerStyle={styles.listContent}
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          scrollEnabled={Platform.OS !== 'web'} 
+          scrollEnabled={Platform.OS !== 'web'}
+          style={isWeb ? ({ overflow: 'visible' } as any) : undefined}
         />
 
         {/* Flecha derecha — glassmorphism */}
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingVertical: 80,
+    paddingVertical: 4,
   },
   arrow: {
     position: 'absolute',

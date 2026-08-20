@@ -28,7 +28,7 @@ export default function MovieCard({ movie, onPress }: Props) {
 
   // Popup dimensions — 1.75x más grande que la card
   const POPUP_WIDTH = CARD_WIDTH * 1.75;
-  const POPUP_IMG_HEIGHT = CARD_HEIGHT * 0.65;
+  const POPUP_IMG_HEIGHT = CARD_HEIGHT * 0.55;
 
   // Hover con delay de 2 segundos
   const [hovered, setHovered] = useState(false);
@@ -148,11 +148,10 @@ export default function MovieCard({ movie, onPress }: Props) {
               width: POPUP_WIDTH,
               // Centrar popup horizontalmente sobre la card
               left: -(POPUP_WIDTH - CARD_WIDTH) / 2,
-              // Situar popup encima de la card
-              bottom: CARD_HEIGHT + 8,
+              // Empezar 60px arriba de la card para que quede centrado
+              top: -60,
             },
           ]}
-          // Mantener el hover activo cuando el mouse está en el popup
           {...(isWeb ? {
             onMouseEnter: handleMouseEnter,
             onMouseLeave: handleMouseLeave,
@@ -219,8 +218,7 @@ export default function MovieCard({ movie, onPress }: Props) {
             </TouchableOpacity>
           </View>
 
-          {/* Flecha apuntando hacia abajo */}
-          <View style={styles.popupArrow} />
+
         </View>
       )}
     </View>
