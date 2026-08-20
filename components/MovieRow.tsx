@@ -162,10 +162,11 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     position: 'relative',
+    overflow: 'visible' as any,
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingVertical: 6,
+    paddingVertical: 80,
   },
   arrow: {
     position: 'absolute',
