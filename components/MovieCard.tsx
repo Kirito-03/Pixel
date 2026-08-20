@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   TouchableOpacity,
   Image,
@@ -13,7 +13,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Movie, TVShow, ContentItem } from '../types';
 import { getImageUrl } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
-import { useMyList } from '../contexts/MyListContext';
 import { shadows, colors, badgeStyles } from '../theme';
 
 interface Props {
@@ -27,10 +26,22 @@ export default function MovieCard({ movie, onPress }: Props) {
   const isWeb = Platform.OS === 'web';
   const CARD_WIDTH = isSmallScreen ? width * 0.34 : 155;
   const CARD_HEIGHT = CARD_WIDTH * 1.5;
-  const { isInMyList } = useMyList();
 
-  // Hover state (web only)
+  // Hover con delay de 2 segundos
   const [hovered, setHovered] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    hoverTimer.current = setTimeout(() => setHovered(true), 2000);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+    setHovered(false);
+  }, []);
 
   const getImageSource = () => {
     if ('source' in movie) {
@@ -39,31 +50,6 @@ export default function MovieCard({ movie, onPress }: Props) {
     }
     return getImageUrl(movie.poster_path, 'w500');
   };
-
-  const getIdAndType = () => {
-    let id: number | string | undefined;
-    let type: 'movie' | 'tv' | 'anime' = 'movie';
-    if ('id' in movie) id = movie.id as any;
-    if ('type' in movie) {
-      type = (movie as any).type;
-    } else {
-      type = (movie as any).first_air_date ? 'tv' : 'movie';
-    }
-    return { id, type };
-  };
-
-  const { id, type } = getIdAndType();
-  const inMyList = id != null ? isInMyList(Number(id), type) : false;
-
-  const getStatusBadge = () => {
-    if (!('status' in movie) || !(movie as any).status) return null;
-    const status = ((movie as any).status || '').toLowerCase();
-    if (status.includes('airing') || status.includes('releasing') || status === 'emisión') return badgeStyles.airing;
-    if (status.includes('finished') || status.includes('completed') || status === 'finalizado') return badgeStyles.finished;
-    if (status.includes('upcoming') || status.includes('not_yet') || status === 'próximo') return badgeStyles.upcoming;
-    return null;
-  };
-  const statusBadge = getStatusBadge();
 
   const getTitle = (): string => {
     if ('title' in movie && typeof movie.title === 'string') return movie.title;
@@ -83,36 +69,42 @@ export default function MovieCard({ movie, onPress }: Props) {
     return isNaN(y) ? '' : String(y);
   };
 
-  const getStatusLabel = (): string => {
-    if (!statusBadge) return '';
-    return statusBadge.label;
+  const getGenres = (): string[] => {
+    const g = (movie as any).genres;
+    if (!g) return [];
+    if (Array.isArray(g)) {
+      return g.slice(0, 3).map((genre: any) =>
+        typeof genre === 'string' ? genre : genre.name || ''
+      ).filter(Boolean);
+    }
+    return [];
+  };
+
+  const getDescription = (): string => {
+    const d = (movie as any).description || (movie as any).overview || '';
+    return d.replace(/<[^>]*>/g, '').slice(0, 100);
+  };
+
+  const isAiring = (): boolean => {
+    if (!('status' in movie) || !(movie as any).status) return false;
+    const status = ((movie as any).status || '').toLowerCase();
+    return status.includes('airing') || status.includes('releasing') || status === 'emisión';
   };
 
   // Scale animation (press)
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const shadowAnim = useRef(new Animated.Value(0)).current;
 
   const handlePressIn = () => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1.04, useNativeDriver: false, friction: 3 }),
-      Animated.spring(shadowAnim, { toValue: 1, useNativeDriver: false, friction: 3 }),
-    ]).start();
+    Animated.spring(scaleAnim, { toValue: 1.03, useNativeDriver: false, friction: 4 }).start();
   };
 
   const handlePressOut = () => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: false, friction: 3 }),
-      Animated.spring(shadowAnim, { toValue: 0, useNativeDriver: false, friction: 3 }),
-    ]).start();
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: false, friction: 4 }).start();
   };
 
-  const animatedShadowRadius = shadowAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 18] });
-  const animatedShadowOpacity = shadowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.05, 0.35] });
-
-  // Web hover handlers
   const webHoverProps = isWeb ? {
-    onMouseEnter: () => setHovered(true),
-    onMouseLeave: () => setHovered(false),
+    onMouseEnter: handleMouseEnter,
+    onMouseLeave: handleMouseLeave,
   } : {};
 
   return (
@@ -122,18 +114,14 @@ export default function MovieCard({ movie, onPress }: Props) {
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
           marginRight: isSmallScreen ? 10 : 12,
-          borderRadius: 10,
-          transform: [{ scale: hovered ? 1.07 : 1 }],
-          shadowColor: hovered ? colors.primary : '#000',
-          shadowRadius: hovered ? 20 : animatedShadowRadius,
-          shadowOpacity: hovered ? 0.5 : animatedShadowOpacity,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: hovered ? 12 : 2,
-          zIndex: hovered ? 10 : 1,
+          borderRadius: 0,
+          transform: [{ scale: hovered ? 1.06 : 1 }],
+          zIndex: hovered ? 20 : 1,
         },
         isWeb ? {
           cursor: 'pointer',
-          transition: 'transform 0.22s ease, box-shadow 0.22s ease',
+          transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+          boxShadow: hovered ? '0 8px 30px rgba(0,0,0,0.7)' : 'none',
         } as any : null,
       ]}
       {...webHoverProps}
@@ -142,7 +130,7 @@ export default function MovieCard({ movie, onPress }: Props) {
         style={{
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          borderRadius: 10,
+          borderRadius: 0,
           overflow: 'hidden',
           backgroundColor: '#1a1a1a',
         }}
@@ -157,65 +145,66 @@ export default function MovieCard({ movie, onPress }: Props) {
           resizeMode="cover"
         />
 
-        {/* ── Overlay base (siempre visible, sutil) ── */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.65)']}
-          style={styles.cardOverlay}
-          pointerEvents="none"
-        >
-          {!hovered && (
-            <Text style={styles.cardTitle} numberOfLines={2}>{getTitle()}</Text>
-          )}
-        </LinearGradient>
+        {/* Badge EN EMISIÓN — solo para animes en emisión */}
+        {isAiring() && !hovered && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>EN EMISIÓN</Text>
+          </View>
+        )}
 
-        {/* ── Hover overlay (web) ── */}
+        {/* Hover overlay con info — aparece tras 2 segundos */}
         {isWeb && hovered && (
           <View style={StyleSheet.absoluteFill}>
             <LinearGradient
-              colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.92)']}
+              colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.97)']}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
             <View style={styles.hoverContent}>
-              {/* Rating + año */}
-              <View style={styles.hoverMeta}>
-                {getRating() ? (
-                  <View style={styles.hoverRatingBadge}>
-                    <Ionicons name="star" size={10} color="#FFD700" />
-                    <Text style={styles.hoverRating}>{getRating()}</Text>
-                  </View>
-                ) : null}
-                {getYear() ? <Text style={styles.hoverYear}>{getYear()}</Text> : null}
-                {getStatusLabel() ? (
-                  <View style={[styles.hoverStatusPill, { backgroundColor: statusBadge?.backgroundColor || '#555' }]}>
-                    <Text style={styles.hoverStatusText}>{getStatusLabel()}</Text>
-                  </View>
-                ) : null}
-              </View>
+              {/* Badge en emisión dentro del hover */}
+              {isAiring() && (
+                <View style={styles.hoverAiringBadge}>
+                  <Text style={styles.hoverAiringText}>EN EMISIÓN</Text>
+                </View>
+              )}
 
               {/* Título */}
               <Text style={styles.hoverTitle} numberOfLines={2}>{getTitle()}</Text>
 
+              {/* Rating + año */}
+              <View style={styles.hoverMeta}>
+                {getRating() ? (
+                  <View style={styles.hoverRatingRow}>
+                    <Ionicons name="star" size={10} color="#E50914" />
+                    <Text style={styles.hoverRating}>{getRating()}</Text>
+                  </View>
+                ) : null}
+                {getYear() ? <Text style={styles.hoverYear}>{getYear()}</Text> : null}
+              </View>
+
+              {/* Géneros */}
+              {getGenres().length > 0 && (
+                <View style={styles.hoverGenreRow}>
+                  {getGenres().map((g, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <Text style={styles.hoverGenreDot}>•</Text>}
+                      <Text style={styles.hoverGenre}>{g}</Text>
+                    </React.Fragment>
+                  ))}
+                </View>
+              )}
+
+              {/* Descripción corta */}
+              {getDescription() ? (
+                <Text style={styles.hoverDesc} numberOfLines={2}>{getDescription()}</Text>
+              ) : null}
+
               {/* Botón Ver */}
               <TouchableOpacity style={styles.hoverPlayBtn} onPress={onPress}>
-                <Ionicons name="play" size={13} color="#fff" />
-                <Text style={styles.hoverPlayText}>Ver</Text>
+                <Ionicons name="play" size={12} color="#000" />
+                <Text style={styles.hoverPlayText}>VER</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        )}
-
-        {/* Badge estado — top-left */}
-        {statusBadge && !hovered && (
-          <View style={[styles.badge, { backgroundColor: statusBadge.backgroundColor }]}>
-            <Text style={styles.badgeText}>{statusBadge.label}</Text>
-          </View>
-        )}
-
-        {/* Indicador Mi Lista — top-right */}
-        {inMyList && (
-          <View style={styles.myListIndicator}>
-            <Ionicons name="checkmark-circle" color="#00E676" size={16} />
           </View>
         )}
       </TouchableOpacity>
@@ -224,43 +213,20 @@ export default function MovieCard({ movie, onPress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  cardOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 8,
-    paddingBottom: 10,
-    paddingTop: 40,
-    justifyContent: 'flex-end',
-  },
-  cardTitle: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 16,
-  },
   badge: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    top: 0,
+    left: 0,
     paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 4,
+    paddingVertical: 4,
+    backgroundColor: '#C0392B',
+    borderRadius: 0,
   },
   badgeText: {
     color: '#fff',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  myListIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 10,
-    padding: 2,
+    letterSpacing: 0.8,
   },
 
   /* ── HOVER STYLES ── */
@@ -272,39 +238,19 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 5,
   },
-  hoverMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    flexWrap: 'wrap',
+  hoverAiringBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#C0392B',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 0,
+    marginBottom: 2,
   },
-  hoverRatingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  hoverRating: {
-    color: '#FFD700',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  hoverYear: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
-  },
-  hoverStatusPill: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  hoverStatusText: {
+  hoverAiringText: {
     color: '#fff',
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   hoverTitle: {
     color: '#FFFFFF',
@@ -312,20 +258,60 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 16,
   },
+  hoverMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hoverRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  hoverRating: {
+    color: '#E50914',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  hoverYear: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+  },
+  hoverGenreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  hoverGenreDot: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+  },
+  hoverGenre: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  hoverDesc: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 10,
+    lineHeight: 13,
+  },
   hoverPlayBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#E50914',
+    backgroundColor: '#FFFFFF',
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 5,
-    marginTop: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 0,
+    marginTop: 4,
   },
   hoverPlayText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
+    color: '#000',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

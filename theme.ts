@@ -1,4 +1,4 @@
-﻿// Paletas de color para soportar modo oscuro y claro
+// Paletas de color para soportar modo oscuro y claro
 export const darkColors = {
   primary: '#E50914',      // Rojo Pixel
   secondary: '#B20710',    // Rojo oscuro
@@ -61,7 +61,6 @@ export const adminColors = {
 };
 
 // Compatibilidad: exportar 'colors' por defecto usando paleta oscura.
-// Esto evita romper componentes que aún no usan ThemeContext.
 export const colors = darkColors;
 
 // Gradientes predefinidos para efectos premium
@@ -73,11 +72,9 @@ export const gradients = {
   shimmer: ['#1a1a1a', '#2a2a2a', '#1a1a1a'],
   overlay: ['transparent', 'rgba(0,0,0,0.8)'],
   overlayTop: ['rgba(0,0,0,0.6)', 'transparent'],
-  // Gradientes premium para hero
   heroBottom: ['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)', '#000'],
   heroLeft: ['rgba(0,0,0,0.95)', 'rgba(0,0,0,0.6)', 'transparent'],
   heroTop: ['rgba(0,0,0,0.5)', 'transparent'],
-  // Gradientes para cards
   cardOverlay: ['transparent', 'rgba(0,0,0,0.85)'],
 };
 
@@ -123,7 +120,7 @@ export const typography = {
 // Badge styles por status
 export const badgeStyles = {
   airing: {
-    backgroundColor: '#E50914',
+    backgroundColor: '#C0392B',  // Rojo menos intenso
     label: 'EN EMISIÓN',
   },
   finished: {
