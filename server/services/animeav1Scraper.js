@@ -87,20 +87,28 @@ async function filterWorkingServers(servers) {
  */
 function parseEpisodePage(html) {
   try {
-    // Parsear embeds: {server:"X",url:"Y"}
-    const embedsRaw = html.match(/embeds:\{SUB:\[([\s\S]*?)\](?:,DUB)?/);
+    // Parsear embeds: buscar el bloque completo y luego SUB
+    const embedsBlockMatch = html.match(/embeds:\{([\s\S]*?)\},downloads/);
     let embeds = { SUB: [] };
-    if (embedsRaw) {
-      const serverMatches = [...embedsRaw[1].matchAll(/\{server:"([^"]+)",url:"([^"]+)"\}/g)];
-      embeds.SUB = serverMatches.map(m => ({ server: m[1], url: m[2] }));
+    if (embedsBlockMatch) {
+      const embedsBlock = embedsBlockMatch[1];
+      const subMatch = embedsBlock.match(/SUB:\[([\s\S]*?)\]/);
+      if (subMatch) {
+        const serverMatches = [...subMatch[1].matchAll(/\{server:"([^"]+)",url:"([^"]+)"\}/g)];
+        embeds.SUB = serverMatches.map(m => ({ server: m[1], url: m[2] }));
+      }
     }
 
     // Parsear downloads
-    const downloadsRaw = html.match(/downloads:\{SUB:\[([\s\S]*?)\]/);
+    const downloadsBlockMatch = html.match(/downloads:\{([\s\S]*?)\}\},uses/);
     let downloads = { SUB: [] };
-    if (downloadsRaw) {
-      const dlMatches = [...downloadsRaw[1].matchAll(/\{server:"([^"]+)",url:"([^"]+)"\}/g)];
-      downloads.SUB = dlMatches.map(m => ({ server: m[1], url: m[2] }));
+    if (downloadsBlockMatch) {
+      const dlBlock = downloadsBlockMatch[1];
+      const subMatch = dlBlock.match(/SUB:\[([\s\S]*?)\]/);
+      if (subMatch) {
+        const dlMatches = [...subMatch[1].matchAll(/\{server:"([^"]+)",url:"([^"]+)"\}/g)];
+        downloads.SUB = dlMatches.map(m => ({ server: m[1], url: m[2] }));
+      }
     }
 
     // Parsear metadatos del anime
