@@ -25,6 +25,8 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   const { currentProfile } = useProfile();
   const { isInMyList, toggleMyList, addToMyList } = useMyList();
   const [isToggling, setIsToggling] = useState(false);
+  const [playHover, setPlayHover] = useState(false);
+  const [infoHover, setInfoHover] = useState(false);
 
   const isAnime = !('release_date' in movie);
   const releaseYear = isAnime ? getAnimeYear((movie as AnimeDetail).startDate) : (movie.release_date ? new Date(movie.release_date).getFullYear() : '');
@@ -172,15 +174,45 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
 
         {/* Botones */}
         <View style={styles.buttonsRow}>
-          <TouchableOpacity style={styles.playButton} onPress={onWatch} activeOpacity={0.85}>
-            <Ionicons name="play" size={18} color="#000" />
-            <Text style={styles.playButtonText}>Reproducir</Text>
+          <TouchableOpacity
+            style={[
+              styles.playButton,
+              isWeb && playHover && {
+                backgroundColor: '#E50914',
+                transform: [{ scale: 1.04 }],
+              } as any,
+            ]}
+            onPress={onWatch}
+            activeOpacity={0.85}
+            {...(isWeb ? {
+              onMouseEnter: () => setPlayHover(true),
+              onMouseLeave: () => setPlayHover(false),
+            } : {})}
+          >
+            <Ionicons name="play" size={18} color={isWeb && playHover ? '#fff' : '#000'} />
+            <Text style={[
+              styles.playButtonText,
+              isWeb && playHover && { color: '#fff' },
+            ]}>
+              Reproducir
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.infoButton}
+            style={[
+              styles.infoButton,
+              isWeb && infoHover && {
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                borderColor: '#fff',
+                transform: [{ scale: 1.04 }],
+              } as any,
+            ]}
             onPress={onMoreInfo}
             activeOpacity={0.75}
+            {...(isWeb ? {
+              onMouseEnter: () => setInfoHover(true),
+              onMouseLeave: () => setInfoHover(false),
+            } : {})}
           >
             <Ionicons name="information-circle-outline" size={18} color="#fff" />
             <Text style={styles.infoButtonText}>Más información</Text>
