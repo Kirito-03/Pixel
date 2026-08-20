@@ -179,7 +179,7 @@ export default function AnimeListScreen() {
 
             <View style={styles.main}>
                 <View style={styles.titleRow}>
-                    <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.title} numberOfLines={1}>#{item.id} - {item.title}</Text>
                     <View style={[styles.badge, getStatusBadgeStyle(item.status)]}>
                         <Text style={[styles.badgeText, getStatusTextStyle(item.status)]}>{item.status || 'Unknown'}</Text>
                     </View>
