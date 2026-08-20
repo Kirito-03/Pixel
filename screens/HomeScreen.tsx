@@ -74,7 +74,7 @@ export default function HomeScreen({ navigation }: Props) {
         poster_path: anime.poster_url || '',
         backdrop_path: anime.banner_url || anime.poster_url || '',
         release_date: anime.release_date || '',
-        vote_average: typeof anime.rating === 'number' ? anime.rating : 0,
+        vote_average: typeof anime.rating === 'number' ? anime.rating : (parseFloat(anime.rating as unknown as string) || 0),
         source: 'anilist',
         genres: Array.isArray(anime.genres) ? anime.genres : [],
         // Pasar status para badges en MovieCard
@@ -97,7 +97,7 @@ export default function HomeScreen({ navigation }: Props) {
             },
             bannerImage: anime.banner_url || undefined,
             startDate: { year: Number.isFinite(releaseYear) ? releaseYear : 0 },
-            averageScore: typeof anime.rating === 'number' ? anime.rating * 10 : 0,
+            averageScore: typeof anime.rating === 'number' ? anime.rating * 10 : ((parseFloat(anime.rating as unknown as string) || 0) * 10),
             episodes: typeof anime.total_episodes === 'number' ? anime.total_episodes : undefined,
             status: anime.status || 'UNKNOWN',
             genres: Array.isArray(anime.genres) ? anime.genres : [],

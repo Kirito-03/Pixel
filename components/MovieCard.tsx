@@ -60,16 +60,6 @@ export default function MovieCard({ movie, onPress }: Props) {
     return '';
   };
 
-  const getRating = (): string => {
-    const v = (movie as any).vote_average || (movie as any).score || (movie as any).averageScore;
-    if (typeof v === 'number' && v > 0) {
-       // AniList scores are out of 100, TMDB out of 10
-       const normalized = v > 10 ? v / 10 : v;
-       return normalized.toFixed(1);
-    }
-    return '0.0';
-  };
-
   const getEpisodesCount = (): string => {
     const eps = (movie as any).episodes;
     if (eps) return `${eps} episodios`;
@@ -112,6 +102,7 @@ export default function MovieCard({ movie, onPress }: Props) {
       style={[
         {
           width: CARD_WIDTH,
+          height: CARD_HEIGHT,
           marginRight: isSmallScreen ? 10 : 12,
           position: 'relative', // Importante para que el zIndex funcione y no se esconda
           zIndex: hovered ? 9999 : 1,
@@ -146,12 +137,6 @@ export default function MovieCard({ movie, onPress }: Props) {
           </View>
         )}
       </TouchableOpacity>
-
-      {/* Puntuación debajo de la imagen, alineada a la izquierda */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 8, gap: 4 }}>
-         <Ionicons name="star" size={14} color="#E50914" />
-         <Text style={{ color: '#E50914', fontSize: 13, fontWeight: '700' }}>{getRating()}</Text>
-      </View>
 
       {/* ── Popup flotante (fuera de la card) ── */}
       {isWeb && hovered && (

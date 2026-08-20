@@ -206,7 +206,7 @@ export function useAnimeModal({
           },
           bannerImage: anime.banner_url || undefined,
           startDate: { year: 0 },
-          averageScore: typeof anime.rating === 'number' ? anime.rating : 0,
+          averageScore: typeof anime.rating === 'number' ? anime.rating : (parseFloat(anime.rating as unknown as string) || 0),
           episodes: typeof anime.total_episodes === 'number' ? anime.total_episodes : undefined,
           status: anime.status || 'UNKNOWN',
           genres: Array.isArray(anime.genres) ? anime.genres : [],

@@ -478,13 +478,13 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
     }
 
     // Rating: actualizar si es 0 o null
-    if (metadata.rating && (!anime.rating || anime.rating === 0)) {
+    if (metadata.rating && (!anime.rating || parseFloat(anime.rating) === 0)) {
       updates.push(`rating = $${paramIndex++}`);
       values.push(metadata.rating);
     }
 
     // Total episodios: actualizar si es 0 o null
-    if (metadata.total_episodes && (!anime.total_episodes || anime.total_episodes === 0)) {
+    if (metadata.total_episodes && (!anime.total_episodes || parseInt(anime.total_episodes, 10) === 0)) {
       updates.push(`total_episodes = $${paramIndex++}`);
       values.push(metadata.total_episodes);
     }
