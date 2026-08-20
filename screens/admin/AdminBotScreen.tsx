@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -7,12 +7,13 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Platform
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { AdminShell } from '../../components/admin/AdminShell'
 import { adminApiService } from '../../services/adminApiService'
-import { adminColors } from '../../theme'
+import { darkColors, typography } from '../../theme'
 
 interface BotJob {
   id: string
@@ -26,12 +27,76 @@ interface BotJob {
   finishedAt: string | null
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const color = status === 'done' ? '#22c55e' : status === 'error' ? '#ef4444' : '#f59e0b'
-  const label = status === 'done' ? '✓ Listo' : status === 'error' ? '✗ Error' : '⟳ Corriendo'
+function TerminalLog({ jobs }: { jobs: BotJob[] }) {
+  const scrollViewRef = useRef<ScrollView>(null);
+  const activeJobs = jobs.filter(j => j.status === 'running')
+  const finishedJobs = jobs.filter(j => j.status !== 'running')
+  
   return (
-    <View style={[styles.badge, { backgroundColor: color + '20', borderColor: color + '60' }]}>
-      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+    <View style={styles.terminalContainer}>
+      <View style={styles.terminalHeader}>
+        <View style={styles.terminalDots}>
+          <View style={[styles.terminalDot, { backgroundColor: '#FF5F56' }]} />
+          <View style={[styles.terminalDot, { backgroundColor: '#FFBD2E' }]} />
+          <View style={[styles.terminalDot, { backgroundColor: '#27C93F' }]} />
+        </View>
+        <Text style={styles.terminalTitle}>pixel_scraper.exe</Text>
+      </View>
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.terminalBody}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      >
+        <Text style={styles.terminalText}>[System] Conectado al motor de scraping...</Text>
+        
+        {finishedJobs.slice().reverse().map(job => (
+          <View key={job.id} style={styles.terminalRow}>
+            <Text style={styles.terminalTime}>[{new Date(job.finishedAt || job.startedAt).toLocaleTimeString()}]</Text>
+            {job.status === 'done' ? (
+              <Text style={styles.terminalSuccess}>
+                {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - {
+                  job.type === 'metadata' 
+                    ? `${job.result?.updated || 0} campos actualizados` 
+                    : `${job.result?.inserted || 0} insertados, ${job.result?.updated || 0} act.`
+                }
+              </Text>
+            ) : (
+              <Text style={styles.terminalError}>
+                {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - ERROR: {job.errors?.[0] || 'Desconocido'}
+              </Text>
+            )}
+          </View>
+        ))}
+
+        {activeJobs.map(job => (
+          <View key={job.id} style={styles.terminalRow}>
+            <Text style={styles.terminalTime}>[{new Date().toLocaleTimeString()}]</Text>
+            <Text style={styles.terminalActive}>
+              {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - {job.progress.message}... {job.progress.total > 0 ? `(${job.progress.current}/${job.progress.total})` : ''}
+            </Text>
+          </View>
+        ))}
+
+        {activeJobs.length > 0 && (
+          <View style={styles.terminalRow}>
+            <Text style={styles.terminalBlink}>_</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  )
+}
+
+function StatCard({ title, value, icon, color }: any) {
+  return (
+    <View style={styles.statCard}>
+      <View style={[styles.statIconBox, { backgroundColor: color + '15', borderColor: color + '30' }]}>
+        <Ionicons name={icon} size={20} color={color} />
+      </View>
+      <View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statTitle}>{title}</Text>
+      </View>
     </View>
   )
 }
@@ -47,6 +112,7 @@ export default function AdminBotScreen() {
   const [previewTitle, setPreviewTitle] = useState('')
   const [jobs, setJobs] = useState<BotJob[]>([])
   const [loading, setLoading] = useState<string | null>(null)
+  
   const [previewData, setPreviewData] = useState<any>(null)
   const [previewAv1Data, setPreviewAv1Data] = useState<any>(null)
   const [slugResult, setSlugResult] = useState<string | null | undefined>(undefined)
@@ -128,6 +194,9 @@ export default function AdminBotScreen() {
         setPreviewAv1Data(res.data.data || null)
         if (!res.data.ok) setError(res.data.message)
       }
+      setAnimeId('')
+      setJkSlug('')
+      setAv1Slug('')
       await fetchJobs()
     } catch (e: any) {
       setError(e?.response?.data?.message || e.message || 'Error')
@@ -137,377 +206,279 @@ export default function AdminBotScreen() {
   }
 
   const activeJobs = jobs.filter(j => j.status === 'running')
-  const finishedJobs = jobs.filter(j => j.status !== 'running')
+  const doneJobs = jobs.filter(j => j.status === 'done')
+  const errorJobs = jobs.filter(j => j.status === 'error')
 
   return (
     <AdminShell activeKey="bot">
       <SafeAreaView style={styles.container} edges={['top']}>
-        {/* Header */}
+        {/* Header - Netflix Style */}
         <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <Ionicons name="hardware-chip-outline" size={22} color={adminColors.primary} />
+            <Ionicons name="hardware-chip" size={24} color={darkColors.primary} />
           </View>
           <View>
             <Text style={styles.headerTitle}>Bot Inteligente</Text>
-            <Text style={styles.headerSub}>AniList + JKAnime Scraper</Text>
+            <Text style={styles.headerSub}>Motor de Scraping & Metadatos</Text>
           </View>
-          {activeJobs.length > 0 && (
-            <View style={styles.runningPill}>
-              <ActivityIndicator size="small" color="#f59e0b" style={{ marginRight: 6 }} />
-              <Text style={styles.runningPillText}>{activeJobs.length} corriendo</Text>
-            </View>
-          )}
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
-          {/* — Configuración — */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>⚙️ Configuración</Text>
-
-            <Text style={styles.label}>ID del Anime (en tu BD) *</Text>
-            <TextInput
-              style={styles.input}
-              value={animeId}
-              onChangeText={setAnimeId}
-              placeholder="Ej: 42"
-              placeholderTextColor={adminColors.textSecondary}
-              keyboardType="numeric"
-            />
-
-            {/* Selector de fuente */}
-            <Text style={styles.label}>Fuente de Episodios</Text>
-            <View style={styles.sourceRow}>
-              {(['auto', 'jkanime', 'animeav1'] as const).map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.sourceBtn, source === s && styles.sourceBtnActive]}
-                  onPress={() => setSource(s)}
-                >
-                  <Text style={[styles.sourceBtnText, source === s && styles.sourceBtnTextActive]}>
-                    {s === 'auto' ? '⚡ Auto' : s === 'jkanime' ? 'JKAnime' : '🎌 AV1'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {source === 'auto' && (
-              <Text style={styles.sourceHint}>Intenta JKAnime primero; si falla, usa AnimeAV1 automáticamente.</Text>
-            )}
-
-            {/* Slug JKAnime (solo si no es solo animeav1) */}
-            {source !== 'animeav1' && (
-              <>
-                <Text style={styles.label}>Slug JKAnime (opcional)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={jkSlug}
-                  onChangeText={setJkSlug}
-                  placeholder="Ej: black-clover"
-                  placeholderTextColor={adminColors.textSecondary}
-                />
-              </>
-            )}
-
-            {/* Slug AnimeAV1 (solo si no es solo jkanime) */}
-            {source !== 'jkanime' && (
-              <>
-                <Text style={styles.label}>Slug AnimeAV1 (opcional)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={av1Slug}
-                  onChangeText={setAv1Slug}
-                  placeholder="Ej: tenkou-saki-no-seiso-karen..."
-                  placeholderTextColor={adminColors.textSecondary}
-                />
-              </>
-            )}
-
-            <View style={styles.row}>
-              <View style={styles.rowCol}>
-                <Text style={styles.label}>Desde episodio</Text>
-                <TextInput
-                  style={styles.input}
-                  value={fromEp}
-                  onChangeText={setFromEp}
-                  keyboardType="numeric"
-                  placeholder="1"
-                  placeholderTextColor={adminColors.textSecondary}
-                />
-              </View>
-              <View style={styles.rowCol}>
-                <Text style={styles.label}>Hasta episodio</Text>
-                <TextInput
-                  style={styles.input}
-                  value={toEp}
-                  onChangeText={setToEp}
-                  keyboardType="numeric"
-                  placeholder="Auto"
-                  placeholderTextColor={adminColors.textSecondary}
-                />
-              </View>
-              <View style={styles.rowCol}>
-                <Text style={styles.label}>Temporada</Text>
-                <TextInput
-                  style={styles.input}
-                  value={season}
-                  onChangeText={setSeason}
-                  keyboardType="numeric"
-                  placeholder="1"
-                  placeholderTextColor={adminColors.textSecondary}
-                />
-              </View>
-            </View>
-
-            {!!error && <Text style={styles.errorText}>{error}</Text>}
-            {!!successMsg && <Text style={styles.successText}>{successMsg}</Text>}
-
-            {/* Botones de acción */}
-            <View style={styles.actionGrid}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnSecondary, !animeId && styles.btnDisabled]}
-                onPress={() => handleAction('metadata')}
-                disabled={!animeId || !!loading}
-              >
-                {loading === 'metadata' ? (
-                  <ActivityIndicator size="small" color={adminColors.text} />
-                ) : (
-                  <>
-                    <Ionicons name="sparkles-outline" size={16} color={adminColors.text} />
-                    <Text style={styles.btnSecondaryText}>Solo Metadatos</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.btn, styles.btnSecondary, !animeId && styles.btnDisabled]}
-                onPress={() => handleAction('scrape')}
-                disabled={!animeId || !!loading}
-              >
-                {loading === 'scrape' ? (
-                  <ActivityIndicator size="small" color={adminColors.text} />
-                ) : (
-                  <>
-                    <Ionicons name="cloud-download-outline" size={16} color={adminColors.text} />
-                    <Text style={styles.btnSecondaryText}>Solo Episodios</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.btn, styles.btnPrimary, !animeId && styles.btnDisabled]}
-                onPress={() => handleAction('both')}
-                disabled={!animeId || !!loading}
-              >
-                {loading === 'both' ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="flash-outline" size={16} color="#fff" />
-                    <Text style={styles.btnPrimaryText}>Todo (Meta + Eps)</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* — Piloto Automático — */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>✈️ Piloto Automático (Emisiones)</Text>
-            <Text style={styles.label}>
-              Escanea JKAnime buscando animes "En Emisión". Si no existen, los crea.
-              Luego descarga automáticamente los episodios más recientes de todos ellos.
-            </Text>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.maxWidthContainer}>
             
-            <TouchableOpacity
-              style={[styles.btn, styles.btnPrimary, { backgroundColor: '#10b981', marginTop: 10 }]}
-              onPress={() => handleAction('syncAiring')}
-              disabled={!!loading}
-            >
-              {loading === 'syncAiring' ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="radio-outline" size={16} color="#fff" />
-                  <Text style={styles.btnPrimaryText}>Sincronizar Emisiones Actuales</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* — Herramientas de prueba — */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🔍 Herramientas de Prueba</Text>
-            <Text style={styles.label}>Título del anime</Text>
-            <TextInput
-              style={styles.input}
-              value={previewTitle}
-              onChangeText={setPreviewTitle}
-              placeholder="Ej: Black Clover"
-              placeholderTextColor={adminColors.textSecondary}
-            />
-
-            <View style={styles.toolRow}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnTool, !previewTitle && styles.btnDisabled]}
-                onPress={() => handleAction('findSlug')}
-                disabled={!previewTitle || !!loading}
-              >
-                {loading === 'findSlug' ? (
-                  <ActivityIndicator size="small" color={adminColors.text} />
-                ) : (
-                  <Text style={styles.btnToolText}>🔍 Slug JKAnime</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnTool, !previewTitle && styles.btnDisabled]}
-                onPress={() => handleAction('findSlugAv1')}
-                disabled={!previewTitle || !!loading}
-              >
-                {loading === 'findSlugAv1' ? (
-                  <ActivityIndicator size="small" color={adminColors.text} />
-                ) : (
-                  <Text style={styles.btnToolText}>🎌 Slug AV1</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-            <View style={styles.toolRow}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnTool, !previewTitle && styles.btnDisabled]}
-                onPress={() => handleAction('previewAnilist')}
-                disabled={!previewTitle || !!loading}
-              >
-                {loading === 'previewAnilist' ? (
-                  <ActivityIndicator size="small" color={adminColors.text} />
-                ) : (
-                  <Text style={styles.btnToolText}>Preview AniList</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnTool, !previewTitle && styles.btnDisabled]}
-                onPress={() => handleAction('previewAv1')}
-                disabled={!previewTitle || !!loading}
-              >
-                {loading === 'previewAv1' ? (
-                  <ActivityIndicator size="small" color={adminColors.text} />
-                ) : (
-                  <Text style={styles.btnToolText}>Preview AV1</Text>
-                )}
-              </TouchableOpacity>
+            {/* Estadísticas */}
+            <View style={styles.statsRow}>
+              <StatCard title="En Progreso" value={activeJobs.length} icon="sync-outline" color="#3b82f6" />
+              <StatCard title="Completados" value={doneJobs.length} icon="checkmark-done-outline" color="#22c55e" />
+              <StatCard title="Errores" value={errorJobs.length} icon="warning-outline" color="#ef4444" />
             </View>
 
-            <View style={{ marginTop: 12 }}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnPrimary, !previewTitle && styles.btnDisabled]}
-                onPress={() => handleAction('createAndScrape')}
-                disabled={!previewTitle || !!loading}
-              >
-                {loading === 'createAndScrape' ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="color-wand-outline" size={16} color="#fff" />
-                    <Text style={styles.btnPrimaryText}>✨ Crear Anime y Scrapear Todo</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {slugResult !== undefined && (
-              <View style={styles.resultBox}>
-                <Text style={styles.resultLabel}>Slug JKAnime encontrado:</Text>
-                <Text style={[styles.resultValue, !slugResult && { color: '#ef4444' }]}>
-                  {slugResult || 'No encontrado'}
-                </Text>
-              </View>
-            )}
-
-            {slugAv1Result !== undefined && (
-              <View style={styles.resultBox}>
-                <Text style={styles.resultLabel}>Slug AnimeAV1 encontrado:</Text>
-                <Text style={[styles.resultValue, !slugAv1Result && { color: '#ef4444' }]}>
-                  {slugAv1Result || 'No encontrado'}
-                </Text>
-              </View>
-            )}
-
-            {previewData && (
-              <View style={styles.resultBox}>
-                <Text style={styles.resultLabel}>AniList devolvería:</Text>
-                <Text style={styles.resultKey}>Título: <Text style={styles.resultValue}>{previewData.title}</Text></Text>
-                <Text style={styles.resultKey}>Inglés: <Text style={styles.resultValue}>{previewData.title_english || '—'}</Text></Text>
-                <Text style={styles.resultKey}>Rating: <Text style={styles.resultValue}>{previewData.rating?.toFixed(1) || '—'}</Text></Text>
-                <Text style={styles.resultKey}>Episodios: <Text style={styles.resultValue}>{previewData.total_episodes || '—'}</Text></Text>
-                <Text style={styles.resultKey}>Estado: <Text style={styles.resultValue}>{previewData.status || '—'}</Text></Text>
-                <Text style={styles.resultKey}>Géneros: <Text style={styles.resultValue}>{previewData.genres?.join(', ') || '—'}</Text></Text>
-              </View>
-            )}
-
-            {previewAv1Data && (
-              <View style={[styles.resultBox, { borderColor: '#6366f140' }]}>
-                <Text style={styles.resultLabel}>🎌 AnimeAV1 devolvería:</Text>
-                <Text style={styles.resultKey}>Título: <Text style={styles.resultValue}>{previewAv1Data.title}</Text></Text>
-                <Text style={styles.resultKey}>Score: <Text style={styles.resultValue}>{previewAv1Data.score?.toFixed(2) || '—'}</Text></Text>
-                <Text style={styles.resultKey}>Episodios: <Text style={styles.resultValue}>{previewAv1Data.episodesCount || '—'}</Text></Text>
-                <Text style={styles.resultKey}>Estado: <Text style={styles.resultValue}>{previewAv1Data.status || '—'}</Text></Text>
-                <Text style={styles.resultKey}>Géneros: <Text style={styles.resultValue}>{previewAv1Data.genres?.join(', ') || '—'}</Text></Text>
-                <Text style={styles.resultKey}>MAL ID: <Text style={styles.resultValue}>{previewAv1Data.malId || '—'}</Text></Text>
-              </View>
-            )}
-          </View>
-
-          {/* — Jobs activos — */}
-          {activeJobs.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>⟳ En progreso</Text>
-              {activeJobs.map(job => (
-                <View key={job.id} style={styles.jobRow}>
-                  <View style={styles.jobMain}>
-                    <View style={styles.jobHeader}>
-                      <Text style={styles.jobType}>{job.type === 'metadata' ? '✨ Metadatos' : '📥 Scrape'}</Text>
-                      <StatusBadge status={job.status} />
-                    </View>
-                    <Text style={styles.jobMsg}>{job.progress.message}</Text>
-                    {job.progress.total > 0 && (
-                      <View style={styles.progressBar}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${Math.min(100, (job.progress.current / job.progress.total) * 100)}%` },
-                          ]}
+            <View style={styles.mainGrid}>
+              
+              {/* Columna Izquierda: Controles */}
+              <View style={styles.leftCol}>
+                
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="settings" size={18} color={darkColors.primary} />
+                    <Text style={styles.cardTitle}>Configuración Manual</Text>
+                  </View>
+                  
+                  <View style={styles.formGrid}>
+                    <View style={styles.formRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.label}>ID del Anime *</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={animeId}
+                          onChangeText={setAnimeId}
+                          placeholder="Ej: 42"
+                          placeholderTextColor={darkColors.textGray}
+                          keyboardType="numeric"
                         />
                       </View>
-                    )}
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* — Historial — */}
-          {finishedJobs.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>📋 Historial reciente</Text>
-              {finishedJobs.slice(0, 8).map(job => (
-                <View key={job.id} style={styles.jobRow}>
-                  <View style={styles.jobMain}>
-                    <View style={styles.jobHeader}>
-                      <Text style={styles.jobType}>{job.type === 'metadata' ? '✨ Meta' : '📥 Scrape'} · anime {job.animeId}</Text>
-                      <StatusBadge status={job.status} />
+                      <View style={{ flex: 2 }}>
+                        <Text style={styles.label}>Fuente</Text>
+                        <View style={styles.sourceRow}>
+                          {(['auto', 'jkanime', 'animeav1'] as const).map((s) => (
+                            <TouchableOpacity
+                              key={s}
+                              style={[styles.sourceBtn, source === s && styles.sourceBtnActive]}
+                              onPress={() => setSource(s)}
+                            >
+                              <Text style={[styles.sourceBtnText, source === s && styles.sourceBtnTextActive]}>
+                                {s === 'auto' ? 'Auto' : s === 'jkanime' ? 'JKAnime' : 'AV1'}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
                     </View>
-                    {job.status === 'done' && job.result && (
-                      <Text style={styles.jobMsg}>
-                        {job.type === 'metadata'
-                          ? `${job.result.updated} campos actualizados`
-                          : `${job.result.inserted} insertados, ${job.result.updated} actualizados de ${job.result.totalFound} · ${job.result.source ? `[${job.result.source}]` : ''}`}
-                      </Text>
-                    )}
-                    {job.status === 'error' && (
-                      <Text style={styles.jobError}>{job.errors[0]}</Text>
-                    )}
+
+                    <View style={styles.formRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.label}>Slug JKAnime (Opc.)</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={jkSlug}
+                          onChangeText={setJkSlug}
+                          placeholder="Ej: naruto"
+                          placeholderTextColor={darkColors.textGray}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.label}>Slug AV1 (Opc.)</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={av1Slug}
+                          onChangeText={setAv1Slug}
+                          placeholder="Ej: naruto-shippuden"
+                          placeholderTextColor={darkColors.textGray}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.formRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.label}>Desde Ep.</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={fromEp}
+                          onChangeText={setFromEp}
+                          keyboardType="numeric"
+                          placeholder="1"
+                          placeholderTextColor={darkColors.textGray}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.label}>Hasta Ep.</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={toEp}
+                          onChangeText={setToEp}
+                          keyboardType="numeric"
+                          placeholder="Auto"
+                          placeholderTextColor={darkColors.textGray}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.label}>Temporada</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={season}
+                          onChangeText={setSeason}
+                          keyboardType="numeric"
+                          placeholder="1"
+                          placeholderTextColor={darkColors.textGray}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {!!error && <Text style={styles.errorText}>{error}</Text>}
+                  {!!successMsg && <Text style={styles.successText}>{successMsg}</Text>}
+
+                  <View style={styles.actionGrid}>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnSecondary, !animeId && styles.btnDisabled]}
+                      onPress={() => handleAction('metadata')}
+                      disabled={!animeId || !!loading}
+                    >
+                      {loading === 'metadata' ? (
+                        <ActivityIndicator size="small" color={darkColors.text} />
+                      ) : (
+                        <Text style={styles.btnSecondaryText}>Solo Meta</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnSecondary, !animeId && styles.btnDisabled]}
+                      onPress={() => handleAction('scrape')}
+                      disabled={!animeId || !!loading}
+                    >
+                      {loading === 'scrape' ? (
+                        <ActivityIndicator size="small" color={darkColors.text} />
+                      ) : (
+                        <Text style={styles.btnSecondaryText}>Solo Episodios</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnPrimary, !animeId && styles.btnDisabled]}
+                      onPress={() => handleAction('both')}
+                      disabled={!animeId || !!loading}
+                    >
+                      {loading === 'both' ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.btnPrimaryText}>Ambos</Text>
+                      )}
+                    </TouchableOpacity>
                   </View>
                 </View>
-              ))}
+
+                {/* Acciones Masivas */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="rocket" size={18} color={darkColors.primary} />
+                    <Text style={styles.cardTitle}>Acciones Masivas</Text>
+                  </View>
+                  <Text style={styles.cardDesc}>
+                    Escanea JKAnime buscando animes "En Emisión". Si no existen, los crea.
+                    Luego descarga automáticamente los episodios más recientes.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnPrimary, { marginTop: 12 }]}
+                    onPress={() => handleAction('syncAiring')}
+                    disabled={!!loading}
+                  >
+                    {loading === 'syncAiring' ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.btnPrimaryText}>Sincronizar Emisiones Actuales</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Herramientas Rápidas */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Ionicons name="search" size={18} color={darkColors.primary} />
+                    <Text style={styles.cardTitle}>Buscador y Pruebas</Text>
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    value={previewTitle}
+                    onChangeText={setPreviewTitle}
+                    placeholder="Título del anime..."
+                    placeholderTextColor={darkColors.textGray}
+                  />
+
+                  <View style={styles.toolGrid}>
+                    <TouchableOpacity
+                      style={[styles.btnTool, !previewTitle && styles.btnDisabled]}
+                      onPress={() => handleAction('findSlug')}
+                      disabled={!previewTitle || !!loading}
+                    >
+                      <Text style={styles.btnToolText}>Slug JK</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.btnTool, !previewTitle && styles.btnDisabled]}
+                      onPress={() => handleAction('findSlugAv1')}
+                      disabled={!previewTitle || !!loading}
+                    >
+                      <Text style={styles.btnToolText}>Slug AV1</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.btnTool, !previewTitle && styles.btnDisabled]}
+                      onPress={() => handleAction('previewAnilist')}
+                      disabled={!previewTitle || !!loading}
+                    >
+                      <Text style={styles.btnToolText}>Prev. Anilist</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {slugResult !== undefined && (
+                    <Text style={styles.resultLine}>
+                      JK: <Text style={{ color: slugResult ? '#22c55e' : '#ef4444' }}>{slugResult || 'No'}</Text>
+                    </Text>
+                  )}
+                  {slugAv1Result !== undefined && (
+                    <Text style={styles.resultLine}>
+                      AV1: <Text style={{ color: slugAv1Result ? '#22c55e' : '#ef4444' }}>{slugAv1Result || 'No'}</Text>
+                    </Text>
+                  )}
+                  {previewData && (
+                    <View style={styles.previewBox}>
+                      <Text style={styles.previewText}>Title: {previewData.title}</Text>
+                      <Text style={styles.previewText}>Rating: {previewData.rating}</Text>
+                      <Text style={styles.previewText}>Eps: {previewData.total_episodes}</Text>
+                    </View>
+                  )}
+                  
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnPrimary, { marginTop: 12 }, !previewTitle && styles.btnDisabled]}
+                    onPress={() => handleAction('createAndScrape')}
+                    disabled={!previewTitle || !!loading}
+                  >
+                    {loading === 'createAndScrape' ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.btnPrimaryText}>Crear & Scrapear (Desde Título)</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+              </View>
+
+              {/* Columna Derecha: Consola */}
+              <View style={styles.rightCol}>
+                <TerminalLog jobs={jobs} />
+              </View>
+
             </View>
-          )}
+
+          </View>
         </ScrollView>
       </SafeAreaView>
     </AdminShell>
@@ -515,97 +486,233 @@ export default function AdminBotScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: adminColors.background },
+  container: { flex: 1, backgroundColor: darkColors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: adminColors.surface,
+    gap: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: '#0a0a0a',
     borderBottomWidth: 1,
-    borderBottomColor: adminColors.border,
+    borderBottomColor: '#222',
   },
   headerIcon: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: adminColors.primary + '15',
-    borderWidth: 1, borderColor: adminColors.primary + '40',
+    width: 48, height: 48, borderRadius: 0,
+    backgroundColor: darkColors.primary + '20',
+    borderWidth: 1, borderColor: darkColors.primary + '50',
     justifyContent: 'center', alignItems: 'center',
   },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: adminColors.text },
-  headerSub: { fontSize: 12, color: adminColors.textSecondary, marginTop: 2 },
-  runningPill: {
-    marginLeft: 'auto', flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#f59e0b20', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5,
-    borderWidth: 1, borderColor: '#f59e0b40',
+  headerTitle: { fontSize: 22, fontWeight: '800', color: darkColors.text, letterSpacing: -0.5 },
+  headerSub: { fontSize: 13, color: darkColors.textGray, marginTop: 4 },
+  scrollContent: { padding: 24, paddingBottom: 40 },
+  maxWidthContainer: {
+    width: '100%',
+    maxWidth: 1100,
+    marginHorizontal: 'auto',
+    alignSelf: 'center',
   },
-  runningPillText: { color: '#f59e0b', fontWeight: '800', fontSize: 12 },
-  content: { padding: 16, paddingBottom: 40, gap: 14 },
+  
+  statsRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+    flexWrap: 'wrap',
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 200,
+    backgroundColor: darkColors.card,
+    borderWidth: 1,
+    borderColor: '#222',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  statIconBox: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: darkColors.text,
+  },
+  statTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: darkColors.textGray,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  mainGrid: {
+    flexDirection: Platform.OS === 'web' && (window as any).innerWidth > 900 ? 'row' : 'column',
+    gap: 24,
+  },
+  leftCol: {
+    flex: 1,
+    gap: 20,
+  },
+  rightCol: {
+    flex: 1,
+    minHeight: 500,
+  },
+
   card: {
-    backgroundColor: adminColors.surface, borderRadius: 14,
-    padding: 16, borderWidth: 1, borderColor: adminColors.border,
+    backgroundColor: darkColors.card,
+    borderWidth: 1,
+    borderColor: '#222',
+    padding: 20,
   },
-  cardTitle: { fontSize: 14, fontWeight: '900', color: adminColors.text, marginBottom: 12 },
-  label: { fontSize: 12, fontWeight: '700', color: adminColors.textSecondary, marginTop: 10, marginBottom: 6 },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    paddingBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: darkColors.text,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  cardDesc: {
+    fontSize: 13,
+    color: darkColors.textGray,
+    lineHeight: 20,
+  },
+
+  formGrid: {
+    gap: 12,
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  label: { 
+    fontSize: 12, 
+    fontWeight: '600', 
+    color: darkColors.textGray, 
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   input: {
-    backgroundColor: adminColors.background, borderWidth: 1,
-    borderColor: adminColors.border, borderRadius: 10,
-    padding: 12, color: adminColors.text, fontSize: 14,
+    backgroundColor: '#0a0a0a', 
+    borderWidth: 1,
+    borderColor: '#333',
+    padding: 12, 
+    color: darkColors.text, 
+    fontSize: 14,
   },
-  row: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  rowCol: { flex: 1 },
-  actionGrid: { flexDirection: 'row', gap: 8, marginTop: 16, flexWrap: 'wrap' },
-  sourceRow: { flexDirection: 'row', gap: 6, marginTop: 6, marginBottom: 2 },
+  
+  sourceRow: { flexDirection: 'row', gap: 6 },
   sourceBtn: {
-    flex: 1, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 6,
+    flex: 1, paddingVertical: 10, paddingHorizontal: 6,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: adminColors.background, borderWidth: 1, borderColor: adminColors.border,
+    backgroundColor: '#0a0a0a', borderWidth: 1, borderColor: '#333',
   },
-  sourceBtnActive: { backgroundColor: adminColors.primary + '20', borderColor: adminColors.primary },
-  sourceBtnText: { fontSize: 11, fontWeight: '700', color: adminColors.textSecondary },
-  sourceBtnTextActive: { color: adminColors.primary },
-  sourceHint: { fontSize: 11, color: adminColors.textSecondary, marginTop: 4, fontStyle: 'italic' },
-  toolRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  sourceBtnActive: { backgroundColor: darkColors.primary + '20', borderColor: darkColors.primary },
+  sourceBtnText: { fontSize: 12, fontWeight: '600', color: darkColors.textGray },
+  sourceBtnTextActive: { color: darkColors.primary },
+
+  actionGrid: { flexDirection: 'row', gap: 8, marginTop: 20 },
   btn: {
-    flex: 1, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12,
-    alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6,
+    flex: 1, paddingVertical: 12, paddingHorizontal: 12,
+    alignItems: 'center', justifyContent: 'center',
   },
-  btnPrimary: { backgroundColor: adminColors.primary },
-  btnPrimaryText: { color: '#fff', fontWeight: '900', fontSize: 13 },
-  btnSecondary: {
-    backgroundColor: adminColors.background, borderWidth: 1, borderColor: adminColors.border,
-  },
-  btnSecondaryText: { color: adminColors.text, fontWeight: '700', fontSize: 13 },
-  btnTool: {
-    backgroundColor: adminColors.background, borderWidth: 1, borderColor: adminColors.border,
-  },
-  btnToolText: { color: adminColors.text, fontWeight: '700', fontSize: 12 },
+  btnPrimary: { backgroundColor: darkColors.primary },
+  btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 13, textTransform: 'uppercase' },
+  btnSecondary: { backgroundColor: '#1f1f1f', borderWidth: 1, borderColor: '#333' },
+  btnSecondaryText: { color: darkColors.text, fontWeight: '700', fontSize: 13, textTransform: 'uppercase' },
   btnDisabled: { opacity: 0.4 },
-  errorText: { marginTop: 10, color: '#ef4444', fontWeight: '700', fontSize: 13 },
-  successText: { marginTop: 10, color: '#22c55e', fontWeight: '700', fontSize: 13 },
-  resultBox: {
-    marginTop: 12, padding: 12, borderRadius: 10,
-    backgroundColor: adminColors.background, borderWidth: 1, borderColor: adminColors.border, gap: 4,
+  
+  errorText: { marginTop: 12, color: '#ef4444', fontWeight: '700', fontSize: 13 },
+  successText: { marginTop: 12, color: '#22c55e', fontWeight: '700', fontSize: 13 },
+
+  toolGrid: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  btnTool: {
+    flex: 1, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333',
+    paddingVertical: 8, alignItems: 'center', justifyContent: 'center'
   },
-  resultLabel: { fontWeight: '900', color: adminColors.text, marginBottom: 6 },
-  resultKey: { fontSize: 12, color: adminColors.textSecondary, fontWeight: '700' },
-  resultValue: { color: adminColors.text, fontWeight: '600' },
-  badge: {
-    paddingHorizontal: 8, paddingVertical: 4,
-    borderRadius: 999, borderWidth: 1,
+  btnToolText: { color: darkColors.textGray, fontSize: 12, fontWeight: '600' },
+  resultLine: { fontSize: 13, color: darkColors.textGray, marginTop: 8, fontWeight: '600' },
+  previewBox: { marginTop: 12, padding: 12, backgroundColor: '#0a0a0a', borderWidth: 1, borderColor: '#333' },
+  previewText: { color: darkColors.textGray, fontSize: 12, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined },
+
+  // Terminal Styles
+  terminalContainer: {
+    flex: 1,
+    backgroundColor: '#050505',
+    borderWidth: 1,
+    borderColor: '#333',
+    minHeight: 500,
+    shadowColor: darkColors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  badgeText: { fontSize: 11, fontWeight: '800' },
-  jobRow: {
-    padding: 12, borderRadius: 10, backgroundColor: adminColors.background,
-    borderWidth: 1, borderColor: adminColors.border, marginTop: 10,
+  terminalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
   },
-  jobMain: { gap: 6 },
-  jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  jobType: { fontWeight: '800', color: adminColors.text, fontSize: 13 },
-  jobMsg: { fontSize: 12, color: adminColors.textSecondary, fontWeight: '600' },
-  jobError: { fontSize: 12, color: '#ef4444', fontWeight: '700' },
-  progressBar: {
-    height: 4, borderRadius: 999, backgroundColor: adminColors.border, overflow: 'hidden',
+  terminalDots: { flexDirection: 'row', gap: 6, marginRight: 16 },
+  terminalDot: { width: 12, height: 12, borderRadius: 6 },
+  terminalTitle: { color: '#666', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  terminalBody: {
+    padding: 16,
   },
-  progressFill: { height: 4, borderRadius: 999, backgroundColor: adminColors.primary },
+  terminalText: {
+    color: '#666',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+    marginBottom: 8,
+  },
+  terminalRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  terminalTime: {
+    color: '#555',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  terminalSuccess: {
+    color: '#22c55e',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  terminalError: {
+    color: '#ef4444',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  terminalActive: {
+    color: '#eab308',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  terminalBlink: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+    opacity: 0.7,
+  }
 })
