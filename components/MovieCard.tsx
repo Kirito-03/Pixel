@@ -26,16 +26,16 @@ export default function MovieCard({ movie, onPress }: Props) {
   const CARD_WIDTH = isSmallScreen ? width * 0.34 : 155;
   const CARD_HEIGHT = CARD_WIDTH * 1.5;
 
-  // Popup dimensions — 1.75x más grande que la card
-  const POPUP_WIDTH = CARD_WIDTH * 1.75;
-  const POPUP_IMG_HEIGHT = CARD_HEIGHT * 0.55;
+  // Popup dimensions — más ancho como Netflix (aprox 2.2x)
+  const POPUP_WIDTH = CARD_WIDTH * 2.2;
+  const POPUP_IMG_HEIGHT = CARD_HEIGHT * 0.75;
 
-  // Hover con delay de 2 segundos
+  // Hover con delay de 1.5 segundos
   const [hovered, setHovered] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseEnter = useCallback(() => {
-    hoverTimer.current = setTimeout(() => setHovered(true), 2000);
+    hoverTimer.current = setTimeout(() => setHovered(true), 1500);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
@@ -48,7 +48,7 @@ export default function MovieCard({ movie, onPress }: Props) {
 
   const getImageSource = () => {
     if ('source' in movie) {
-      if ((movie as any).source === 'anilist') return (movie as any).poster_path;
+      if ((movie as any).source === 'anilist') return (movie as any).poster_path || (movie as any).coverImage?.extraLarge || (movie as any).coverImage?.large;
       return getImageUrl((movie as any).poster_path, 'w500');
     }
     return getImageUrl((movie as any).poster_path, 'w500');
@@ -60,9 +60,12 @@ export default function MovieCard({ movie, onPress }: Props) {
     return '';
   };
 
-  const getRating = (): string => {
-    const v = (movie as any).vote_average;
-    return typeof v === 'number' && v > 0 ? v.toFixed(1) : '';
+  const getEpisodesCount = (): string => {
+    const eps = (movie as any).episodes;
+    if (eps) return `${eps} episodios`;
+    const format = (movie as any).format;
+    if (format === 'MOVIE') return 'Película';
+    return '';
   };
 
   const getYear = (): string => {
@@ -83,11 +86,6 @@ export default function MovieCard({ movie, onPress }: Props) {
     return [];
   };
 
-  const getDescription = (): string => {
-    const d = (movie as any).description || (movie as any).overview || '';
-    return d.replace(/<[^>]*>/g, '').slice(0, 120);
-  };
-
   const isAiring = (): boolean => {
     if (!('status' in movie) || !(movie as any).status) return false;
     const status = ((movie as any).status || '').toLowerCase();
@@ -106,8 +104,9 @@ export default function MovieCard({ movie, onPress }: Props) {
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
           marginRight: isSmallScreen ? 10 : 12,
-          // overflow visible para que el popup salga fuera
-          zIndex: hovered ? 999 : 1,
+          position: 'relative', // Importante para que el zIndex funcione y no se esconda
+          zIndex: hovered ? 9999 : 1,
+          elevation: hovered ? 9999 : 1, // Para Android
         },
         isWeb ? { overflow: 'visible' } as any : null,
       ]}
@@ -134,7 +133,7 @@ export default function MovieCard({ movie, onPress }: Props) {
         {/* Badge EN EMISIÓN — solo para animes en emisión */}
         {isAiring() && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>EN EMISIÓN</Text>
+            <Text style={styles.badgeText}>NUEVO EPISODIO</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -148,7 +147,7 @@ export default function MovieCard({ movie, onPress }: Props) {
               width: POPUP_WIDTH,
               // Centrar popup horizontalmente sobre la card
               left: -(POPUP_WIDTH - CARD_WIDTH) / 2,
-              // Empezar 60px arriba de la card para que quede centrado
+              // Empezar 60px arriba de la card para que quede centrado verticalmente
               top: -60,
             },
           ]}
@@ -164,37 +163,49 @@ export default function MovieCard({ movie, onPress }: Props) {
               style={{ width: '100%', height: '100%' } as any}
               resizeMode="cover"
             />
-            {/* Gradient sobre la imagen */}
             <LinearGradient
-              colors={['transparent', 'rgba(20,20,20,0.7)']}
+              colors={['transparent', 'rgba(20,20,20,0.85)']}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
-            {/* Badge EN EMISIÓN dentro del popup */}
-            {isAiring() && (
-              <View style={styles.popupBadge}>
-                <Text style={styles.popupBadgeText}>EN EMISIÓN</Text>
-              </View>
-            )}
+            {/* El título superpuesto en la imagen (al no tener logo) */}
+            <View style={styles.popupTitleOverlay}>
+               <Text style={styles.popupTitleText} numberOfLines={2}>{getTitle()}</Text>
+            </View>
           </View>
 
-          {/* Info debajo de la imagen */}
+          {/* Info debajo de la imagen (estilo Netflix) */}
           <View style={styles.popupInfo}>
-            {/* Título */}
-            <Text style={styles.popupTitle} numberOfLines={2}>{getTitle()}</Text>
-
-            {/* Rating + Año */}
-            <View style={styles.popupMeta}>
-              {getRating() ? (
-                <View style={styles.popupRatingRow}>
-                  <Ionicons name="star" size={12} color="#E50914" />
-                  <Text style={styles.popupRating}>{getRating()}</Text>
-                </View>
-              ) : null}
-              {getYear() ? <Text style={styles.popupYear}>{getYear()}</Text> : null}
+            
+            {/* Fila de controles circulares */}
+            <View style={styles.popupActionsRow}>
+              <View style={styles.popupActionsLeft}>
+                <TouchableOpacity style={styles.actionBtnPlay} onPress={onPress}>
+                  <Ionicons name="play" size={20} color="#000" style={{ marginLeft: 3 }} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtnRound}>
+                  <Ionicons name="add" size={22} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.actionBtnRound} onPress={onPress}>
+                <Ionicons name="chevron-down" size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
 
-            {/* Géneros separados por puntos */}
+            {/* Fila de Meta: 13+ | 4 temporadas | HD */}
+            <View style={styles.popupMetaNetflix}>
+              <View style={styles.netflixBadgeBorder}>
+                <Text style={styles.netflixBadgeText}>13+</Text>
+              </View>
+              <Text style={styles.netflixSeasonsText}>
+                {getEpisodesCount() || (getYear() ? `Año ${getYear()}` : 'Anime')}
+              </Text>
+              <View style={styles.netflixBadgeBorder}>
+                <Text style={styles.netflixBadgeText}>HD</Text>
+              </View>
+            </View>
+
+            {/* Fila de Géneros: Imaginativo • Disparatado • Fantasía */}
             {getGenres().length > 0 && (
               <View style={styles.popupGenreRow}>
                 {getGenres().map((g, i) => (
@@ -205,20 +216,7 @@ export default function MovieCard({ movie, onPress }: Props) {
                 ))}
               </View>
             )}
-
-            {/* Descripción */}
-            {getDescription() ? (
-              <Text style={styles.popupDesc} numberOfLines={3}>{getDescription()}</Text>
-            ) : null}
-
-            {/* Botón VER */}
-            <TouchableOpacity style={styles.popupPlayBtn} onPress={onPress}>
-              <Ionicons name="play" size={16} color="#000" />
-              <Text style={styles.popupPlayText}>REPRODUCIR</Text>
-            </TouchableOpacity>
           </View>
-
-
         </View>
       )}
     </View>
@@ -228,128 +226,124 @@ export default function MovieCard({ movie, onPress }: Props) {
 const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
-    top: 0,
+    bottom: 0,
     left: 0,
-    paddingHorizontal: 7,
+    right: 0,
     paddingVertical: 4,
-    backgroundColor: '#C0392B',
+    backgroundColor: '#E50914',
     borderRadius: 0,
+    alignItems: 'center',
   },
   badgeText: {
     color: '#fff',
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 
-  /* ── POPUP FLOTANTE ── */
+  /* ── POPUP FLOTANTE NETFLIX STYLE ── */
   popup: {
     position: 'absolute',
     backgroundColor: '#141414',
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: 'hidden' as any,
-    // Sombra profunda
+    // Sombra profunda para que se vea por encima
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.8,
-    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.9,
+    shadowRadius: 30,
     elevation: 30,
     zIndex: 9999,
   } as any,
-  popupBadge: {
+  popupTitleOverlay: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: '#C0392B',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 0,
+    bottom: 12,
+    left: 14,
+    right: 14,
   },
-  popupBadgeText: {
+  popupTitleText: {
     color: '#fff',
-    fontSize: 9,
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   popupInfo: {
-    padding: 14,
-    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 12,
   },
-  popupTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 21,
-    marginBottom: 2,
+  
+  // Controles
+  popupActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  popupMeta: {
+  popupActionsLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  popupRatingRow: {
+  actionBtnPlay: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionBtnRound: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(42,42,42,0.6)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Metadata
+  popupMetaNetflix: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
-  popupRating: {
-    color: '#E50914',
+  netflixBadgeBorder: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 2,
+  },
+  netflixBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  netflixSeasonsText: {
+    color: '#fff',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
   },
-  popupYear: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-  },
+
+  // Géneros
   popupGenreRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 5,
+    gap: 6,
   },
   popupGenreDot: {
-    color: 'rgba(255,255,255,0.35)',
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
   },
   popupGenre: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  popupDesc: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  popupPlayBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 0,
-    marginTop: 4,
-  },
-  popupPlayText: {
-    color: '#000',
+    color: '#fff',
     fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  // Triangulito indicador debajo del popup
-  popupArrow: {
-    position: 'absolute',
-    bottom: -8,
-    alignSelf: 'center',
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#141414',
+    fontWeight: '400',
   },
 });
