@@ -33,7 +33,6 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
   const SCROLL_AMOUNT = TOTAL_CARD_WIDTH * CARDS_PER_SCREEN;
   
   const flatListRef = useRef<FlatList<Movie | TVShow | ContentItem>>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
   const [scrollX, setScrollX] = useState(0);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
@@ -42,20 +41,12 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
 
   const handleLeftArrow = () => {
     const newPosition = Math.max(0, scrollX - SCROLL_AMOUNT);
-    if (isWeb) {
-      scrollViewRef.current?.scrollTo({ x: newPosition, animated: true });
-    } else {
-      flatListRef.current?.scrollToOffset({ offset: newPosition, animated: true });
-    }
+    flatListRef.current?.scrollToOffset({ offset: newPosition, animated: true });
   };
 
   const handleRightArrow = () => {
     const newPosition = scrollX + SCROLL_AMOUNT;
-    if (isWeb) {
-      scrollViewRef.current?.scrollTo({ x: newPosition, animated: true });
-    } else {
-      flatListRef.current?.scrollToOffset({ offset: newPosition, animated: true });
-    }
+    flatListRef.current?.scrollToOffset({ offset: newPosition, animated: true });
   };
 
   const handleScroll = (event: any) => {
@@ -90,46 +81,24 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
           </TouchableOpacity>
         )}
 
-        {isWeb ? (
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-            style={{ overflow: 'visible' as any }}
-          >
-            {movies.map((item, index) => (
-              <MovieCard 
-                key={item.id} 
-                movie={item} 
-                onPress={() => onMoviePress(item.id)} 
-                isFirst={index === 0}
-                isLast={index === movies.length - 1}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={movies}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item, index }) => (
-              <MovieCard 
-                movie={item} 
-                onPress={() => onMoviePress(item.id)} 
-                isFirst={index === 0}
-                isLast={index === movies.length - 1}
-              />
-            )}
-            contentContainerStyle={styles.listContent}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          />
-        )}
+        <FlatList
+          ref={flatListRef}
+          data={movies}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item, index }) => (
+            <MovieCard 
+              movie={item} 
+              onPress={() => onMoviePress(item.id)} 
+              isFirst={index === 0}
+              isLast={index === movies.length - 1}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        />
 
         {/* Flecha derecha — glassmorphism */}
         {showRightArrow && !isSmallScreen && (

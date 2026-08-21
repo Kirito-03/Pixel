@@ -107,7 +107,7 @@ export default function HomeScreen({ navigation }: Props) {
         finished: ContentItem[],
         upcoming: ContentItem[]
     ): ContentItem[] => {
-        const allItems = [...airing, ...finished, ...upcoming];
+        const allItems = [...finished, ...upcoming];
 
         // Eliminar duplicados por id
         const seen = new Set<number>();
