@@ -6,9 +6,7 @@ import {
   ScrollView,
   TouchableOpacity, 
   useWindowDimensions,
-  PanResponder,
   Platform,
-  GestureResponderHandlers,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,33 +38,7 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
   
-  const scrollXRef = useRef(0);
-  const isDragging = useRef(false);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => Platform.OS === 'web',
-      onMoveShouldSetPanResponder: () => Platform.OS === 'web',
-
-      onPanResponderGrant: () => {
-        scrollXRef.current = scrollX;
-        isDragging.current = true;
-      },
-
-      onPanResponderMove: (_, gestureState) => {
-        const newOffset = scrollXRef.current - (gestureState.dx * 0.3);
-        if (isWeb) {
-          scrollViewRef.current?.scrollTo({ x: newOffset, animated: false });
-        } else {
-          flatListRef.current?.scrollToOffset({ offset: newOffset, animated: false });
-        }
-      },
-
-      onPanResponderRelease: () => {
-        isDragging.current = false;
-      },
-    })
-  ).current;
 
   const handleLeftArrow = () => {
     const newPosition = Math.max(0, scrollX - SCROLL_AMOUNT);
@@ -106,13 +78,7 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       
-      <View 
-        style={[
-          styles.listContainer,
-          isWeb && ({ cursor: 'grab' } as any)
-        ]} 
-        {...(panResponder.panHandlers as GestureResponderHandlers)}
-      >
+      <View style={styles.listContainer}>
         {/* Flecha izquierda — glassmorphism */}
         {showLeftArrow && !isSmallScreen && (
           <TouchableOpacity 

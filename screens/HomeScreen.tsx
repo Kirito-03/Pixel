@@ -35,18 +35,21 @@ export default function HomeScreen({ navigation }: Props) {
 
     const scrollViewRef = useRef<ScrollView>(null);
     const { height: screenHeight } = Dimensions.get('window');
+    
+    // INFINITE SCROLL STATE
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const loadingMoreRef = useRef<boolean>(false);
+    const loadedRowKeysRef = useRef<Set<string>>(new Set());
+    const [extraRows, setExtraRows] = useState<{ key: string; title: string; items: ContentItem[] }[]>([]);
+    const [genreSequenceIndex, setGenreSequenceIndex] = useState(0);
+
+    // List of dynamic genres to load infinitely (Netflix style)
+    const GENRE_POOL = ['Action', 'Romance', 'Comedy', 'Sci-Fi', 'Fantasy', 'Slice of Life', 'Drama', 'Adventure'];
 
     const CATEGORY_LABELS: Record<string, string> = {
         airing: 'En emisión',
         finished: 'Finalizados',
-        upcoming: 'Todo el catálogo',
-    };
-
-    const CATEGORY_POOLS: Record<'all' | 'movies' | 'series' | 'anime', string[]> = {
-        all: ['airing', 'finished', 'upcoming'],
-        movies: [],
-        series: [],
-        anime: ['airing', 'finished', 'upcoming'],
+        upcoming: 'Próximos lanzamientos',
     };
 
     // Accent colors por sección para variedad visual
@@ -68,7 +71,6 @@ export default function HomeScreen({ navigation }: Props) {
         vote_average: typeof anime.rating === 'number' ? anime.rating : (parseFloat(anime.rating as unknown as string) || 0),
         source: 'anilist',
         genres: Array.isArray(anime.genres) ? anime.genres : [],
-        // Pasar status para badges en MovieCard
         status: anime.status || '',
     });
 
@@ -100,12 +102,6 @@ export default function HomeScreen({ navigation }: Props) {
         } as any;
     };
 
-    /**
-     * Lógica de Destacados:
-     * 1. Prioriza animes con mejor rating
-     * 2. Si empatan en rating, prioriza los que tienen episodios disponibles
-     * 3. Si no, los más recientes o más completos
-     */
     const buildFeaturedItems = (
         airing: ContentItem[],
         finished: ContentItem[],
@@ -124,16 +120,13 @@ export default function HomeScreen({ navigation }: Props) {
         // Score compuesto para ordenar
         const scoreItem = (item: ContentItem & { status?: string; total_episodes?: number }) => {
             let score = 0;
-            // Rating principal (0–10 range, ya mapeado)
             const rating = typeof item.vote_average === 'number' ? item.vote_average : 0;
-            score += rating * 10; // peso mayor al rating
+            score += rating * 10;
 
-            // Bonus por tener episodios disponibles (dato de la BD)
             if (typeof (item as any).total_episodes === 'number' && (item as any).total_episodes > 0) {
                 score += 15;
             }
 
-            // Bonus por reciente
             if (item.release_date) {
                 const year = new Date(item.release_date).getFullYear();
                 const currentYear = new Date().getFullYear();
@@ -146,7 +139,7 @@ export default function HomeScreen({ navigation }: Props) {
 
         return unique
             .sort((a, b) => scoreItem(b as any) - scoreItem(a as any))
-            .slice(0, 12); // Top 12 para el carrusel de Destacados
+            .slice(0, 12); 
     };
 
     useEffect(() => {
@@ -177,7 +170,6 @@ export default function HomeScreen({ navigation }: Props) {
                 newContentSections.upcoming
             );
             setFeaturedItems(featured);
-
             setContentSections(newContentSections);
         } catch (error) {
             console.error('Critical error loading content:', error);
@@ -206,8 +198,15 @@ export default function HomeScreen({ navigation }: Props) {
     };
 
     const handleScroll = (event: any) => {
-        const { contentOffset } = event.nativeEvent;
+        const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
         setBlackHeader(contentOffset.y > 10);
+        
+        // Infinite scroll logic
+        const paddingToBottom = 150;
+        const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+        if (isAtBottom && !isLoadingMore && contentFilter === 'anime') {
+            loadMoreGenres();
+        }
     };
 
     const handleContentPress = (item: ContentItem) => {
@@ -221,6 +220,59 @@ export default function HomeScreen({ navigation }: Props) {
     const handleFilterChange = (filter: 'series' | 'movies' | 'all' | 'anime') => {
         setContentFilter(filter);
         setSelectedCategory(null);
+        setExtraRows([]);
+        setGenreSequenceIndex(0);
+        loadedRowKeysRef.current = new Set();
+    };
+
+    // Load new genre rows infinitely
+    const loadMoreGenres = async () => {
+        try {
+            if (loadingMoreRef.current) return;
+            loadingMoreRef.current = true;
+            setIsLoadingMore(true);
+
+            if (genreSequenceIndex >= GENRE_POOL.length) {
+                // If we ran out of genres, maybe loop or stop
+                setIsLoadingMore(false);
+                return;
+            }
+
+            const batchSize = 2; // Load 2 genres at a time
+            const newExtraRows: { key: string; title: string; items: ContentItem[] }[] = [];
+
+            for (let i = 0; i < batchSize; i++) {
+                const currentIndex = genreSequenceIndex + i;
+                if (currentIndex >= GENRE_POOL.length) break;
+                
+                const genre = GENRE_POOL[currentIndex];
+                const response = await catalogService.getAnimeList({ genre, limit: 15 });
+                const items = (response?.data || []).map(mapCatalogAnimeToContentItem);
+
+                if (items.length > 0) {
+                    const rowKey = `genre_${genre}`;
+                    if (!loadedRowKeysRef.current.has(rowKey)) {
+                        newExtraRows.push({
+                            key: rowKey,
+                            title: `Animes de ${genre}`,
+                            items: items,
+                        });
+                        loadedRowKeysRef.current.add(rowKey);
+                    }
+                }
+            }
+
+            setGenreSequenceIndex(prev => prev + batchSize);
+
+            if (newExtraRows.length > 0) {
+                setExtraRows(prev => [...prev, ...newExtraRows]);
+            }
+        } catch (error) {
+            console.error('Error loading more genres:', error);
+        } finally {
+            setIsLoadingMore(false);
+            loadingMoreRef.current = false;
+        }
     };
 
 
@@ -442,7 +494,25 @@ export default function HomeScreen({ navigation }: Props) {
                         </View>
                     )}
 
+                    {/* Infinite Scroll Genre Rows */}
+                    {extraRows.map((row) => (
+                        <MovieRow
+                            key={row.key}
+                            title={row.title}
+                            accentColor={colors.primary}
+                            movies={filterContent(row.items)}
+                            onMoviePress={(id) => {
+                                const item = row.items.find(i => i.id === id);
+                                if (item) handleContentNavigation(item);
+                            }}
+                        />
+                    ))}
 
+                    {isLoadingMore && (
+                        <View style={styles.loadingMore}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 

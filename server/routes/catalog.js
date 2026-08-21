@@ -4,7 +4,7 @@ import pool from '../db.js';
 const router = express.Router();
 
 router.get('/anime', async (req, res) => {
-  const { page = '1', limit = '20', search = '', status = '', franchise = '', sort = 'created_at' } = req.query;
+  const { page = '1', limit = '20', search = '', status = '', franchise = '', genre = '', sort = 'created_at' } = req.query;
 
   const safePage = Math.max(parseInt(String(page), 10) || 1, 1);
   const safeLimit = Math.min(Math.max(parseInt(String(limit), 10) || 20, 1), 50);
@@ -30,6 +30,11 @@ router.get('/anime', async (req, res) => {
     if (franchise) {
       where += ` AND franchise_key = $${i++}`;
       params.push(franchise);
+    }
+    
+    if (genre) {
+      where += ` AND genres::text ILIKE $${i++}`;
+      params.push(`%${genre}%`);
     }
 
     if (search) {

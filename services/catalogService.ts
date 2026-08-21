@@ -51,6 +51,7 @@ export const catalogService = {
     status?: string;
     search?: string;
     franchise?: string;
+    genre?: string;
   }) {
     const { data } = await http.get('/api/catalog/anime', { params });
     return data as { data: CatalogAnime[]; pagination: any };
@@ -76,7 +77,7 @@ export const catalogService = {
     const [airing, finished, upcoming] = await Promise.all([
       http.get('/api/catalog/anime', { params: { status: 'Releasing', page: 1, limit } }),
       http.get('/api/catalog/anime', { params: { status: 'Finished', page: 1, limit } }),
-      http.get('/api/catalog/anime', { params: { status: '', page: 1, limit } }),
+      http.get('/api/catalog/anime', { params: { status: 'Not Yet Released', page: 1, limit } }),
     ]);
 
     return {
