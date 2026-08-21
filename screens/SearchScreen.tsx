@@ -21,8 +21,15 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [recentQueries, setRecentQueries] = useState<string[]>([]);
   const [isFocused, setIsFocused] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const typingTimer = useRef<any>(null);
   const latestQueryRef = useRef<string>('');
+
+  const ALL_GENRES = [
+    'Action', 'Romance', 'Comedy', 'Sci-Fi', 
+    'Fantasy', 'Adventure', 'Drama', 'Sports', 
+    'Slice of Life', 'Horror', 'Mystery', 'Supernatural'
+  ];
 
   // ESC en web → goBack
   useEffect(() => {
@@ -79,6 +86,7 @@ export default function SearchScreen() {
   const clearSearch = () => {
     setQuery('');
     latestQueryRef.current = '';
+    setSelectedGenre(null);
     setSuggestions([]);
     setResults([]);
     if (typingTimer.current) {
@@ -113,6 +121,7 @@ export default function SearchScreen() {
 
   const handleSearch = async (text: string) => {
     setQuery(text);
+    setSelectedGenre(null);
     latestQueryRef.current = text;
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => fetchSuggestions(text), 500);
@@ -133,6 +142,22 @@ export default function SearchScreen() {
       }
     } else {
       setResults([]);
+    }
+  };
+
+  const handleGenrePress = async (genre: string) => {
+    setQuery('');
+    setSelectedGenre(genre);
+    setSuggestions([]);
+    setLoading(true);
+    try {
+      const response = await catalogService.getAnimeList({ genre, limit: 30 });
+      const filtered = (response?.data || []).map(mapCatalogAnimeToContentItem);
+      setResults(filtered);
+    } catch (error) {
+      setResults([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -254,7 +279,7 @@ export default function SearchScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
-            {recentQueries.length > 0 && (
+            {recentQueries.length > 0 && !selectedGenre && query.length === 0 && (
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeaderRow}>
                   <View style={styles.sectionHeaderLeft}>
@@ -272,6 +297,7 @@ export default function SearchScreen() {
                       style={styles.recentChip}
                       onPress={() => {
                         setQuery(text);
+                        setSelectedGenre(null);
                         setSuggestions([]);
                         handleSearch(text);
                         recordRecentSearch(text);
@@ -285,11 +311,36 @@ export default function SearchScreen() {
               </View>
             )}
 
+            {!selectedGenre && query.length === 0 && (
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionHeaderLeft}>
+                    <View style={styles.redBar} />
+                    <Text style={styles.sectionTitle}>EXPLORAR POR GÉNERO</Text>
+                  </View>
+                </View>
+                <View style={styles.genresGrid}>
+                  {ALL_GENRES.map((genre) => (
+                    <TouchableOpacity
+                      key={genre}
+                      style={styles.genreCard}
+                      onPress={() => handleGenrePress(genre)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.genreCardText}>{genre}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {results.length > 0 && (
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionHeaderLeft}>
                   <View style={styles.redBar} />
-                  <Text style={styles.sectionTitle}>RESULTADOS</Text>
+                  <Text style={styles.sectionTitle}>
+                    {selectedGenre ? `RESULTADOS PARA: ${selectedGenre.toUpperCase()}` : 'RESULTADOS'}
+                  </Text>
                 </View>
               </View>
             )}
@@ -301,7 +352,7 @@ export default function SearchScreen() {
         )}
         columnWrapperStyle={results.length > 0 ? styles.gridColumns : undefined}
         ListEmptyComponent={
-          query.length > 2 && !loading && results.length === 0 ? (
+          ((query.length > 2 || selectedGenre) && !loading && results.length === 0) ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={48} color="#222" style={{ marginBottom: 16 }} />
               <Text style={styles.emptyText}>No se encontraron resultados</Text>
