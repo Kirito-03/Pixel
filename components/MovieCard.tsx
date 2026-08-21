@@ -19,9 +19,10 @@ interface Props {
   onPress: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  onHoverChange?: (isHovered: boolean) => void;
 }
 
-export default function MovieCard({ movie, onPress, isFirst = false, isLast = false }: Props) {
+export default function MovieCard({ movie, onPress, isFirst = false, isLast = false, onHoverChange }: Props) {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
@@ -37,8 +38,11 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseEnter = useCallback(() => {
-    hoverTimer.current = setTimeout(() => setHovered(true), 1500);
-  }, []);
+    hoverTimer.current = setTimeout(() => {
+      setHovered(true);
+      if (onHoverChange) onHoverChange(true);
+    }, 1500);
+  }, [onHoverChange]);
 
   const handleMouseLeave = useCallback(() => {
     if (hoverTimer.current) {
@@ -46,7 +50,8 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
       hoverTimer.current = null;
     }
     setHovered(false);
-  }, []);
+    if (onHoverChange) onHoverChange(false);
+  }, [onHoverChange]);
 
   const getImageSource = () => {
     if ('source' in movie) {

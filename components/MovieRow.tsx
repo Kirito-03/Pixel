@@ -36,6 +36,7 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
   const [scrollX, setScrollX] = useState(0);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
   
 
 
@@ -93,8 +94,21 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
               onPress={() => onMoviePress(item.id)} 
               isFirst={index === 0}
               isLast={index === movies.length - 1}
+              onHoverChange={(isHovered) => {
+                if (isHovered) setHoveredId(item.id);
+                else if (hoveredId === item.id) setHoveredId(null);
+              }}
             />
           )}
+          CellRendererComponent={({ children, index, style, ...props }: any) => {
+            const item = movies[index];
+            const isHovered = item && item.id === hoveredId;
+            return (
+              <View style={[style, { zIndex: isHovered ? 9999 : 1, elevation: isHovered ? 9999 : 1 }]} {...props}>
+                {children}
+              </View>
+            );
+          }}
           contentContainerStyle={styles.listContent}
           onScroll={handleScroll}
           scrollEventThrottle={16}
