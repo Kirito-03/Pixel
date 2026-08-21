@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { Linking } from 'react-native';
 import { MOCK_TRENDING } from '../data/mockNews';
 import { NewsHero, NewsCard, TrendingItem } from '../components/NewsComponents';
 import Header from '../components/Header';
@@ -120,6 +121,7 @@ export default function NewsScreen() {
     badge: (a.category || 'Industria').replace(/^./, (c) => c.toUpperCase()),
     date: a.published_at || new Date().toISOString(),
     featured: a.is_featured,
+    url: a.external_url,
   });
 
   const hero = featured ? toNewsItem(featured) : null;
@@ -161,7 +163,7 @@ export default function NewsScreen() {
         {hero ? (
           <NewsHero
             item={hero as any}
-            onPress={() => navigation.navigate('NewsDetail', { slug: String((featured as any)?.slug || hero.id) })}
+            onPress={() => hero.url ? Linking.openURL(hero.url) : navigation.navigate('NewsDetail', { slug: String((featured as any)?.slug || hero.id) })}
           />
         ) : null}
 
@@ -204,7 +206,7 @@ export default function NewsScreen() {
                   <NewsCard
                     key={item.id}
                     item={item as any}
-                    onPress={() => navigation.navigate('NewsDetail', { slug: String(item.id) })}
+                    onPress={() => item.url ? Linking.openURL(item.url) : navigation.navigate('NewsDetail', { slug: String(item.id) })}
                   />
                 ))}
                 {chunk.length < columns &&

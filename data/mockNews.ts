@@ -6,9 +6,10 @@ export interface NewsItem {
   title: string;
   description: string;
   image: string;
-  badge: NewsBadge;
+  badge: NewsBadge | string;
   date: string; // ISO string
   featured?: boolean;
+  url?: string | null;
 }
 
 export const MOCK_NEWS: NewsItem[] = [

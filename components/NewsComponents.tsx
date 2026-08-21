@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   Animated,
+  Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -137,20 +138,23 @@ export function NewsCard({ item, onPress }: NewsCardProps) {
   const isWeb = Platform.OS === 'web';
   const [imageError, setImageError] = useState(false);
 
+  const [isHovered, setIsHovered] = useState(false);
+
   const onIn = () =>
-    Animated.spring(scale, { toValue: 1.04, useNativeDriver: false, friction: 6 }).start();
+    Animated.spring(scale, { toValue: 1.02, useNativeDriver: false, friction: 6 }).start();
   const onOut = () =>
     Animated.spring(scale, { toValue: 1, useNativeDriver: false, friction: 6 }).start();
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.88}
-      onPress={onPress}
-      onPressIn={onIn}
-      onPressOut={onOut}
-      style={[styles.cardWrapper, isWeb ? ({ cursor: 'pointer' } as any) : null]}
-    >
-      <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
+    <View style={[styles.cardWrapper, isWeb ? ({ cursor: 'pointer' } as any) : null]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onIn}
+        onPressOut={onOut}
+        onHoverIn={() => setIsHovered(true)}
+        onHoverOut={() => setIsHovered(false)}
+      >
+        <Animated.View style={[styles.card, { transform: [{ scale }] }, isHovered && styles.cardHovered]}>
         {/* Imagen */}
         <View style={styles.cardImageBox}>
           {!item.image || imageError ? (
@@ -164,9 +168,12 @@ export function NewsCard({ item, onPress }: NewsCardProps) {
             pointerEvents="none"
           />
           {/* Badge sobre imagen */}
-          <View style={[styles.badge, styles.cardBadge, { backgroundColor: BADGE_COLORS[item.badge] }]}>
+          <View style={[styles.badge, styles.cardBadge, { backgroundColor: BADGE_COLORS[item.badge] || '#E50914' }]}>
             <Text style={styles.badgeText}>{item.badge.toUpperCase()}</Text>
           </View>
+          
+          {/* Pequeño cuadrado rojo superior derecho */}
+          <View style={styles.topRightSquare} />
         </View>
 
         {/* Contenido */}
@@ -175,11 +182,16 @@ export function NewsCard({ item, onPress }: NewsCardProps) {
             <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.45)" />
             <Text style={styles.cardDate}>{formatDate(item.date)}</Text>
           </View>
-          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+          <Text style={[styles.cardTitle, isHovered && styles.cardTitleHovered]} numberOfLines={2}>{item.title}</Text>
+          {isHovered ? (
+            <Text style={styles.readMoreText}>LEER MÁS {'>'}</Text>
+          ) : (
+            <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+          )}
         </View>
       </Animated.View>
-    </TouchableOpacity>
+    </Pressable>
+  </View>
   );
 }
 
@@ -223,12 +235,12 @@ const styles = StyleSheet.create({
   heroWrapper: {
     marginHorizontal: 20,
     marginBottom: 32,
-    borderRadius: 16,
+    borderRadius: 0,
     overflow: 'hidden',
   },
   heroCard: {
     height: 340,
-    borderRadius: 16,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#111',
   },
@@ -272,7 +284,7 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   badgeText: {
     color: '#fff',
@@ -286,11 +298,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
-    borderRadius: 12,
-    backgroundColor: '#161616',
+    borderRadius: 0,
+    backgroundColor: '#000000',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  cardHovered: {
+    borderColor: '#E50914',
   },
   cardImageBox: {
     height: 160,
@@ -332,8 +347,16 @@ const styles = StyleSheet.create({
   },
   cardBadge: {
     position: 'absolute',
-    top: 10,
-    left: 10,
+    top: 0,
+    left: 0,
+  },
+  topRightSquare: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    backgroundColor: '#E50914',
   },
   cardBody: {
     padding: 14,
@@ -349,10 +372,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
   },
+  cardTitleHovered: {
+    color: '#E50914',
+  },
   cardDesc: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
     lineHeight: 17,
+  },
+  readMoreText: {
+    color: '#E50914',
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+    letterSpacing: 1.2,
   },
 
   /* TRENDING */
