@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, Switch, TouchableOpacity } from 'react-native';
+import { View, Text, Switch, TouchableOpacity, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../../services/firebase';
 import { SubNav } from './SubNav';
 
 const accountTabs = [
-    { id: 'personal', label: 'Información Personal' },
-    { id: 'preferences', label: 'Preferencias' },
+    { id: 'personal', label: 'INFORMACIÓN PERSONAL' },
+    { id: 'preferences', label: 'PREFERENCIAS' },
 ];
 
 const securityTabs = [
@@ -29,6 +29,11 @@ export const ContentPanel = ({
     handleChangeProfile,
     navigation,
     handleAdminAccess,
+    currentProfile,
+    getAvatarUrl,
+    handleChangeAvatar,
+    fileInputRef,
+    handleWebFileSelect
 }: any) => {
     const [accountSubTab, setAccountSubTab] = useState('personal');
     const [securitySubTab, setSecuritySubTab] = useState('history');
@@ -37,44 +42,103 @@ export const ContentPanel = ({
         switch (accountSubTab) {
             case 'personal':
                 return (
-                    <View style={styles.card}>
-                        <Text style={styles.cardTitle}>Detalles de la Cuenta</Text>
-                        <View style={styles.row}>
-                            <View>
-                                <Text style={styles.rowLabel}>Email</Text>
-                                <Text style={styles.rowDesc}>{user?.email}</Text>
+                    <View>
+                        {/* Detalles de la cuenta */}
+                        <View style={styles.cardWrapper}>
+                            <View style={styles.cardHeader}>
+                                <Ionicons name="mail-outline" size={16} color="#E50914" />
+                                <Text style={styles.cardTitle}>Detalles de la Cuenta</Text>
                             </View>
-                            {!auth.currentUser?.emailVerified && (
-                                <TouchableOpacity style={styles.actionBtn} onPress={handleEmailVerification}>
-                                    <Text style={styles.actionBtnText}>Verificar</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        <View style={styles.row}>
-                            <View>
-                                <Text style={styles.rowLabel}>Contraseña</Text>
-                                <Text style={styles.rowDesc}>*************</Text>
+                            <View style={styles.cardContent}>
+                                <View style={styles.row}>
+                                    <View style={styles.rowInfo}>
+                                        <Text style={styles.rowLabel}>Email</Text>
+                                        <Text style={styles.rowDesc}>{user?.email}</Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.actionBtn}>
+                                        <Ionicons name="pencil" size={14} color="#999999" style={styles.actionBtnIcon} />
+                                        <Text style={styles.actionBtnText}>CAMBIAR</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[styles.row, styles.rowNoBorder]}>
+                                    <View style={styles.rowInfo}>
+                                        <Text style={styles.rowLabel}>Contraseña</Text>
+                                        <Text style={styles.rowDesc}>*************</Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.actionBtn} onPress={handlePasswordReset}>
+                                        <Ionicons name="pencil" size={14} color="#999999" style={styles.actionBtnIcon} />
+                                        <Text style={styles.actionBtnText}>CAMBIAR</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                            <TouchableOpacity style={styles.actionBtn} onPress={handlePasswordReset}>
-                                <Text style={styles.actionBtnText}>Cambiar</Text>
-                            </TouchableOpacity>
                         </View>
+
+                        {/* Perfil Público */}
+                        <View style={styles.cardWrapper}>
+                            <View style={styles.cardHeader}>
+                                <Ionicons name="person-outline" size={16} color="#E50914" />
+                                <Text style={styles.cardTitle}>Perfil Público</Text>
+                            </View>
+                            <View style={styles.cardContent}>
+                                <View style={styles.row}>
+                                    <View style={styles.rowInfo}>
+                                        <Text style={styles.rowLabel}>Nombre del perfil</Text>
+                                        <Text style={styles.rowDesc}>{currentProfile?.name}</Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.actionBtn}>
+                                        <Ionicons name="pencil" size={14} color="#999999" style={styles.actionBtnIcon} />
+                                        <Text style={styles.actionBtnText}>CAMBIAR</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={[styles.row, styles.rowNoBorder]}>
+                                    <View style={styles.rowInfo}>
+                                        <Text style={styles.rowLabel}>Foto de perfil</Text>
+                                        <View style={styles.profilePicEditContainer}>
+                                            <View style={styles.profilePicPreview}>
+                                                <Image
+                                                    source={{ uri: getAvatarUrl() }}
+                                                    style={{ width: '100%', height: '100%', borderRadius: 4 }}
+                                                />
+                                                <View style={styles.profilePicRedDot} />
+                                            </View>
+                                            <TouchableOpacity style={styles.actionBtn} onPress={handleChangeAvatar}>
+                                                <Ionicons name="camera-outline" size={14} color="#999999" style={styles.actionBtnIcon} />
+                                                <Text style={styles.actionBtnText}>CAMBIAR FOTO</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        <Text style={styles.profilePicMeta}>JPG, PNG — Máx. 5MB</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+
+                        {Platform.OS === 'web' && (
+                            <input
+                                ref={(el: HTMLInputElement) => { fileInputRef.current = el; }}
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={handleWebFileSelect}
+                            />
+                        )}
                     </View>
                 );
             case 'preferences':
                 return (
-                    <View style={styles.card}>
-                        <Text style={styles.cardTitle}>Preferencias de Contenido</Text>
-                        <View style={styles.row}>
-                            <View>
+                    <View style={styles.cardWrapper}>
+                        <View style={styles.cardHeader}>
+                            <Text style={styles.cardTitle}>Preferencias de Contenido</Text>
+                        </View>
+                        <View style={[styles.row, styles.rowNoBorder]}>
+                            <View style={styles.rowInfo}>
                                 <Text style={styles.rowLabel}>Contenido +18</Text>
                                 <Text style={styles.rowDesc}>Mostrar contenido para adultos y NSFW</Text>
                             </View>
                             <Switch
                                 value={adultContentEnabled}
                                 onValueChange={setAdultContentEnabled}
-                                trackColor={{ false: '#767577', true: colors.primary }}
-                                thumbColor={adultContentEnabled ? '#00d4ff' : '#f4f3f4'}
+                                trackColor={{ false: '#333', true: '#E50914' }}
+                                thumbColor={adultContentEnabled ? '#fff' : '#ccc'}
                             />
                         </View>
                     </View>
@@ -84,62 +148,36 @@ export const ContentPanel = ({
         }
     };
 
-    const renderSecurityContent = () => {
-        switch (securitySubTab) {
-            case 'history':
-                return (
-                    <View style={styles.card}>
-                        <Text style={styles.cardTitle}>Historial de Inicio de Sesión</Text>
-                        <View style={styles.row}>
-                            <View>
-                                <Text style={styles.rowLabel}>Chrome en Windows 11</Text>
-                                <Text style={styles.rowDesc}>Ubicación: Lima, Perú (IP: 192.168.1.1)</Text>
-                            </View>
-                            <Text style={styles.rowDesc}>Ahora</Text>
-                        </View>
-                        <View style={styles.row}>
-                            <View>
-                                <Text style={styles.rowLabel}>App de Android</Text>
-                                <Text style={styles.rowDesc}>Ubicación: Arequipa, Perú (IP: 200.48.225.10)</Text>
-                            </View>
-                            <Text style={styles.rowDesc}>Ayer</Text>
-                        </View>
-                    </View>
-                );
-            case 'devices':
-                return (
-                    <View style={styles.card}>
-                        <Text style={styles.cardTitle}>Dispositivos Activos</Text>
-                        <View style={styles.row}>
-                            <View>
-                                <Text style={styles.rowLabel}>Este Dispositivo (Chrome en Windows)</Text>
-                                <Text style={styles.rowDesc}>Sesión actual</Text>
-                            </View>
-                            <TouchableOpacity style={[styles.actionBtn, { borderColor: '#aaa' }]}>
-                                <Text style={[styles.actionBtnText, { color: '#aaa' }]}>Actual</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.row}>
-                            <View>
-                                <Text style={styles.rowLabel}>Samsung Galaxy S23</Text>
-                                <Text style={styles.rowDesc}>Última actividad: hace 2 horas</Text>
-                            </View>
-                            <TouchableOpacity style={[styles.actionBtn, { borderColor: '#e50914' }]}>
-                                <Text style={[styles.actionBtnText, { color: '#e50914' }]}>Cerrar Sesión</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                );
-            default:
-                return null;
-        }
-    };
+    // Placeholder renderers for other tabs to keep the UI complete
+    const renderSecurityContent = () => (
+        <View style={styles.cardWrapper}>
+            <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Actividad</Text>
+            </View>
+            <View style={[styles.row, styles.rowNoBorder]}>
+                <View style={styles.rowInfo}>
+                    <Text style={styles.rowLabel}>Historial no disponible</Text>
+                    <Text style={styles.rowDesc}>Esta sección está en desarrollo.</Text>
+                </View>
+            </View>
+        </View>
+    );
+
+    const renderHeader = (title: string, subtitle?: string) => (
+        <View style={styles.sectionTitleContainer}>
+            <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionTitleRedBar} />
+                <Text style={styles.sectionTitle}>{title}</Text>
+            </View>
+            {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+        </View>
+    );
 
     switch (activeTab) {
         case 'account':
             return (
                 <View>
-                    <Text style={styles.sectionTitle}>Cuenta</Text>
+                    {renderHeader('Cuenta', 'GESTIONA TU INFORMACIÓN PERSONAL')}
                     <SubNav tabs={accountTabs} activeTab={accountSubTab} onTabPress={setAccountSubTab} colors={colors} theme={theme} />
                     {renderAccountContent()}
                 </View>
@@ -147,7 +185,7 @@ export const ContentPanel = ({
         case 'security':
             return (
                 <View>
-                    <Text style={styles.sectionTitle}>Seguridad y Actividad</Text>
+                    {renderHeader('Seguridad')}
                     <SubNav tabs={securityTabs} activeTab={securitySubTab} onTabPress={setSecuritySubTab} colors={colors} theme={theme} />
                     {renderSecurityContent()}
                 </View>
@@ -155,31 +193,28 @@ export const ContentPanel = ({
         case 'settings':
             return (
                 <View>
-                    <Text style={styles.sectionTitle}>Configuración</Text>
-                    <View style={styles.card}>
-                        <Text style={styles.cardTitle}>General</Text>
+                    {renderHeader('Configuración')}
+                    <View style={styles.cardWrapper}>
+                        <View style={styles.cardHeader}><Text style={styles.cardTitle}>General</Text></View>
                         <View style={styles.row}>
-                            <View>
+                            <View style={styles.rowInfo}>
                                 <Text style={styles.rowLabel}>Notificaciones</Text>
                                 <Text style={styles.rowDesc}>Recibir alertas de nuevos estrenos</Text>
                             </View>
-                            <Switch
-                                value={notificationsEnabled}
-                                onValueChange={setNotificationsEnabled}
-                                trackColor={{ false: '#767577', true: colors.primary }}
-                                thumbColor={notificationsEnabled ? '#00d4ff' : '#f4f3f4'}
-                            />
+                            <Switch value={notificationsEnabled} onValueChange={setNotificationsEnabled} trackColor={{ false: '#333', true: '#E50914' }} />
                         </View>
-                        <View style={styles.row}>
-                            <Text style={styles.rowLabel}>Idioma</Text>
-                            <Text style={{ color: colors.textGray }}>Español (Latam)</Text>
+                        <View style={[styles.row, styles.rowNoBorder]}>
+                            <View style={styles.rowInfo}>
+                                <Text style={styles.rowLabel}>Idioma</Text>
+                                <Text style={styles.rowDesc}>Español (Latam)</Text>
+                            </View>
                         </View>
                     </View>
-                    <View style={styles.card}>
-                        <Text style={styles.cardTitle}>Gestión de Perfiles</Text>
-                        <TouchableOpacity style={styles.row} onPress={handleChangeProfile}>
-                            <Text style={styles.rowLabel}>Cambiar de perfil</Text>
-                            <Ionicons name="chevron-forward" size={20} color={colors.textGray} />
+                    <View style={styles.cardWrapper}>
+                        <View style={styles.cardHeader}><Text style={styles.cardTitle}>Gestión de Perfiles</Text></View>
+                        <TouchableOpacity style={[styles.row, styles.rowNoBorder]} onPress={handleChangeProfile}>
+                            <Text style={styles.rowDesc}>Cambiar de perfil</Text>
+                            <Ionicons name="chevron-forward" size={20} color="#666" />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -187,15 +222,15 @@ export const ContentPanel = ({
         case 'appearance':
             return (
                 <View>
-                    <Text style={styles.sectionTitle}>Apariencia</Text>
-                    <View style={styles.card}>
-                        <View style={styles.row}>
-                            <View>
+                    {renderHeader('Apariencia')}
+                    <View style={styles.cardWrapper}>
+                        <View style={[styles.row, styles.rowNoBorder]}>
+                            <View style={styles.rowInfo}>
                                 <Text style={styles.rowLabel}>Tema</Text>
-                                <Text style={styles.rowDesc}>{theme === 'dark' ? 'Modo Oscuro' : 'Modo Claro'}</Text>
+                                <Text style={styles.rowDesc}>Modo Oscuro</Text>
                             </View>
                             <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Apariencia' as never)}>
-                                <Text style={styles.actionBtnText}>Personalizar</Text>
+                                <Text style={styles.actionBtnText}>PERSONALIZAR</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -204,16 +239,16 @@ export const ContentPanel = ({
         case 'admin':
             return (
                 <View>
-                    <Text style={styles.sectionTitle}>Administración</Text>
-                    <View style={styles.card}>
-                        <Text style={styles.cardTitle}>Panel de Control</Text>
-                        <View style={styles.row}>
-                            <View>
+                    {renderHeader('Administración')}
+                    <View style={styles.cardWrapper}>
+                        <View style={styles.cardHeader}><Text style={styles.cardTitle}>Panel de Control</Text></View>
+                        <View style={[styles.row, styles.rowNoBorder]}>
+                            <View style={styles.rowInfo}>
                                 <Text style={styles.rowLabel}>Acceso Administrador</Text>
                                 <Text style={styles.rowDesc}>Gestionar anime, usuarios y configuración</Text>
                             </View>
-                            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={handleAdminAccess}>
-                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Entrar al Panel</Text>
+                            <TouchableOpacity style={[styles.actionBtn, { borderColor: '#E50914', backgroundColor: 'rgba(229,9,20,0.1)' }]} onPress={handleAdminAccess}>
+                                <Text style={[styles.actionBtnText, { color: '#E50914' }]}>ENTRAR AL PANEL</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

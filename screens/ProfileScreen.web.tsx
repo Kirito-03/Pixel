@@ -46,10 +46,13 @@ export default function ProfileScreen() {
                     style={topBarStyles.backBtn}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.8)" />
-                    <Text style={topBarStyles.backText}>Volver</Text>
+                    <Ionicons name="arrow-back" size={16} color="#666" />
+                    <Text style={topBarStyles.backText}>VOLVER</Text>
                 </TouchableOpacity>
-                <Text style={topBarStyles.title}>Mi perfil</Text>
+                <View style={topBarStyles.titleContainer}>
+                    <View style={topBarStyles.titleRedBar} />
+                    <Text style={topBarStyles.title}>MI PERFIL</Text>
+                </View>
                 <View style={topBarStyles.backBtn} />
             </View>
 
@@ -102,11 +105,9 @@ const topBarStyles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 14,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(255,255,255,0.08)',
-        backgroundColor: '#0A0A0A',
+        paddingHorizontal: 30,
+        paddingVertical: 20,
+        backgroundColor: '#000000',
     },
     backBtn: {
         flexDirection: 'row',
@@ -116,14 +117,25 @@ const topBarStyles = StyleSheet.create({
         cursor: 'pointer' as any,
     },
     backText: {
-        color: 'rgba(255,255,255,0.75)',
-        fontSize: 14,
-        fontWeight: '500',
+        color: '#666',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 1,
+    },
+    titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    titleRedBar: {
+        width: 3,
+        height: 14,
+        backgroundColor: '#E50914',
+        marginRight: 8,
     },
     title: {
         color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '700',
-        letterSpacing: -0.2,
+        fontSize: 14,
+        fontWeight: '800',
+        letterSpacing: 2,
     },
 });

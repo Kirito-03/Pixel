@@ -11,8 +11,8 @@ const SidebarItem = ({ id, icon, label, activeTab, colors, styles, onPress }: an
     >
         <Ionicons
             name={icon}
-            size={22}
-            color={activeTab === id ? colors.primary : colors.textGray}
+            size={20}
+            color={activeTab === id ? '#FFFFFF' : '#666666'}
             style={styles.menuIcon}
         />
         <Text style={[styles.menuText, activeTab === id && styles.menuTextActive]}>{label}</Text>
@@ -24,9 +24,6 @@ export const Sidebar = ({
     currentProfile,
     getAvatarUrl,
     setImageError,
-    handleChangeAvatar,
-    fileInputRef,
-    handleWebFileSelect,
     activeTab,
     setActiveTab,
     setLogoutVisible,
@@ -38,29 +35,17 @@ export const Sidebar = ({
     return (
         <View style={styles.sidebar}>
             <View style={styles.sidebarHeader}>
-                <TouchableOpacity
-                    style={styles.avatarContainer}
-                    onPress={handleChangeAvatar}
-                >
+                <View style={styles.avatarContainer}>
                     <Image
                         key={`${currentProfile?.avatar_url || 'default-avatar'}`}
                         source={{ uri: getAvatarUrl() }}
                         style={styles.avatar}
                         onError={() => setImageError(true)}
                     />
-                </TouchableOpacity>
+                    <View style={styles.avatarBadge} />
+                </View>
                 <Text style={styles.username}>{currentProfile?.name}</Text>
                 <Text style={styles.userEmail}>{user?.email}</Text>
-
-                {Platform.OS === 'web' && (
-                    <input
-                        ref={(el: HTMLInputElement) => { fileInputRef.current = el; }}
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={handleWebFileSelect}
-                    />
-                )}
             </View>
 
             <View style={styles.menuContainer}>
@@ -75,8 +60,8 @@ export const Sidebar = ({
 
             <View style={styles.sidebarFooter}>
                 <TouchableOpacity style={styles.logoutButton} onPress={() => setLogoutVisible(true)}>
-                    <Ionicons name="log-out-outline" size={24} color="#e50914" />
-                    <Text style={styles.logoutText}>Cerrar sesión</Text>
+                    <Ionicons name="log-out-outline" size={16} color="#E50914" />
+                    <Text style={styles.logoutText}>CERRAR SESIÓN</Text>
                 </TouchableOpacity>
             </View>
         </View>

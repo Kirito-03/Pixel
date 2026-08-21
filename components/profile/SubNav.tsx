@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { spacing } from '../../theme';
 
 interface SubNavProps {
     tabs: { id: string; label: string }[];
@@ -10,9 +9,7 @@ interface SubNavProps {
     theme: string;
 }
 
-export const SubNav: React.FC<SubNavProps> = ({ tabs, activeTab, onTabPress, colors, theme }) => {
-    const styles = createSubNavStyles(colors, theme);
-
+export const SubNav: React.FC<SubNavProps> = ({ tabs, activeTab, onTabPress }) => {
     return (
         <View style={styles.container}>
             {tabs.map((tab) => (
@@ -30,30 +27,30 @@ export const SubNav: React.FC<SubNavProps> = ({ tabs, activeTab, onTabPress, col
     );
 };
 
-const createSubNavStyles = (colors: any, theme: string) => StyleSheet.create({
+const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
         borderBottomWidth: 1,
-        borderBottomColor: theme === 'dark' ? '#2d2d2d' : '#e5e5e5',
-        marginBottom: spacing.xl,
+        borderBottomColor: '#1a1a1a',
+        marginBottom: 30,
     },
     tab: {
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        marginRight: spacing.lg,
+        paddingVertical: 12,
+        paddingHorizontal: 4,
+        marginRight: 40,
         borderBottomWidth: 2,
         borderBottomColor: 'transparent',
     },
     tabActive: {
-        borderBottomColor: colors.primary,
+        borderBottomColor: '#E50914',
     },
     tabText: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: colors.textGray,
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#666666',
+        letterSpacing: 1,
     },
     tabTextActive: {
-        color: colors.primary,
-        fontWeight: '600',
+        color: '#FFFFFF',
     },
 });
