@@ -16,7 +16,7 @@ const JIKAN_HEADERS = {
 
 // Cache simple en memoria para no saturar Jikan (cache 30 min por día)
 const scheduleCache = new Map(); // key: day → { data, ts }
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutos
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 horas de cache para mitigar caídas de Jikan
 
 /**
  * GET /api/schedules?filter=monday|tuesday|...
@@ -37,28 +37,40 @@ router.get('/', async (req, res) => {
   }
 
   try {
-    const response = await axios.get(`${JIKAN_BASE}/schedules`, {
-      params: { filter: day, limit: 25 },
-      headers: JIKAN_HEADERS,
-      timeout: 15000,
-    });
+    let response;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        response = await axios.get(`${JIKAN_BASE}/schedules`, {
+          params: { filter: day, limit: 25 },
+          headers: JIKAN_HEADERS,
+          timeout: 10000,
+        });
+        break; // Success, exit retry loop
+      } catch (err) {
+        retries--;
+        if (retries === 0) throw err;
+        // Wait 1 second before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
 
     const data = response.data?.data || [];
 
-    // Guardar en cache
+    // Guardar en cache (ahora dura 2 horas para mayor resiliencia)
     scheduleCache.set(day, { data, ts: Date.now() });
 
     return res.json({ data, cached: false, day });
   } catch (error) {
-    if (error.response?.status === 429) {
-      // Rate limit de Jikan — devolver cache viejo si existe
-      if (cached) {
-        return res.json({ data: cached.data, cached: true, day, warning: 'Rate limit Jikan, usando cache.' });
-      }
-      return res.status(429).json({ error: 'Rate limit de Jikan API. Intenta en unos segundos.' });
+    console.error(`[Schedules] Error llamando a Jikan para ${day}:`, error.message);
+    
+    // Si hay cualquier error (429, 504, 500) y tenemos cache viejo, usamos el cache sin importar el TTL
+    if (cached) {
+      console.warn(`[Schedules] Fallback a cache viejo para ${day}.`);
+      return res.json({ data: cached.data, cached: true, day, warning: 'Error API Jikan, usando cache viejo.' });
     }
-    console.error('[Schedules] Error llamando a Jikan:', error.message);
-    return res.status(500).json({ error: 'Error obteniendo horarios', detail: error.message });
+
+    return res.status(error.response?.status || 500).json({ error: 'Error obteniendo horarios', detail: error.message });
   }
 });
 
