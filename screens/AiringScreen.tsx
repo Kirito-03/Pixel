@@ -35,7 +35,8 @@ export default function AiringScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [calendarDay, setCalendarDay] = useState<string>('monday');
+  const currentDayStr = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date().getDay()];
+  const [calendarDay, setCalendarDay] = useState<string>(currentDayStr);
   const [calendarData, setCalendarData] = useState<any[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   
@@ -68,9 +69,17 @@ export default function AiringScreen({ navigation }: any) {
     try {
       setLoading(true);
       setError(null);
-      // "Airing" es mapeado desde "RELEASING" en AniList
       const res = await catalogService.getAnimeList({ status: 'Airing', limit: 100 });
-      setAnimes(res.data || []);
+      // Deduplicate by id
+      const uniqueAnimes: CatalogAnime[] = [];
+      const seenIds = new Set<string>();
+      for (const item of (res.data || [])) {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          uniqueAnimes.push(item);
+        }
+      }
+      setAnimes(uniqueAnimes);
     } catch (err: any) {
       setError(err.message || 'Error cargando animes en emisión');
     } finally {
@@ -98,43 +107,83 @@ export default function AiringScreen({ navigation }: any) {
     setModalVisible(true);
   };
 
+  const mapJikanToContentItem = (item: any): ContentItem => ({
+    id: Number(item.mal_id),
+    type: 'anime',
+    title: item.title || 'Sin título',
+    overview: item.synopsis || '',
+    poster_path: item.images?.jpg?.large_image_url || '',
+    backdrop_path: item.images?.jpg?.large_image_url || '',
+    release_date: '',
+    vote_average: item.score || 0,
+    source: 'jikan',
+    genres: [],
+    status: item.status || '',
+  });
+
+  const handleCalendarPress = (item: any) => {
+    const content = mapJikanToContentItem(item);
+    setSelectedContent(content);
+    setModalVisible(true);
+  };
+
   const renderItem = ({ item }: { item: CatalogAnime }) => {
     return (
       <TouchableOpacity
-        style={[styles.card, { width: itemWidth, marginRight: gap, height: itemWidth * 1.5 + 40 }]}
+        style={[styles.card, { width: itemWidth, marginRight: gap }]}
         activeOpacity={0.8}
         onPress={() => handleMoviePress(item)}
       >
-        <Image
-          source={{ uri: item.poster_url || 'https://via.placeholder.com/300x450' }}
-          style={[styles.poster, { height: itemWidth * 1.5 }]}
-          resizeMode="cover"
-        />
-        <View style={styles.episodesBadge}>
-          <Text style={styles.episodesText}>{item.total_episodes || '?'} Eps</Text>
+        <View style={[styles.posterBox, { height: itemWidth * 1.5 }]}>
+          <Image
+            source={{ uri: item.poster_url || 'https://via.placeholder.com/300x450' }}
+            style={styles.poster}
+            resizeMode="cover"
+          />
+          <View style={styles.badgeTopLeft}>
+            <Text style={styles.badgeText}>SUB</Text>
+          </View>
+          <View style={styles.badgeTopRight}>
+            <Ionicons name="star" size={10} color="#fff" style={{ marginRight: 2 }} />
+            <Text style={styles.badgeText}>{typeof item.rating === 'number' ? (item.rating / 10).toFixed(1) : 'N/A'}</Text>
+          </View>
+          <View style={styles.badgeBottomLeft}>
+            <Text style={styles.epText}>{item.total_episodes ? `Ep ${item.total_episodes}` : 'Emisión'}</Text>
+          </View>
         </View>
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
+        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>Emisión actual</Text>
       </TouchableOpacity>
     );
   };
 
   const renderCalendarItem = ({ item }: { item: any }) => {
     return (
-      <View style={[styles.card, { width: itemWidth, marginRight: gap, height: itemWidth * 1.5 + 40 }]}>
-        <Image
-          source={{ uri: item.images?.jpg?.large_image_url || 'https://via.placeholder.com/300x450' }}
-          style={[styles.poster, { height: itemWidth * 1.5 }]}
-          resizeMode="cover"
-        />
-        <View style={styles.episodesBadge}>
-          <Text style={styles.episodesText}>{item.score ? `★ ${item.score}` : 'N/A'}</Text>
+      <TouchableOpacity
+        style={[styles.card, { width: itemWidth, marginRight: gap }]}
+        activeOpacity={0.8}
+        onPress={() => handleCalendarPress(item)}
+      >
+        <View style={[styles.posterBox, { height: itemWidth * 1.5 }]}>
+          <Image
+            source={{ uri: item.images?.jpg?.large_image_url || 'https://via.placeholder.com/300x450' }}
+            style={styles.poster}
+            resizeMode="cover"
+          />
+          <View style={styles.badgeTopLeft}>
+            <Text style={styles.badgeText}>SUB</Text>
+          </View>
+          <View style={styles.badgeTopRight}>
+            <Ionicons name="star" size={10} color="#fff" style={{ marginRight: 2 }} />
+            <Text style={styles.badgeText}>{item.score ? item.score.toFixed(1) : 'N/A'}</Text>
+          </View>
+          <View style={styles.badgeBottomLeft}>
+            <Text style={styles.epText}>{item.broadcast?.time || '00:00'}</Text>
+          </View>
         </View>
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-      </View>
+        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>{item.broadcast?.string || 'Emisión semanal'}</Text>
+      </TouchableOpacity>
     );
   };
 
@@ -161,8 +210,12 @@ export default function AiringScreen({ navigation }: any) {
       <View style={{ height: 90 }} />
 
       <View style={styles.headerTitleContainer}>
-        <Ionicons name="radio-outline" size={28} color={colors.primary} />
-        <Text style={styles.pageTitle}>Emisión</Text>
+        <Text style={styles.superTitle}>EN VIVO</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.pageTitleWhite}>EMI</Text>
+          <Text style={styles.pageTitleRed}>SIÓN</Text>
+        </View>
+        <Text style={styles.pageSubtitle}>CALENDARIO DE EMISIÓN SEMANAL</Text>
       </View>
       
       <View style={styles.tabsContainer}>
@@ -170,29 +223,43 @@ export default function AiringScreen({ navigation }: any) {
           style={[styles.tabBtn, activeTab === 'local' && styles.tabBtnActive]}
           onPress={() => setActiveTab('local')}
         >
-          <Text style={[styles.tabText, activeTab === 'local' && styles.tabTextActive]}>Ver Disponibles</Text>
+          <Ionicons name="list" size={16} color={activeTab === 'local' ? '#fff' : '#666'} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabText, activeTab === 'local' && styles.tabTextActive]}>VER DISPONIBLES</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.tabBtn, activeTab === 'calendar' && styles.tabBtnActive]}
+          style={[styles.tabBtn, activeTab === 'calendar' && styles.tabBtnActiveCalendar]}
           onPress={() => setActiveTab('calendar')}
         >
-          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive]}>Calendario Global</Text>
+          <Ionicons name="calendar-outline" size={16} color={activeTab === 'calendar' ? '#fff' : '#666'} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive]}>CALENDARIO GLOBAL</Text>
         </TouchableOpacity>
       </View>
 
-      {activeTab === 'calendar' && (
-        <View style={styles.daysContainer}>
-          {DAYS.map(d => (
-            <TouchableOpacity 
-              key={d.id} 
-              style={[styles.dayBtn, calendarDay === d.id && styles.dayBtnActive]}
-              onPress={() => setCalendarDay(d.id)}
-            >
-              <Text style={[styles.dayText, calendarDay === d.id && styles.dayTextActive]}>{d.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+      <View style={styles.daysContainer}>
+        {DAYS.map(d => (
+          <TouchableOpacity 
+            key={d.id} 
+            style={[styles.dayBtn, calendarDay === d.id && styles.dayBtnActive]}
+            onPress={() => {
+              setActiveTab('calendar');
+              setCalendarDay(d.id);
+            }}
+          >
+            <Text style={[styles.dayText, calendarDay === d.id && styles.dayTextActive]}>{d.label.toUpperCase()}</Text>
+            {calendarDay === d.id && <View style={styles.activeDayDot} />}
+          </TouchableOpacity>
+        ))}
+      </View>
+      
+      {/* Indicador del Día / Sección Hoy */}
+      <View style={styles.sectionHeaderBox}>
+        <View style={styles.sectionHeaderDot} />
+        <Text style={styles.sectionHeaderText}>
+          {activeTab === 'calendar' 
+            ? DAYS.find(d => d.id === calendarDay)?.label.toUpperCase() 
+            : 'HOY'}
+        </Text>
+      </View>
 
       {activeTab === 'local' && (
         loading ? (
@@ -260,99 +327,180 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   headerTitleContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E50914',
+    marginLeft: 20,
+    paddingLeft: 16,
+  },
+  superTitle: {
+    color: '#E50914',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 4,
   },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginLeft: 10,
+  pageTitleWhite: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  pageTitleRed: {
+    color: '#E50914',
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  pageSubtitle: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    marginBottom: 16,
-    gap: 10,
+    marginBottom: 24,
+    gap: 12,
   },
   tabBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   tabBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#E50914',
+  },
+  tabBtnActiveCalendar: {
+    backgroundColor: '#E50914',
   },
   tabText: {
-    color: colors.textGray,
-    fontWeight: 'bold',
+    color: '#666',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 1,
   },
   tabTextActive: {
     color: '#fff',
   },
   daysContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  dayBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    position: 'relative',
+  },
+  dayBtnActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#E50914',
+  },
+  dayText: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  dayTextActive: {
+    color: '#fff',
+  },
+  activeDayDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 4,
+    height: 4,
+    backgroundColor: '#E50914',
+  },
+  sectionHeaderBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 16,
   },
-  dayBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+  sectionHeaderDot: {
+    width: 6,
+    height: 6,
+    backgroundColor: '#E50914',
+    marginRight: 8,
   },
-  dayBtnActive: {
-    backgroundColor: colors.cardLight,
-  },
-  dayText: {
-    color: colors.textGray,
+  sectionHeaderText: {
+    color: '#E50914',
     fontSize: 12,
-    fontWeight: 'bold',
-  },
-  dayTextActive: {
-    color: colors.text,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   gridContainer: {
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
   card: {
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  posterBox: {
+    width: '100%',
+    backgroundColor: '#000',
     position: 'relative',
+    marginBottom: 8,
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
-    backgroundColor: colors.card,
+  },
+  badgeTopLeft: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: '#E50914',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeTopRight: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeBottomLeft: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  epText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontWeight: '700',
   },
   title: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '500',
-    marginTop: 8,
-    textAlign: 'center',
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
   },
-  episodesBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  episodesText: {
-    color: colors.primary,
+  subtitle: {
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 10,
-    fontWeight: 'bold',
   },
   center: {
     flex: 1,
