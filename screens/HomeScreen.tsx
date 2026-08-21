@@ -107,7 +107,7 @@ export default function HomeScreen({ navigation }: Props) {
         finished: ContentItem[],
         upcoming: ContentItem[]
     ): ContentItem[] => {
-        const allItems = [...finished, ...upcoming];
+        const allItems = [...airing, ...finished, ...upcoming];
 
         // Eliminar duplicados por id
         const seen = new Set<number>();
@@ -117,29 +117,10 @@ export default function HomeScreen({ navigation }: Props) {
             return true;
         });
 
-        // Score compuesto para ordenar
-        const scoreItem = (item: ContentItem & { status?: string; total_episodes?: number }) => {
-            let score = 0;
-            const rating = typeof item.vote_average === 'number' ? item.vote_average : 0;
-            score += rating * 10;
+        // Barajar aleatoriamente para que "Destacados" no sea idéntico a ninguna otra fila
+        const shuffled = unique.sort(() => 0.5 - Math.random());
 
-            if (typeof (item as any).total_episodes === 'number' && (item as any).total_episodes > 0) {
-                score += 15;
-            }
-
-            if (item.release_date) {
-                const year = new Date(item.release_date).getFullYear();
-                const currentYear = new Date().getFullYear();
-                if (year >= currentYear - 1) score += 8;
-                if (year >= currentYear) score += 5;
-            }
-
-            return score;
-        };
-
-        return unique
-            .sort((a, b) => scoreItem(b as any) - scoreItem(a as any))
-            .slice(0, 12); 
+        return shuffled.slice(0, 12); 
     };
 
     useEffect(() => {
