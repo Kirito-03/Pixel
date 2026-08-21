@@ -235,21 +235,23 @@ export default function AiringScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.daysContainer}>
-        {DAYS.map(d => (
-          <TouchableOpacity 
-            key={d.id} 
-            style={[styles.dayBtn, calendarDay === d.id && styles.dayBtnActive]}
-            onPress={() => {
-              setActiveTab('calendar');
-              setCalendarDay(d.id);
-            }}
-          >
-            <Text style={[styles.dayText, calendarDay === d.id && styles.dayTextActive]}>{d.label.toUpperCase()}</Text>
-            {calendarDay === d.id && <View style={styles.activeDayDot} />}
-          </TouchableOpacity>
-        ))}
-      </View>
+      {activeTab === 'calendar' && (
+        <View style={styles.daysContainer}>
+          {DAYS.map(d => (
+            <TouchableOpacity 
+              key={d.id} 
+              style={[styles.dayBtn, calendarDay === d.id && styles.dayBtnActive]}
+              onPress={() => {
+                setActiveTab('calendar');
+                setCalendarDay(d.id);
+              }}
+            >
+              <Text style={[styles.dayText, calendarDay === d.id && styles.dayTextActive]}>{d.label.toUpperCase()}</Text>
+              {calendarDay === d.id && <View style={styles.activeDayDot} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       
       {/* Indicador del Día / Sección Hoy */}
       <View style={styles.sectionHeaderBox}>
@@ -295,7 +297,12 @@ export default function AiringScreen({ navigation }: any) {
       {activeTab === 'calendar' && (
         calendarLoading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color={'#E50914'} />
+          </View>
+        ) : calendarData.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="calendar-outline" size={48} color={'#666'} />
+            <Text style={styles.errorText}>No hay animes programados para este día.</Text>
           </View>
         ) : (
           <FlatList
