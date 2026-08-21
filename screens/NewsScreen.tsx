@@ -127,8 +127,8 @@ export default function NewsScreen() {
   const hero = featured ? toNewsItem(featured) : null;
   const grid = items.filter((n) => n.slug !== featured?.slug).map(toNewsItem);
 
-  // En web 3 columnas, mobile 1 columna
-  const columns = isSmallScreen ? 1 : 3;
+  // En web 5 columnas, mobile 2 o 1
+  const columns = isSmallScreen ? 1 : width < 1024 ? 3 : 5;
 
   // Chunks para el grid
   const chunks: typeof grid[] = [];
@@ -154,8 +154,12 @@ export default function NewsScreen() {
         {/* ── PAGE HEADER ── */}
         <SafeAreaView>
           <View style={styles.pageHeader}>
-            <Text style={styles.pageTitle}>Noticias</Text>
-            <Text style={styles.pageSubtitle}>Las últimas novedades del mundo del anime</Text>
+            <Text style={styles.superTitle}>ÚLTIMAS NOVEDADES</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.pageTitleWhite}>NOTI</Text>
+              <Text style={styles.pageTitleRed}>CIAS</Text>
+            </View>
+            <Text style={styles.pageSubtitle}>DEL MUNDO DEL ANIME Y MANGA</Text>
           </View>
         </SafeAreaView>
 
@@ -265,16 +269,35 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 24,
   },
-  pageTitle: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+  superTitle: {
+    color: '#E50914',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
     marginBottom: 4,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  pageTitleWhite: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  pageTitleRed: {
+    color: '#E50914',
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
   pageSubtitle: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
 
   /* SECTION */

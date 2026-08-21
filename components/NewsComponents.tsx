@@ -105,7 +105,7 @@ export function NewsHero({ item, onPress }: NewsHeroProps) {
         <View style={styles.heroContent}>
           {/* Badge + Fecha */}
           <View style={styles.heroMeta}>
-            <View style={[styles.badge, { backgroundColor: BADGE_COLORS[item.badge] }]}>
+            <View style={[styles.badge, { backgroundColor: BADGE_COLORS[item.badge] || '#E50914' }]}>
               <Text style={styles.badgeText}>{item.badge.toUpperCase()}</Text>
             </View>
             <View style={styles.dateRow}>
@@ -119,6 +119,15 @@ export function NewsHero({ item, onPress }: NewsHeroProps) {
 
           {/* Descripción */}
           <Text style={styles.heroDesc} numberOfLines={2}>{item.description}</Text>
+          
+          <Text style={styles.heroReadMore}>LEER ARTÍCULO {'>'}</Text>
+        </View>
+        
+        {/* Tres cuadritos rojos inferiores derechos */}
+        <View style={styles.heroSquares}>
+          <View style={styles.heroSquare} />
+          <View style={styles.heroSquare} />
+          <View style={styles.heroSquare} />
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -237,9 +246,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     borderRadius: 0,
     overflow: 'hidden',
+    borderLeftWidth: 4,
+    borderLeftColor: '#E50914',
   },
   heroCard: {
-    height: 340,
+    height: 380,
     borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#111',
@@ -278,6 +289,25 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.65)',
     fontSize: 14,
     lineHeight: 20,
+    marginBottom: 16,
+  },
+  heroReadMore: {
+    color: '#E50914',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  heroSquares: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  heroSquare: {
+    width: 6,
+    height: 6,
+    backgroundColor: '#E50914',
   },
 
   /* BADGE */
@@ -308,7 +338,7 @@ const styles = StyleSheet.create({
     borderColor: '#E50914',
   },
   cardImageBox: {
-    height: 160,
+    height: 240,
     backgroundColor: '#1a1a1a',
     position: 'relative',
   },
