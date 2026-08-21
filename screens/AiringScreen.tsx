@@ -54,12 +54,28 @@ export default function AiringScreen({ navigation }: any) {
   const fetchCalendar = async (day: string) => {
     try {
       setCalendarLoading(true);
+      setCalendarData([]); // Clear previous data immediately
+      
       // Llamamos al backend proxy para evitar CORS en web
       const baseURL = getCurrentBaseURL() || 'http://localhost:3001';
       const res = await axios.get(`${baseURL}/api/schedules?filter=${day}`);
-      setCalendarData(res.data.data || []);
+      
+      const rawData = res.data?.data || [];
+      
+      // Deduplicate by mal_id
+      const uniqueItems: any[] = [];
+      const seenMalIds = new Set<number>();
+      for (const item of rawData) {
+        if (!seenMalIds.has(item.mal_id)) {
+          seenMalIds.add(item.mal_id);
+          uniqueItems.push(item);
+        }
+      }
+      
+      setCalendarData(uniqueItems);
     } catch (err) {
       console.error('[AiringScreen] Error cargando calendario:', err);
+      setCalendarData([]); // Ensure it's cleared on error
     } finally {
       setCalendarLoading(false);
     }
