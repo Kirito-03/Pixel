@@ -231,11 +231,15 @@ export default function SearchScreen() {
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>Buscar</Text>
-          {/* Espacio simétrico */}
-          <View style={styles.backBtn} />
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.superTitle}>EXPLORA</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.pageTitleWhite}>BÚS</Text>
+              <Text style={styles.pageTitleRed}>QUEDA</Text>
+            </View>
+          </View>
         </View>
       </SafeAreaView>
 
@@ -327,6 +331,7 @@ export default function SearchScreen() {
                 recordRecentSearch(text);
               }}
             >
+              <Ionicons name="time-outline" size={16} color="#666" style={{ marginRight: 10 }} />
               <Text style={styles.recentText}>{text}</Text>
             </TouchableOpacity>
           ))}
@@ -342,9 +347,12 @@ export default function SearchScreen() {
         )}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            {query ? 'No se encontraron resultados' : 'Busca tus películas favoritas'}
-          </Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search-outline" size={48} color="#444" style={{ marginBottom: 16 }} />
+            <Text style={styles.empty}>
+              {query ? 'No se encontraron resultados.' : 'Busca tus series o películas favoritas.'}
+            </Text>
+          </View>
         }
       />
 
@@ -382,42 +390,62 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   backBtn: {
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginRight: 10,
   },
-  topTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+  headerTitleContainer: {
+    flex: 1,
+  },
+  superTitle: {
+    color: '#888',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 2,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  pageTitleWhite: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  pageTitleRed: {
+    color: '#E50914',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -1,
   },
 
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
-    margin: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    paddingHorizontal: 16,
   },
   searchIcon: {
-    marginRight: spacing.sm,
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    color: colors.text,
-    padding: spacing.md,
+    color: '#FFF',
+    paddingVertical: 14,
     fontSize: 16,
+    fontWeight: '500',
   },
   loadingIndicator: {
     marginRight: spacing.sm,
@@ -428,32 +456,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   suggestionsContainer: {
-    marginHorizontal: spacing.md,
+    marginHorizontal: 20,
     marginBottom: spacing.sm,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#333',
     overflow: 'hidden',
-    ...shadows.md,
   },
   recentContainer: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm,
-    ...shadows.sm,
+    marginHorizontal: 20,
+    marginBottom: 24,
   },
   recentTitle: {
-    color: colors.textGray,
-    fontSize: 13,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.xs,
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 12,
   },
   suggestionRow: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#333',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -467,10 +493,11 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   recentRow: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#333',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
   },
   suggestionText: {
     color: colors.text,
@@ -481,29 +508,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    borderRadius: borderRadius.sm,
+    borderRadius: 2,
   },
   suggestionType: {
     color: colors.text,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   recentText: {
-    color: colors.text,
+    color: '#CCC',
     fontSize: 14,
+    fontWeight: '500',
   },
   list: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 20,
     paddingBottom: spacing.lg,
   },
   columns: {
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 80,
+  },
   empty: {
-    color: colors.textGray,
+    color: '#666',
     textAlign: 'center',
-    marginTop: spacing.xl,
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
