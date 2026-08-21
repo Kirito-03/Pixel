@@ -88,7 +88,8 @@ export default function MangaScreen() {
     };
   }, [activeFilter, search, isSmallScreen]);
 
-  const columns = isSmallScreen ? 2 : 6;
+  // 8 columnas en pantallas grandes para evitar el espacio negro
+  const columns = isSmallScreen ? 2 : 8;
   const mapped = useMemo(() => items.map(toUI), [items]);
   const chunks: typeof mapped[] = [];
   for (let i = 0; i < mapped.length; i += columns) {
@@ -159,7 +160,7 @@ export default function MangaScreen() {
                   ))}
                   {/* Fill empty spaces in last row if needed (Flexbox) */}
                   {Array.from({ length: columns - row.length }).map((_, fIdx) => (
-                    <View key={`fill-${rIdx}-${fIdx}`} style={{ flex: 1, minWidth: 140, maxWidth: 200 }} />
+                    <View key={`fill-${rIdx}-${fIdx}`} style={{ flex: 1, minWidth: 140 }} />
                   ))}
                 </View>
               ))}
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
   headerArea: {
     backgroundColor: '#050505',
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: Platform.OS === 'web' ? 80 : 50, // Added padding to clear the absolute Header
     paddingBottom: 10,
     zIndex: 10,
   },

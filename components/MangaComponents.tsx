@@ -231,7 +231,7 @@ export function MangaFilterChips({ active, onChange }: FilterChipsProps) {
 // ─────────────────────────────────────────────
 const styles = StyleSheet.create({
   /* CARD */
-  cardOuter: { flex: 1, minWidth: 140, maxWidth: 200 },
+  cardOuter: { flex: 1, minWidth: 140 },
   card: {
     backgroundColor: 'transparent',
   },
