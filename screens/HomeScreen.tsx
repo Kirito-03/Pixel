@@ -35,16 +35,6 @@ export default function HomeScreen({ navigation }: Props) {
 
     const scrollViewRef = useRef<ScrollView>(null);
     const { height: screenHeight } = Dimensions.get('window');
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const loadingMoreRef = useRef<boolean>(false);
-    const loadedRowKeysRef = useRef<Set<string>>(new Set());
-    const [extraRows, setExtraRows] = useState<{ key: string; title: string; items: ContentItem[] }[]>([]);
-    const [categorySequenceIndex, setCategorySequenceIndex] = useState(0);
-    const [pagesByCategory, setPagesByCategory] = useState<Record<string, number>>({
-        airing: 1,
-        finished: 1,
-        upcoming: 1,
-    });
 
     const CATEGORY_LABELS: Record<string, string> = {
         airing: 'En emisión',
@@ -216,15 +206,8 @@ export default function HomeScreen({ navigation }: Props) {
     };
 
     const handleScroll = (event: any) => {
-        const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
-        const scrollY = contentOffset.y;
-        setBlackHeader(scrollY > 10);
-
-        const paddingToBottom = 80;
-        const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-        if (isAtBottom && !isLoadingMore) {
-            loadMoreContent();
-        }
+        const { contentOffset } = event.nativeEvent;
+        setBlackHeader(contentOffset.y > 10);
     };
 
     const handleContentPress = (item: ContentItem) => {
@@ -238,76 +221,9 @@ export default function HomeScreen({ navigation }: Props) {
     const handleFilterChange = (filter: 'series' | 'movies' | 'all' | 'anime') => {
         setContentFilter(filter);
         setSelectedCategory(null);
-        setExtraRows([]);
-        setCategorySequenceIndex(0);
-        loadedRowKeysRef.current = new Set();
-        setPagesByCategory({ airing: 1, finished: 1, upcoming: 1 });
     };
 
-    const loadMoreContent = async () => {
-        try {
-            if (loadingMoreRef.current) return;
-            loadingMoreRef.current = true;
-            setIsLoadingMore(true);
 
-            const pool = CATEGORY_POOLS[contentFilter];
-            if (!pool || pool.length === 0) return;
-
-            const batchSize = 3;
-            const newExtraRows: { key: string; title: string; items: ContentItem[] }[] = [];
-            const updatedPages: Record<string, number> = { ...pagesByCategory };
-
-            for (let i = 0; i < batchSize; i++) {
-                const idx = (categorySequenceIndex + i) % pool.length;
-                const categoryId = pool[idx];
-                const nextPage = (updatedPages[categoryId] || 1) + 1;
-                const status =
-                    categoryId === 'airing' ? 'Airing' : (categoryId === 'finished' ? 'Finished' : 'Upcoming');
-                const response = await catalogService.getAnimeList({ status, page: nextPage, limit: 20 });
-                const items = (response?.data || []).map(mapCatalogAnimeToContentItem);
-
-                if (items.length > 0) {
-                    const seen = new Set<string>();
-                    const uniqueItems = items.filter(item => {
-                        const key = `${item.source}_${item.id}`;
-                        if (seen.has(key)) return false;
-                        seen.add(key);
-                        return true;
-                    });
-                    const rowKey = `${categoryId}_page_${nextPage}`;
-                    if (!loadedRowKeysRef.current.has(rowKey)) {
-                        newExtraRows.push({
-                            key: rowKey,
-                            title: CATEGORY_LABELS[categoryId],
-                            items: uniqueItems,
-                        });
-                        loadedRowKeysRef.current.add(rowKey);
-                    }
-                }
-
-                updatedPages[categoryId] = nextPage;
-            }
-
-            setCategorySequenceIndex(prev => (prev + batchSize) % pool.length);
-            setPagesByCategory(updatedPages);
-
-            if (newExtraRows.length > 0) {
-                setExtraRows(prev => {
-                    const all = [...prev, ...newExtraRows];
-                    const map = new Map<string, { key: string; title: string; items: ContentItem[] }>();
-                    for (const r of all) {
-                        if (!map.has(r.key)) map.set(r.key, r);
-                    }
-                    return Array.from(map.values());
-                });
-            }
-        } catch (error) {
-            console.error('Error loading more content:', error);
-        } finally {
-            setIsLoadingMore(false);
-            loadingMoreRef.current = false;
-        }
-    };
 
     const handleCategorySelect = (categoryId: string, categoryName: string) => {
         navigation.navigate('Categoria', { categoryId, categoryName });
@@ -526,25 +442,7 @@ export default function HomeScreen({ navigation }: Props) {
                         </View>
                     )}
 
-                    {/* Filas adicionales cargadas dinámicamente al llegar al final */}
-                    {extraRows.map((row) => (
-                        <MovieRow
-                            key={row.key}
-                            title={row.title}
-                            accentColor={SECTION_ACCENTS[row.key.split('_')[0]] || colors.primary}
-                            movies={filterContent(row.items)}
-                            onMoviePress={(id) => {
-                                const item = row.items.find(i => i.id === id);
-                                if (item) handleContentNavigation(item);
-                            }}
-                        />
-                    ))}
 
-                    {isLoadingMore && (
-                        <View style={styles.loadingMore}>
-                            <ActivityIndicator size="small" color={colors.primary} />
-                        </View>
-                    )}
                 </View>
             </ScrollView>
 
