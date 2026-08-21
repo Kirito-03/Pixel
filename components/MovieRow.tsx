@@ -85,6 +85,7 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
         <FlatList
           ref={flatListRef}
           data={movies}
+          extraData={hoveredId}
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.id.toString()}
@@ -95,8 +96,11 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
               isFirst={index === 0}
               isLast={index === movies.length - 1}
               onHoverChange={(isHovered) => {
-                if (isHovered) setHoveredId(item.id);
-                else if (hoveredId === item.id) setHoveredId(null);
+                if (isHovered) {
+                  setHoveredId(item.id);
+                } else {
+                  setHoveredId((prev) => prev === item.id ? null : prev);
+                }
               }}
             />
           )}
@@ -104,7 +108,7 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
             const item = movies[index];
             const isHovered = item && item.id === hoveredId;
             return (
-              <View style={[style, { zIndex: isHovered ? 9999 : 1, elevation: isHovered ? 9999 : 1 }]} {...props}>
+              <View style={[style, { zIndex: isHovered ? 9999 : 1, elevation: isHovered ? 9999 : 1, overflow: 'visible' }]} {...props}>
                 {children}
               </View>
             );
