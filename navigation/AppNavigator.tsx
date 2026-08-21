@@ -23,6 +23,7 @@ import MangaDetailScreen from '../screens/MangaDetailScreen';
 import MangaReaderScreen from '../screens/MangaReaderScreen';
 import AppearanceScreen from '../screens/AppearanceScreen';
 import AiringScreen from '../screens/AiringScreen';
+import LegalScreen from '../screens/LegalScreen';
 
 // ── Admin Screens: code-split on web, static on native ─────────
 // React.lazy only works on web (React DOM). On native, React Native
@@ -417,6 +418,7 @@ export default function AppNavigator() {
           <>
             <RootStack.Screen name="Ingreso" component={LoginScreen} />
             <RootStack.Screen name="Registro" component={RegisterScreen} />
+            <RootStack.Screen name="LegalScreen" component={LegalScreen} />
           </>
         ) : (
           <>
@@ -433,6 +435,7 @@ export default function AppNavigator() {
             )}
             <RootStack.Screen name="Apariencia" component={AppearanceScreen} />
             <RootStack.Screen name="Descargas" component={DownloadsScreen as any} />
+            <RootStack.Screen name="LegalScreen" component={LegalScreen} />
             {isAdmin && <RootStack.Screen name="Admin" component={AdminNavigator} />}
           </>
         )}

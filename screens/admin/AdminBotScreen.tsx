@@ -215,7 +215,7 @@ export default function AdminBotScreen() {
         {/* Header - Netflix Style */}
         <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <Ionicons name="hardware-chip" size={24} color={darkColors.primary} />
+            <Ionicons name="star" size={24} color="#FF0000" />
           </View>
           <View>
             <Text style={styles.headerTitle}>Bot Inteligente</Text>
@@ -499,8 +499,8 @@ const styles = StyleSheet.create({
   },
   headerIcon: {
     width: 48, height: 48, borderRadius: 0,
-    backgroundColor: darkColors.primary + '20',
-    borderWidth: 1, borderColor: darkColors.primary + '50',
+    backgroundColor: '#FF0000' + '20',
+    borderWidth: 1, borderColor: '#FF0000',
     justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { fontSize: 22, fontWeight: '800', color: darkColors.text, letterSpacing: -0.5 },
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 24, paddingBottom: 40 },
   maxWidthContainer: {
     width: '100%',
-    maxWidth: 1600,
+    maxWidth: '100%', // El usuario dijo que había mucho espacio libre a los lados
     marginHorizontal: 'auto',
     alignSelf: 'center',
   },
@@ -555,19 +555,20 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   leftCol: {
-    flex: 1,
+    flex: 1.2, // Darle un poco más de espacio a los forms si es necesario, o al revés
     gap: 20,
   },
   rightCol: {
-    flex: 1,
-    minHeight: 600,
+    flex: 1.8, // Para que el terminal (creaper) sea ancho
+    minHeight: 500,
   },
 
   card: {
     backgroundColor: darkColors.card,
     borderWidth: 1,
     borderColor: '#222',
-    padding: 20,
+    padding: 24,
+    borderRadius: 0, // Cuadrado puro
   },
   cardHeader: {
     flexDirection: 'row',
@@ -610,30 +611,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a', 
     borderWidth: 1,
     borderColor: '#333',
-    padding: 12, 
+    padding: 14, // Inputs un poco más grandes
     color: darkColors.text, 
     fontSize: 14,
+    borderRadius: 0, // Cuadrado puro
   },
   
   sourceRow: { flexDirection: 'row', gap: 6 },
   sourceBtn: {
-    flex: 1, paddingVertical: 10, paddingHorizontal: 6,
+    flex: 1, paddingVertical: 14, paddingHorizontal: 6,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#0a0a0a', borderWidth: 1, borderColor: '#333',
+    borderRadius: 0,
   },
   sourceBtnActive: { backgroundColor: darkColors.primary + '20', borderColor: darkColors.primary },
-  sourceBtnText: { fontSize: 12, fontWeight: '600', color: darkColors.textGray },
+  sourceBtnText: { fontSize: 13, fontWeight: '700', color: darkColors.textGray },
   sourceBtnTextActive: { color: darkColors.primary },
 
-  actionGrid: { flexDirection: 'row', gap: 8, marginTop: 20 },
+  actionGrid: { flexDirection: 'row', gap: 12, marginTop: 24 },
   btn: {
-    flex: 1, paddingVertical: 12, paddingHorizontal: 12,
+    flex: 1, paddingVertical: 18, paddingHorizontal: 12, // Botones muy grandes
     alignItems: 'center', justifyContent: 'center',
+    borderRadius: 0, // Cuadrado puro
   },
   btnPrimary: { backgroundColor: darkColors.primary },
-  btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 13, textTransform: 'uppercase' },
+  btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 14, textTransform: 'uppercase' },
   btnSecondary: { backgroundColor: '#1f1f1f', borderWidth: 1, borderColor: '#333' },
-  btnSecondaryText: { color: darkColors.text, fontWeight: '700', fontSize: 13, textTransform: 'uppercase' },
+  btnSecondaryText: { color: darkColors.text, fontWeight: '700', fontSize: 14, textTransform: 'uppercase' },
   btnDisabled: { opacity: 0.4 },
   
   errorText: { marginTop: 12, color: '#ef4444', fontWeight: '700', fontSize: 13 },
@@ -655,7 +659,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#050505',
     borderWidth: 1,
     borderColor: '#333',
-    height: 600,
+    height: 500, // Menos altura para que "no baje demasiado"
+    borderRadius: 0, // Cuadrado puro
     shadowColor: darkColors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,

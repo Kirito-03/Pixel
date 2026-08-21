@@ -119,6 +119,72 @@
                             <tr>
                                 <td colspan="5" style="text-align: center; padding: 2rem;">
                                     <div class="loading"></div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img id="user-avatar" src="" alt="Avatar" class="user-avatar">
+                    <div class="user-details">
+                        <h3 id="user-name">Cargando...</h3>
+                        <p id="user-email">...</p>
+                    </div>
+                </div>
+                <button id="logout-btn" class="logout-btn">Cerrar Sesión</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1>Dashboard</h1>
+                <p>Resumen general del panel de administración</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total de Anime</h3>
+                    <div class="value" id="total-anime">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Total de Episodios</h3>
+                    <div class="value" id="total-episodes">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Google Drive</h3>
+                    <div class="value" id="gdrive-count">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <h3>Almacenamiento Local</h3>
+                    <div class="value" id="local-count">-</div>
+                </div>
+            </div>
+
+            <!-- Recent Anime -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Anime Agregados Recientemente</h2>
+                    <a href="./anime-list.html" class="btn btn-secondary">Ver Todos</a>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Título</th>
+                                <th>Estado</th>
+                                <th>Episodios</th>
+                                <th>Fecha</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-anime-table">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 2rem;">
+                                    <div class="loading"></div>
                                 </td>
                             </tr>
                         </tbody>
@@ -127,6 +193,38 @@
             </div>
         </main>
     </div>
+
+    <!-- Banner de Cookies -->
+    <div id="cookie-banner" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background-color: #1a1a1a; padding: 15px 20px; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #333;">
+        <p style="margin: 0; color: #ccc; font-size: 14px; max-width: 80%;">
+            Usamos cookies para administrar las sesiones de administrador y analíticas básicas. 
+            Al continuar usando este panel, aceptas nuestro uso de cookies.
+        </p>
+        <button id="accept-cookies" style="background-color: #E50914; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 500;">Aceptar</button>
+    </div>
+
+    <footer style="text-align: center; padding: 20px; color: #666; font-size: 12px; margin-top: 20px;">
+        <a href="#" style="color: #999; text-decoration: none; margin: 0 10px;">Política de Privacidad</a> | 
+        <a href="#" style="color: #999; text-decoration: none; margin: 0 10px;">Términos y Condiciones</a>
+        <br><br>
+        &copy; 2026 Pixel no Sekai Admin. Todos los derechos reservados.
+    </footer>
+
+    <script>
+        // Lógica simple del banner de cookies
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!localStorage.getItem('admin_cookie_consent')) {
+                document.getElementById('cookie-banner').style.display = 'flex';
+            } else {
+                document.getElementById('cookie-banner').style.display = 'none';
+            }
+
+            document.getElementById('accept-cookies').addEventListener('click', function() {
+                localStorage.setItem('admin_cookie_consent', 'true');
+                document.getElementById('cookie-banner').style.display = 'none';
+            });
+        });
+    </script>
 
     <script src="./js/api.js"></script>
     <script src="./js/dashboard.js"></script>

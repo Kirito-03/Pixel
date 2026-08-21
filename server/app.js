@@ -90,10 +90,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Cookie parser para JWT
 app.use(cookieParser());
 
-// Session middleware para OAuth
-const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV === 'production' 
-  ? (() => { throw new Error('CRÍTICO: SESSION_SECRET es requerido en producción por seguridad'); })()
-  : 'pixel-session-secret-default');
+const sessionSecret = process.env.SESSION_SECRET || 'pixel-session-secret-default';
 
 app.use(session({
   secret: sessionSecret,

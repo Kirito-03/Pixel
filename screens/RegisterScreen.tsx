@@ -45,6 +45,7 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [legalConsent, setLegalConsent] = useState(false);
   const fileInputRef = React.useRef<any>(null);
 
   const [googleRequest, googleResponse, googlePromptAsync] = GoogleAuth.useIdTokenAuthRequest({
@@ -68,6 +69,7 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const newErrors: { [key: string]: string } = {};
     if (!profileName.trim()) newErrors.profileName = 'El nombre del perfil es requerido';
     if (!selectedImageUri) newErrors.avatar = 'Debes seleccionar una foto de perfil';
+    if (!legalConsent) newErrors.legal = 'Debes aceptar los Términos y la Política de Privacidad';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -368,6 +370,19 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         onChange={handleWebFileSelect}
       />
 
+      <TouchableOpacity 
+        style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 10 }}
+        onPress={() => { setLegalConsent(!legalConsent); clearError('legal'); }}
+      >
+        <View style={{ width: 24, height: 24, borderWidth: 2, borderColor: legalConsent ? '#E50914' : '#ccc', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginRight: 10, backgroundColor: legalConsent ? '#E50914' : 'transparent' }}>
+          {legalConsent && <Ionicons name="checkmark" size={16} color="#fff" />}
+        </View>
+        <Text style={{ color: '#121212', fontSize: 14 }}>
+          He leído y acepto los <Text style={{ textDecorationLine: 'underline' }} onPress={() => navigation.navigate('LegalScreen', { type: 'terms' })}>Términos</Text> y la <Text style={{ textDecorationLine: 'underline' }} onPress={() => navigation.navigate('LegalScreen', { type: 'privacy' })}>Política de Privacidad</Text>
+        </Text>
+      </TouchableOpacity>
+      {errors.legal && <Text style={[webStyles.errorText, { marginTop: -15, marginBottom: 15 }]}>{errors.legal}</Text>}
+
       <View style={[webStyles.buttonRow, { marginBottom: 21 }]}>
         <TouchableOpacity style={webStyles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={18} color="#666" />
@@ -538,6 +553,19 @@ const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         />
       </View>
       {errors.profileName && <Text style={mobileStyles.errorText}>{errors.profileName}</Text>}
+
+      <TouchableOpacity 
+        style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 10, paddingRight: 20 }}
+        onPress={() => { setLegalConsent(!legalConsent); clearError('legal'); }}
+      >
+        <View style={{ width: 22, height: 22, borderWidth: 2, borderColor: legalConsent ? '#E50914' : '#ccc', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginRight: 10, backgroundColor: legalConsent ? '#E50914' : 'transparent' }}>
+          {legalConsent && <Ionicons name="checkmark" size={14} color="#fff" />}
+        </View>
+        <Text style={{ color: '#121212', fontSize: 13, flex: 1 }}>
+          He leído y acepto los <Text style={{ textDecorationLine: 'underline', color: '#E50914' }} onPress={(e) => { e.stopPropagation(); navigation.navigate('LegalScreen', { type: 'terms' }); }}>Términos</Text> y la <Text style={{ textDecorationLine: 'underline', color: '#E50914' }} onPress={(e) => { e.stopPropagation(); navigation.navigate('LegalScreen', { type: 'privacy' }); }}>Política de Privacidad</Text>
+        </Text>
+      </TouchableOpacity>
+      {errors.legal && <Text style={[mobileStyles.errorText, { marginTop: -15, marginBottom: 15 }]}>{errors.legal}</Text>}
 
       <View style={mobileStyles.buttonRow}>
         <TouchableOpacity style={mobileStyles.backButton} onPress={handleBack}>

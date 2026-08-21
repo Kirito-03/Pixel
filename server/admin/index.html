@@ -34,6 +34,42 @@
                 </button>
                 
                 <div class="info-box">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Netflix Clone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/admin.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <h1>Admin Panel</h1>
+                <p>Netflix Clone</p>
+            </div>
+            
+            <div class="login-content">
+                <h2>Iniciar Sesión</h2>
+                <p class="subtitle">Acceso exclusivo para administradores</p>
+                
+                <div id="error-message" class="error-message" style="display: none;"></div>
+                
+                <button id="google-login-btn" class="google-btn">
+                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+                        <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18L12.05 13.56c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9.003 18z" fill="#34A853"/>
+                        <path d="M3.964 10.712c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.96H.957C.347 6.175 0 7.55 0 9.002c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                        <path d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.426 0 9.003 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335"/>
+                    </svg>
+                    <span>Continuar con Google</span>
+                </button>
+                
+                <div class="info-box">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm1 12H7V7h2v5zm0-6H7V4h2v2z" fill="currentColor"/>
                     </svg>
@@ -42,6 +78,38 @@
             </div>
         </div>
     </div>
+
+    <!-- Banner de Cookies -->
+    <div id="cookie-banner" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background-color: #1a1a1a; padding: 15px 20px; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #333;">
+        <p style="margin: 0; color: #ccc; font-size: 14px; max-width: 80%;">
+            Usamos cookies para administrar las sesiones de administrador y analíticas básicas. 
+            Al continuar usando este panel, aceptas nuestro uso de cookies.
+        </p>
+        <button id="accept-cookies" style="background-color: #E50914; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 500;">Aceptar</button>
+    </div>
+
+    <footer style="text-align: center; padding: 20px; color: #666; font-size: 12px; margin-top: 20px;">
+        <a href="#" style="color: #999; text-decoration: none; margin: 0 10px;">Política de Privacidad</a> | 
+        <a href="#" style="color: #999; text-decoration: none; margin: 0 10px;">Términos y Condiciones</a>
+        <br><br>
+        &copy; 2026 Pixel no Sekai Admin. Todos los derechos reservados.
+    </footer>
+
+    <script>
+        // Lógica simple del banner de cookies
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!localStorage.getItem('admin_cookie_consent')) {
+                document.getElementById('cookie-banner').style.display = 'flex';
+            } else {
+                document.getElementById('cookie-banner').style.display = 'none';
+            }
+
+            document.getElementById('accept-cookies').addEventListener('click', function() {
+                localStorage.setItem('admin_cookie_consent', 'true');
+                document.getElementById('cookie-banner').style.display = 'none';
+            });
+        });
+    </script>
 
     <script src="./js/auth.js"></script>
 </body>

@@ -12,6 +12,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useMyList } from '../contexts/MyListContext';
 import { catalogService, CatalogAnime } from '../services/catalogService';
 import { useTabNavigation } from '../hooks/useTabNavigation';
+import ConsentModal from '../components/ConsentModal';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
@@ -547,6 +548,9 @@ export default function HomeScreen({ navigation }: Props) {
                 </View>
             </ScrollView>
 
+            <ConsentModal />
+
+            {/* Modal para Mostrar/Ocultar detalles (compartido con Home y Catálogo) */}
             <MovieModal
                 content={selectedContent}
                 visible={modalVisible}
