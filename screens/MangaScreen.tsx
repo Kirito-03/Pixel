@@ -35,15 +35,25 @@ export default function MangaScreen() {
     return Math.max(7.8, Math.min(9.8, base));
   };
 
-  const toUI = (m: Manga): MangaItemUI => ({
-    id: m.id,
-    title: m.title,
-    image: m.cover_url || '',
-    status: m.status,
-    rating: stableRating(m.id),
-    chapters: Number(m.chapter_count || 0),
-    updatedAt: m.updated_at || new Date().toISOString(),
-  });
+  const toUI = (m: Manga): MangaItemUI => {
+    let chapterNum: number | string = 0;
+    if (m.latest_chapter) {
+      const parsed = parseFloat(m.latest_chapter);
+      chapterNum = isNaN(parsed) ? m.latest_chapter : parsed;
+    } else if (m.chapter_count) {
+      chapterNum = m.chapter_count;
+    }
+
+    return {
+      id: m.id,
+      title: m.title,
+      image: m.cover_url || '',
+      status: m.status,
+      rating: stableRating(m.id),
+      chapters: chapterNum,
+      updatedAt: m.updated_at || new Date().toISOString(),
+    };
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +88,6 @@ export default function MangaScreen() {
     };
   }, [activeFilter, search, isSmallScreen]);
 
-  // Grid: chunks según columnas
   const columns = isSmallScreen ? 2 : 6;
   const mapped = useMemo(() => items.map(toUI), [items]);
   const chunks: typeof mapped[] = [];
@@ -88,7 +97,6 @@ export default function MangaScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header flotante */}
       <Header
         black
         activeSection="Manga"
@@ -100,79 +108,92 @@ export default function MangaScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        stickyHeaderIndices={[0]}
       >
-        {/* ── PAGE HEADER ── */}
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>Manga</Text>
-          <Text style={styles.pageSubtitle}>Lee tus manga favoritos en línea</Text>
-        </View>
-
-        {/* ── FILTROS ── */}
-        <View style={styles.section}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={18} color="rgba(255,255,255,0.45)" />
+        <View style={styles.headerArea}>
+          <Text style={styles.superTitle}>LEE EN LÍNEA</Text>
+          <Text style={styles.mainTitle}>
+            MANG<Text style={{color: '#E50914'}}>A</Text>
+          </Text>
+          
+          <View style={styles.searchWrapper}>
+            <View style={styles.searchRedLine} />
+            <Ionicons name="search" size={20} color="#444" style={{marginLeft: 16, marginRight: 12}} />
             <TextInput
+              style={[styles.searchInput, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}]}
+              placeholder="Buscar manga..."
+              placeholderTextColor="#444"
               value={search}
               onChangeText={setSearch}
-              placeholder="Buscar manga..."
-              placeholderTextColor="rgba(255,255,255,0.35)"
-              style={styles.searchInput}
-              autoCorrect={false}
-              autoCapitalize="none"
             />
-            {search.trim() ? (
-              <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.35)" onPress={() => setSearch('')} />
-            ) : null}
+            {loading && <ActivityIndicator size="small" color="#E50914" style={{ marginRight: 16 }} />}
           </View>
-          <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.filtersWrapper}>
+            <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
+            <Text style={styles.resultsCount}>{mapped.length} resultados</Text>
+          </View>
 
           {/* ── GRID DE CARDS ── */}
           {loading ? (
-            <View style={styles.loadingBox}>
+            <View style={styles.loaderContainer}>
               <ActivityIndicator size="large" color="#E50914" />
             </View>
           ) : mapped.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="book-outline" size={48} color="rgba(255,255,255,0.15)" />
-              <Text style={styles.emptyText}>No hay manga en esta categoría</Text>
+              <Text style={styles.emptyText}>No hay manga para este filtro.</Text>
             </View>
           ) : (
-            chunks.map((chunk, ci) => (
-              <View key={ci} style={styles.gridRow}>
-                {chunk.map(item => (
-                  <MangaCard key={item.id} item={item} onPress={() => navigation.navigate('MangaDetail', { id: item.id })} />
-                ))}
-                {/* Relleno si la fila no está completa */}
-                {chunk.length < columns &&
-                  Array.from({ length: columns - chunk.length }).map((_, i) => (
-                    <View key={`pad-${i}`} style={{ flex: 1 }} />
+            <View style={{ marginTop: 24, gap: 12 }}>
+              {chunks.map((row, rIdx) => (
+                <View key={`row-${rIdx}`} style={styles.gridRow}>
+                  {row.map((it) => (
+                    <MangaCard
+                      key={it.id}
+                      item={it}
+                      onPress={() => navigation.navigate('MangaDetail', { id: it.id })}
+                    />
                   ))}
-              </View>
-            ))
+                  {/* Fill empty spaces in last row if needed (Flexbox) */}
+                  {Array.from({ length: columns - row.length }).map((_, fIdx) => (
+                    <View key={`fill-${rIdx}-${fIdx}`} style={{ flex: 1, minWidth: 140, maxWidth: 200 }} />
+                  ))}
+                </View>
+              ))}
+            </View>
           )}
         </View>
 
-        {/* ── MÁS POPULARES ── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="flame" size={20} color="#E50914" />
-            <Text style={styles.sectionTitle}>Más populares esta semana</Text>
+        {/* ── POPULARES (RANKING) ── */}
+        {!search.trim() && popular.length > 0 && (
+          <View style={[styles.section, { marginTop: 40 }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Ranking Popular</Text>
+            </View>
+            <View style={styles.rankingGrid}>
+              {popular.map((p, idx) => (
+                <MangaRankingItem
+                  key={p.id}
+                  item={{
+                    id: p.id,
+                    title: p.title,
+                    image: p.cover_url || '',
+                    status: p.status,
+                    rating: stableRating(p.id),
+                    chapters: p.chapter_count || 0,
+                    rank: p.rank,
+                    updatedAt: p.updated_at || '',
+                  }}
+                  isTop={idx === 0}
+                  onPress={() => navigation.navigate('MangaDetail', { id: p.id })}
+                />
+              ))}
+            </View>
           </View>
-
-          {/* 3 columnas en web, 1 en mobile */}
-          <View style={isSmallScreen ? styles.rankingCol : styles.rankingGrid}>
-            {popular.map(item => (
-              <View
-                key={item.id}
-                style={isSmallScreen ? { width: '100%' } : styles.rankingCell}
-              >
-                <MangaRankingItem item={{ ...toUI(item), rank: item.rank }} onPress={() => navigation.navigate('MangaDetail', { id: item.id })} />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={{ height: 40 }} />
+        )}
       </ScrollView>
     </View>
   );
@@ -181,59 +202,79 @@ export default function MangaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#050505',
   },
-  scrollContent: {
-    paddingTop: 80,
-  },
-
-  /* PAGE HEADER */
-  pageHeader: {
+  headerArea: {
+    backgroundColor: '#050505',
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingTop: 10,
+    paddingBottom: 10,
+    zIndex: 10,
   },
-  pageTitle: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+  superTitle: {
+    color: '#E50914',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 3,
     marginBottom: 4,
   },
-  pageSubtitle: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 14,
+  mainTitle: {
+    color: '#FFF',
+    fontSize: 52,
+    fontWeight: '900',
+    letterSpacing: -2,
+    marginBottom: 20,
+    lineHeight: 52,
   },
-
-  /* SECTION */
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#222',
+    height: 48,
+    position: 'relative',
+    marginBottom: 10,
+  },
+  searchRedLine: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: '#E50914',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '500',
+    height: '100%',
+  },
+  scrollContent: {
+    paddingBottom: 60,
+  },
   section: {
     paddingHorizontal: 20,
     marginBottom: 36,
   },
-  searchBox: {
+  filtersWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    paddingBottom: 10,
   },
-  searchInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    paddingVertical: 0,
+  resultsCount: {
+    color: '#555',
+    fontSize: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 20,
   },
   sectionTitle: {
     color: '#FFFFFF',
@@ -241,39 +282,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.2,
   },
-
-  /* GRID */
   gridRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 12,
   },
-
-  /* EMPTY */
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
-    gap: 12,
   },
   emptyText: {
+    marginTop: 12,
     color: 'rgba(255,255,255,0.3)',
     fontSize: 14,
   },
-  loadingBox: {
-    paddingVertical: 40,
-    alignItems: 'center',
+  loaderContainer: {
+    minHeight: 200,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-
-  /* RANKING */
   rankingCol: { flexDirection: 'column' },
   rankingGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-  },
-  rankingCell: {
-    flex: 1,
-    minWidth: 260,
   },
 });

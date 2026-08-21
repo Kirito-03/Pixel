@@ -30,7 +30,7 @@ export interface MangaItemUI {
   image: string;
   status: MangaStatus;
   rating: number;
-  chapters: number;
+  chapters: number | string;
   updatedAt: string;
   popular?: boolean;
 }
@@ -101,19 +101,19 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
 
           {/* Overlay bottom */}
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.5)']}
-            style={StyleSheet.absoluteFillObject}
+            colors={['transparent', 'rgba(0,0,0,0.9)']}
+            style={styles.gradientOverlay}
             pointerEvents="none"
           />
 
           {/* Badge estado */}
           <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] }]}>
-            <Text style={styles.statusText}>{item.status}</Text>
+            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
           </View>
 
           {/* Rating */}
           <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={10} color="#FFD700" />
+            <Ionicons name="star" size={10} color="#FFF" />
             <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
           </View>
         </View>
@@ -122,15 +122,15 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
         <View style={styles.cardInfo}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
           <View style={styles.cardMeta}>
-            <Ionicons name="book-outline" size={11} color="rgba(255,255,255,0.45)" />
-            <Text style={styles.cardMetaText}>{item.chapters} capítulos</Text>
+            <Ionicons name="document-text-outline" size={10} color="rgba(255,255,255,0.45)" />
+            <Text style={styles.cardMetaText}>{item.chapters} caps.</Text>
+            {item.updatedAt && (
+              <>
+                <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.45)" style={{ marginLeft: 4 }} />
+                <Text style={styles.cardMetaText}>{formatDate(item.updatedAt)}</Text>
+              </>
+            )}
           </View>
-          {item.updatedAt && (
-            <View style={styles.cardMeta}>
-              <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.45)" />
-              <Text style={styles.cardMetaText}>{formatDate(item.updatedAt)}</Text>
-            </View>
-          )}
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -233,15 +233,19 @@ const styles = StyleSheet.create({
   /* CARD */
   cardOuter: { flex: 1, minWidth: 140, maxWidth: 200 },
   card: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'transparent',
   },
   posterBox: {
     height: 240,
     backgroundColor: '#1a1a1a',
+    position: 'relative',
+  },
+  gradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
   },
   fallbackWrap: {
     ...StyleSheet.absoluteFillObject,
@@ -274,53 +278,51 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
+    top: 0,
+    left: 0,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
   },
   statusText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   ratingBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 4,
   },
   ratingText: {
-    color: '#FFD700',
-    fontSize: 11,
-    fontWeight: '700',
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   cardInfo: {
-    padding: 12,
-    gap: 4,
+    paddingVertical: 8,
+    gap: 2,
   },
   cardTitle: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     marginBottom: 2,
   },
   cardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
   cardMetaText: {
     color: 'rgba(255,255,255,0.45)',
-    fontSize: 11,
+    fontSize: 9,
   },
 
   /* RANKING */
@@ -394,15 +396,13 @@ const styles = StyleSheet.create({
   chipsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 24,
   },
   chip: {
-    paddingHorizontal: 18,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#1E1E1E',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#0A0A0A',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   chipActive: {
     backgroundColor: '#E50914',
