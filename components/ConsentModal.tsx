@@ -7,8 +7,6 @@ export default function ConsentModal() {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
 
-  if (Platform.OS !== 'web') return null;
-
   useEffect(() => {
     const checkConsent = async () => {
       try {
@@ -41,7 +39,7 @@ export default function ConsentModal() {
     }
   };
 
-  if (!visible) return null;
+  if (!visible || Platform.OS !== 'web') return null;
 
   return (
     <Modal transparent animationType="slide" visible={visible}>
