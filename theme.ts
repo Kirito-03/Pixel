@@ -72,8 +72,8 @@ export const gradients = {
   shimmer: ['#1a1a1a', '#2a2a2a', '#1a1a1a'],
   overlay: ['transparent', 'rgba(0,0,0,0.8)'],
   overlayTop: ['rgba(0,0,0,0.6)', 'transparent'],
-  heroBottom: ['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)', '#000'],
-  heroLeft: ['rgba(0,0,0,0.95)', 'rgba(0,0,0,0.6)', 'transparent'],
+  heroBottom: ['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.6)', '#000'],
+  heroLeft: ['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.3)', 'transparent'],
   heroTop: ['rgba(0,0,0,0.5)', 'transparent'],
   cardOverlay: ['transparent', 'rgba(0,0,0,0.85)'],
 };
