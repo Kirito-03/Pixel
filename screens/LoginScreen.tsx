@@ -13,6 +13,7 @@ import {
   Modal,
   ActivityIndicator,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,9 @@ import AnimatedLeftPanel from '../components/AnimatedLeftPanel';
 import Loader from '../components/Loader';
 
 export default function LoginScreen({ navigation }: any) {
+  const { height: screenHeight } = useWindowDimensions();
+  const heroHeight = Math.max(180, screenHeight * 0.35); // 35% of screen, min 180px
+
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -337,13 +341,13 @@ export default function LoginScreen({ navigation }: any) {
       )}
 
       <ScrollView
-        contentContainerStyle={mobileStyles.scrollContent}
+        contentContainerStyle={[mobileStyles.scrollContent, { minHeight: screenHeight }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         bounces={false}
       >
         {/* ═══ TOP HERO SECTION (Black) ═══ */}
-        <View style={mobileStyles.topHero}>
+        <View style={[mobileStyles.topHero, { height: heroHeight }]}>
           {/* Animated Background */}
           <View style={StyleSheet.absoluteFillObject}>
              <AnimatedLeftPanel fullScreenMode={true} />
@@ -676,8 +680,6 @@ const mobileStyles = StyleSheet.create({
   
   // ── TOP HERO (Black) ──
   topHero: {
-    flex: 0.45,
-    minHeight: 250,
     width: '100%',
     backgroundColor: '#0a0a0a',
     position: 'relative',
@@ -701,7 +703,7 @@ const mobileStyles = StyleSheet.create({
 
   // ── BOTTOM FORM (White) ──
   bottomFormContainer: {
-    flex: 0.55,
+    flex: 1,
     backgroundColor: '#fff',
     marginTop: -20, // Overlap with top section
     position: 'relative',
