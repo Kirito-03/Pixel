@@ -142,7 +142,9 @@ export default function HomeScreen({ navigation }: Props) {
                 ? sections.airing
                 : (sections.finished.length ? sections.finished : sections.upcoming);
 
-            setFeaturedMovies(featuredBase.slice(0, 5).map(mapCatalogAnimeToAnimeDetail));
+            // Barajar aleatoriamente para que siempre sean diferentes
+            const shuffledFeatured = [...featuredBase].sort(() => 0.5 - Math.random());
+            setFeaturedMovies(shuffledFeatured.slice(0, 5).map(mapCatalogAnimeToAnimeDetail));
 
             // Construir sección Destacados
             const featured = buildFeaturedItems(

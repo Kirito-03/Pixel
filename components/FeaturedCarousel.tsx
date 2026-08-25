@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, FlatList, StyleSheet, useWindowDimensions, Animated, Platform, PanResponder } from 'react-native';
 import FeaturedMovie from './FeaturedMovie';
 import { MovieDetail, AnimeDetail } from '../types';
@@ -42,9 +42,9 @@ export default function FeaturedCarousel({ movies, onWatch, onMoreInfo }: Props)
     })
   ).current;
 
-  // Efecto de Fade al cambiar índice (Solo Android)
+  // Efecto de Fade al cambiar índice (Android & Web)
   useEffect(() => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === 'android' || Platform.OS === 'web') {
       fadeAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -73,7 +73,7 @@ export default function FeaturedCarousel({ movies, onWatch, onMoreInfo }: Props)
     const interval = setInterval(() => {
       setCurrentIndex((prev) => {
         const next = (prev + 1) % movies.length;
-        if (Platform.OS !== 'android') {
+        if (Platform.OS !== 'android' && Platform.OS !== 'web') {
           listRef.current?.scrollToIndex({ index: next, animated: true });
         }
         return next;
@@ -109,8 +109,8 @@ export default function FeaturedCarousel({ movies, onWatch, onMoreInfo }: Props)
 
   return (
     <View style={[styles.container, { width }]}>
-      {Platform.OS === 'android' ? (
-        // --- VISTA ANDROID (FADE) ---
+      {(Platform.OS === 'android' || Platform.OS === 'web') ? (
+        // --- VISTA ANDROID & WEB (FADE) ---
         <View {...panResponder.panHandlers} style={{ flex: 1 }}>
           <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
             <FeaturedMovie
@@ -160,7 +160,7 @@ export default function FeaturedCarousel({ movies, onWatch, onMoreInfo }: Props)
       </View>
 
       {/* Progress bar con gradiente */}
-      {movies.length > 1 && Platform.OS !== 'android' && (
+      {movies.length > 1 && (Platform.OS !== 'android' && Platform.OS !== 'web') && (
         <View style={styles.progressBarContainer}>
           <Animated.View
             style={[
