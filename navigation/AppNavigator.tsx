@@ -86,13 +86,13 @@ function AdminNavigator() {
       initialRouteName="AdminDashboard"
       screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}
     >
-      <AdminStack.Screen name="AdminLogin" component={AdminLoginScreen as any} />
-      <AdminStack.Screen name="AdminDashboard" component={AdminDashboardScreen as any} />
-      <AdminStack.Screen name="AdminImport" component={AdminImportScreen as any} />
-      <AdminStack.Screen name="AnimeList" component={AnimeListScreen as any} />
-      <AdminStack.Screen name="AnimeForm" component={AnimeFormScreen as any} />
-      <AdminStack.Screen name="EpisodeManager" component={EpisodeManagerScreen as any} />
-      <AdminStack.Screen name="AdminBot" component={AdminBotScreen as any} />
+      <AdminStack.Screen name="AdminLogin" component={AdminLoginScreen as any} options={{ title: 'Pixel - Admin Login' }} />
+      <AdminStack.Screen name="AdminDashboard" component={AdminDashboardScreen as any} options={{ title: 'Pixel - Dashboard' }} />
+      <AdminStack.Screen name="AdminImport" component={AdminImportScreen as any} options={{ title: 'Pixel - Importar' }} />
+      <AdminStack.Screen name="AnimeList" component={AnimeListScreen as any} options={{ title: 'Pixel - Catálogo Admin' }} />
+      <AdminStack.Screen name="AnimeForm" component={AnimeFormScreen as any} options={{ title: 'Pixel - Editar Anime' }} />
+      <AdminStack.Screen name="EpisodeManager" component={EpisodeManagerScreen as any} options={{ title: 'Pixel - Gestor de Episodios' }} />
+      <AdminStack.Screen name="AdminBot" component={AdminBotScreen as any} options={{ title: 'Pixel - Bot Inteligente' }} />
     </AdminStack.Navigator>
   );
 
