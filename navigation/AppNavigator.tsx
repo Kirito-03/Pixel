@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Storage } from '../services/storage';
 
@@ -171,12 +171,13 @@ function MainTabs({ route }: { route: any }) {
     console.log('MainTabs: Profile already set and matches selectedProfile. No action.');
   }, [selectedProfile, currentProfile, setCurrentProfile]);
 
-  // En web el Header ya proporciona navegación; en nativo necesitamos el tab bar
+  // En web grande el Header proporciona navegación; en web chica y en nativo necesitamos el tab bar
   const isWeb = Platform.OS === 'web';
-  const hideTabBar = isWeb ? { display: 'none' as const } : undefined;
+  const { width } = useWindowDimensions();
+  const isSmallWeb = isWeb && width < 768;
 
-  // Estilo premium del tab bar para Android/iOS
-  const tabBarBaseStyle = isWeb
+  // Estilo premium del tab bar para Android/iOS y Web Móvil
+  const tabBarBaseStyle = (isWeb && !isSmallWeb)
     ? { display: 'none' as const }
     : {
         backgroundColor: '#0a0a0a',
