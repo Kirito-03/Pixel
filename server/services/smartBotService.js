@@ -7,7 +7,7 @@
  *  - PostgreSQL para persistencia
  */
 import pool from '../db.js';
-import { searchAniListMetadata, searchAniListByMalId } from './anilistService.js';
+import { searchAniListMetadata, searchAniListByMalId, searchJikanMetadata } from './anilistService.js';
 import { findJkAnimeSlug, scrapeAnimeEpisodes } from './jkanimeScraper.js';
 import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData, scrapeAiringAnimesAv1 } from './animeav1Scraper.js';
 
@@ -517,14 +517,31 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
       metadata = await searchAniListByMalId(forceMalId);
     }
 
-    // Fallback a buscar por título
+    // Fallback a buscar por título en AniList
     if (!metadata) {
       job.progress.message = `Buscando "${anime.title}" en AniList...`;
       metadata = await searchAniListMetadata(anime.title_english || anime.title);
     }
 
+    // Fallback a buscar en Jikan (MyAnimeList) si AniList falló
     if (!metadata) {
-      throw new Error(`No se encontró "${anime.title}" en AniList`);
+      const searchStr = anime.title_english || anime.title;
+      job.progress.message = `Fallo AniList. Usando fallback Jikan para "${searchStr}"...`;
+      // Pequeña limpieza heurística para mejorar matches en Jikan
+      let cleanTitle = searchStr
+        .replace(/Season \d+/i, '')
+        .replace(/Part \d+/i, '')
+        .replace(/Movie( \d+)?/i, '')
+        .trim();
+      
+      metadata = await searchJikanMetadata(cleanTitle);
+      if (metadata) {
+        console.log(`[SmartBot] Fallback Jikan exitoso para "${searchStr}" -> "${metadata.title}"`);
+      }
+    }
+
+    if (!metadata) {
+      throw new Error(`No se encontró "${anime.title}" en AniList ni en Jikan`);
     }
 
     // Construir UPDATE solo con campos vacíos

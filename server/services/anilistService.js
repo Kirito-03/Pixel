@@ -173,6 +173,59 @@ export async function searchAniListByMalId(malId) {
   }
 }
 
+/**
+ * Busca un anime por título en Jikan (MyAnimeList) como Fallback.
+ * @param {string} title - Título del anime a buscar
+ * @returns {Promise<object|null>} Metadatos del anime o null
+ */
+export async function searchJikanMetadata(title) {
+  try {
+    const response = await axios.get(
+      `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`,
+      { timeout: 10000 }
+    );
+    
+    const anime = response.data?.data?.[0];
+    if (!anime) return null;
+
+    let releaseDate = null;
+    if (anime.aired?.from) {
+      releaseDate = anime.aired.from.split('T')[0];
+    }
+
+    return {
+      title: anime.title_english || anime.title,
+      title_english: anime.title_english || anime.title || '',
+      title_japanese: anime.title_japanese || '',
+      description: anime.synopsis || '',
+      poster_url: anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || '',
+      banner_url: '', // Jikan no da banner por default en search
+      genres: anime.genres ? anime.genres.map(g => g.name) : [],
+      rating: anime.score ? parseFloat(anime.score) : null, // Jikan ya usa escala 0-10
+      total_episodes: anime.episodes || null,
+      status: mapJikanStatus(anime.status),
+      release_date: releaseDate,
+    };
+  } catch (error) {
+    if (error.response?.status === 429) {
+      console.warn('[Jikan] Rate limit, esperando 5s...');
+      await new Promise(r => setTimeout(r, 5000));
+      return searchJikanMetadata(title);
+    }
+    console.error(`[Jikan] Error buscando fallback para "${title}":`, error.message);
+    return null;
+  }
+}
+
+function mapJikanStatus(status) {
+  if (!status) return 'Unknown';
+  const s = status.toLowerCase();
+  if (s.includes('finished')) return 'Finished';
+  if (s.includes('currently airing')) return 'Airing';
+  if (s.includes('not yet aired')) return 'Upcoming';
+  return 'Unknown';
+}
+
 function mapAniListStatus(status) {
   const map = {
     FINISHED: 'Finished',
