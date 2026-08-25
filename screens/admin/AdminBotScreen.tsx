@@ -110,6 +110,8 @@ export default function AdminBotScreen() {
   const [toEp, setToEp] = useState('')
   const [season, setSeason] = useState('1')
   const [previewTitle, setPreviewTitle] = useState('')
+  const [fixStartId, setFixStartId] = useState('')
+  const [fixEndId, setFixEndId] = useState('')
   const [jobs, setJobs] = useState<BotJob[]>([])
   const [loading, setLoading] = useState<string | null>(null)
   
@@ -180,8 +182,13 @@ export default function AdminBotScreen() {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/sync-airing')
         setSuccessMsg(res.data.message)
       } else if (action === 'fixImages') {
-        const res = await adminApiService.axiosInstance.post('/api/admin/bot/fix-missing-images')
+        const res = await adminApiService.axiosInstance.post('/api/admin/bot/fix-missing-images', {
+          startId: fixStartId || undefined,
+          endId: fixEndId || undefined
+        })
         setSuccessMsg(res.data.message)
+        setFixStartId('')
+        setFixEndId('')
       } else if (action === 'findSlug') {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/find-slug', { title: previewTitle })
         setSlugResult(res.data.slug || null)
@@ -390,6 +397,32 @@ export default function AdminBotScreen() {
                     Ejecuta trabajos masivos como sincronización de episodios en emisión o 
                     recuperación automática de portadas faltantes.
                   </Text>
+                  
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.label}>Desde ID (Opc.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={fixStartId}
+                        onChangeText={setFixStartId}
+                        placeholder="Ej: 903"
+                        placeholderTextColor={darkColors.textGray}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.label}>Hasta ID (Opc.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={fixEndId}
+                        onChangeText={setFixEndId}
+                        placeholder="Ej: 1064"
+                        placeholderTextColor={darkColors.textGray}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
                   <View style={{ gap: 12, marginTop: 12 }}>
                     <TouchableOpacity
                       style={[styles.btn, styles.btnPrimary]}

@@ -164,8 +164,9 @@ export async function syncAiringAnimes() {
 
 /**
  * Busca animes que no tengan póster/banner e intenta actualizarlos usando AniList.
+ * Opcionalmente se puede acotar por un rango de IDs.
  */
-export async function fixMissingImages() {
+export async function fixMissingImages(startId = null, endId = null) {
   const jobId = `bot-${Date.now()}-fiximages`;
   const job = {
     id: jobId,
@@ -180,7 +181,7 @@ export async function fixMissingImages() {
   };
   botJobs.set(jobId, job);
 
-  runFixMissingImagesJob(job).catch(err => {
+  runFixMissingImagesJob(job, startId, endId).catch(err => {
     job.status = 'error';
     job.errors.push(err.message);
     job.finishedAt = new Date().toISOString();
@@ -189,9 +190,23 @@ export async function fixMissingImages() {
   return { jobId, status: 'started' };
 }
 
-async function runFixMissingImagesJob(job) {
+async function runFixMissingImagesJob(job, startId, endId) {
   try {
-    const res = await pool.query(`SELECT id, title FROM anime_content WHERE poster_url IS NULL OR poster_url = '' OR banner_url IS NULL OR banner_url = ''`);
+    let query = `SELECT id, title FROM anime_content WHERE (poster_url IS NULL OR poster_url = '' OR banner_url IS NULL OR banner_url = '')`;
+    const params = [];
+    
+    if (startId && endId) {
+      query += ` AND id >= $1 AND id <= $2`;
+      params.push(startId, endId);
+    } else if (startId) {
+      query += ` AND id >= $1`;
+      params.push(startId);
+    } else if (endId) {
+      query += ` AND id <= $1`;
+      params.push(endId);
+    }
+
+    const res = await pool.query(query, params);
     const animes = res.rows;
     if (animes.length === 0) {
       job.status = 'done';

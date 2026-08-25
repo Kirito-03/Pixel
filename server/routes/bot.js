@@ -245,10 +245,15 @@ router.post('/sync-all', async (req, res) => {
 /**
  * POST /api/admin/bot/fix-missing-images
  * Inicia el proceso para buscar animes sin foto y rellenarlos.
+ * Body (opcional): { startId: number, endId: number }
  */
 router.post('/fix-missing-images', async (req, res) => {
+  const { startId, endId } = req.body || {};
   try {
-    const fixJob = await fixMissingImages();
+    const fixJob = await fixMissingImages(
+      startId ? parseInt(startId) : null, 
+      endId ? parseInt(endId) : null
+    );
     res.json({
       ok: true,
       jobId: fixJob.jobId,
