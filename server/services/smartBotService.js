@@ -533,6 +533,12 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
         .replace(/Part \d+/i, '')
         .replace(/Movie( \d+)?/i, '')
         .trim();
+        
+      // Si el título sigue siendo kilométrico (más de 6 palabras), MyAnimeList suele tirar 504 al buscarlo
+      const words = cleanTitle.split(' ');
+      if (words.length > 6) {
+        cleanTitle = words.slice(0, 6).join(' ');
+      }
       
       metadata = await searchJikanMetadata(cleanTitle);
       if (metadata) {
