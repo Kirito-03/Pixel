@@ -704,6 +704,7 @@ const mobileStyles = StyleSheet.create({
 
   // ── BOTTOM FORM (White) ──
   bottomFormContainer: {
+    flex: 1,
     backgroundColor: '#fff',
     marginTop: -20, // Overlap with top section
     position: 'relative',
