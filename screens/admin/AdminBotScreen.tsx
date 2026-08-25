@@ -45,11 +45,25 @@ function TerminalLog({ jobs }: { jobs: BotJob[] }) {
       <ScrollView 
         ref={scrollViewRef}
         style={styles.terminalBody}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         <Text style={styles.terminalText}>[System] Conectado al motor de scraping...</Text>
+
+        {activeJobs.length > 0 && (
+          <View style={styles.terminalRow}>
+            <Text style={styles.terminalBlink}>_</Text>
+          </View>
+        )}
+
+        {activeJobs.map(job => (
+          <View key={job.id} style={styles.terminalRow}>
+            <Text style={styles.terminalTime}>[{new Date().toLocaleTimeString()}]</Text>
+            <Text style={styles.terminalActive}>
+              {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - {job.progress.message}... {job.progress.total > 0 ? `(${job.progress.current}/${job.progress.total})` : ''}
+            </Text>
+          </View>
+        ))}
         
-        {finishedJobs.slice().reverse().map(job => (
+        {finishedJobs.map(job => (
           <View key={job.id} style={styles.terminalRow}>
             <Text style={styles.terminalTime}>[{new Date(job.finishedAt || job.startedAt).toLocaleTimeString()}]</Text>
             {job.status === 'done' ? (
@@ -68,20 +82,6 @@ function TerminalLog({ jobs }: { jobs: BotJob[] }) {
           </View>
         ))}
 
-        {activeJobs.map(job => (
-          <View key={job.id} style={styles.terminalRow}>
-            <Text style={styles.terminalTime}>[{new Date().toLocaleTimeString()}]</Text>
-            <Text style={styles.terminalActive}>
-              {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - {job.progress.message}... {job.progress.total > 0 ? `(${job.progress.current}/${job.progress.total})` : ''}
-            </Text>
-          </View>
-        ))}
-
-        {activeJobs.length > 0 && (
-          <View style={styles.terminalRow}>
-            <Text style={styles.terminalBlink}>_</Text>
-          </View>
-        )}
       </ScrollView>
     </View>
   )
@@ -709,8 +709,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#050505',
     borderWidth: 1,
     borderColor: '#333',
-    height: 500, // Menos altura para que "no baje demasiado"
-    borderRadius: 0, // Cuadrado puro
+    height: 500,
+    maxHeight: 500, // Fijar la altura máxima
+    borderRadius: 0,
     shadowColor: darkColors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
