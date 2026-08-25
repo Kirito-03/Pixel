@@ -704,7 +704,6 @@ const mobileStyles = StyleSheet.create({
 
   // ── BOTTOM FORM (White) ──
   bottomFormContainer: {
-    flex: 1,
     backgroundColor: '#fff',
     marginTop: -20, // Overlap with top section
     position: 'relative',
@@ -725,7 +724,6 @@ const mobileStyles = StyleSheet.create({
   decorSquareInner: { width: 40, height: 40, borderWidth: 2, borderColor: 'rgba(229, 9, 20, 0.2)' },
   
   formContent: {
-    flex: 1,
     paddingHorizontal: 28,
     paddingTop: 30,
     paddingBottom: 20,
