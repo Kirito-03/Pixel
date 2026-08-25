@@ -7,6 +7,8 @@ export default function ConsentModal() {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
 
+  if (Platform.OS !== 'web') return null;
+
   useEffect(() => {
     const checkConsent = async () => {
       try {
