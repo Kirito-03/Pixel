@@ -8,16 +8,21 @@ import { loadNetworkConfig, saveNetworkConfig, clearNetworkConfig } from '../../
 import { getCandidateBaseURLs } from '../../utils/networkUtils';
 
 const getInitialBaseURL = (): string => {
+  // 1. Siempre dar máxima prioridad a las variables de entorno, incluso en modo DEV
+  const apiUrl = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/api\/?$/, '').trim();
+  const envUrl = apiUrl || process.env.EXPO_PUBLIC_SERVER_BASE_URL;
+  if (envUrl) return envUrl;
+
+  // 2. Si no hay variable, usar defaults locales en desarrollo
   if (__DEV__) {
     if (Platform.OS === 'android') {
       return 'http://10.0.2.2:3001';
     }
     return 'http://localhost:3001';
   }
-  // En producción: usar el dominio raiz para que nginx haga el proxy correctamente.
-  // EXPO_PUBLIC_API_URL = 'https://pixelnosekai.art/api' → solo queremos 'https://pixelnosekai.art'
-  const apiUrl = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/api\/?$/, '').trim();
-  return apiUrl || process.env.EXPO_PUBLIC_SERVER_BASE_URL || 'https://pixelnosekai.art';
+  
+  // 3. Producción sin variable (fallback)
+  return 'https://pixelnosekai.art';
 };
 
 let BASE_URL = getInitialBaseURL();

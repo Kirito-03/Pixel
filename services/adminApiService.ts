@@ -4,11 +4,16 @@ import { Platform } from 'react-native';
 import { getCurrentBaseURL } from './databaseService';
 
 // Base URL del backend
-const API_BASE_URL = Platform.select({
-    android: 'http://10.0.2.2:3001', // Android emulator
-    ios: 'http://localhost:3001',
-    default: 'http://localhost:3001'
-});
+const getAdminBaseUrl = () => {
+    const envUrl = process.env.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_SERVER_BASE_URL;
+    if (envUrl) return envUrl.replace(/\/api\/?$/, '').trim();
+    return Platform.select({
+        android: 'http://10.0.2.2:3001', // Android emulator
+        ios: 'http://localhost:3001',
+        default: 'http://localhost:3001'
+    });
+};
+const API_BASE_URL = getAdminBaseUrl();
 
 interface AnimeData {
     tmdb_id?: number;
