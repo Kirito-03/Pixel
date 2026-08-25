@@ -179,6 +179,9 @@ export default function AdminBotScreen() {
       } else if (action === 'syncAiring') {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/sync-airing')
         setSuccessMsg(res.data.message)
+      } else if (action === 'fixImages') {
+        const res = await adminApiService.axiosInstance.post('/api/admin/bot/fix-missing-images')
+        setSuccessMsg(res.data.message)
       } else if (action === 'findSlug') {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/find-slug', { title: previewTitle })
         setSlugResult(res.data.slug || null)
@@ -384,20 +387,34 @@ export default function AdminBotScreen() {
                     <Text style={styles.cardTitle}>Acciones Masivas</Text>
                   </View>
                   <Text style={styles.cardDesc}>
-                    Escanea JKAnime buscando animes "En Emisión". Si no existen, los crea.
-                    Luego descarga automáticamente los episodios más recientes.
+                    Ejecuta trabajos masivos como sincronización de episodios en emisión o 
+                    recuperación automática de portadas faltantes.
                   </Text>
-                  <TouchableOpacity
-                    style={[styles.btn, styles.btnPrimary, { marginTop: 12 }]}
-                    onPress={() => handleAction('syncAiring')}
-                    disabled={!!loading}
-                  >
-                    {loading === 'syncAiring' ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.btnPrimaryText}>Sincronizar Emisiones Actuales</Text>
-                    )}
-                  </TouchableOpacity>
+                  <View style={{ gap: 12, marginTop: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnPrimary]}
+                      onPress={() => handleAction('syncAiring')}
+                      disabled={!!loading}
+                    >
+                      {loading === 'syncAiring' ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.btnPrimaryText}>Sincronizar Emisiones Actuales</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnSecondary]}
+                      onPress={() => handleAction('fixImages')}
+                      disabled={!!loading}
+                    >
+                      {loading === 'fixImages' ? (
+                        <ActivityIndicator size="small" color={darkColors.text} />
+                      ) : (
+                        <Text style={styles.btnSecondaryText}>Corregir Imágenes Faltantes</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Herramientas Rápidas */}
