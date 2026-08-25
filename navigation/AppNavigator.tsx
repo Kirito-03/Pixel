@@ -74,8 +74,8 @@ const MangaStack = createNativeStackNavigator();
 function HomeNavigator() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}>
-      <HomeStack.Screen name="HomeMain" component={HomeScreen as any} />
-      <HomeStack.Screen name="Categoria" component={CategoryScreen as any} />
+      <HomeStack.Screen name="HomeMain" component={HomeScreen as any} options={{ title: 'Pixel - Inicio' }} />
+      <HomeStack.Screen name="Categoria" component={CategoryScreen as any} options={{ title: 'Pixel - Categoría' }} />
     </HomeStack.Navigator>
   );
 }
@@ -111,8 +111,8 @@ function AdminNavigator() {
 function NewsNavigator() {
   return (
     <NewsStack.Navigator screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}>
-      <NewsStack.Screen name="NoticiasHome" component={NewsScreen as any} />
-      <NewsStack.Screen name="NewsDetail" component={NewsDetailScreen as any} />
+      <NewsStack.Screen name="NoticiasHome" component={NewsScreen as any} options={{ title: 'Pixel - Noticias' }} />
+      <NewsStack.Screen name="NewsDetail" component={NewsDetailScreen as any} options={{ title: 'Pixel - Detalle Noticia' }} />
     </NewsStack.Navigator>
   );
 }
@@ -120,9 +120,9 @@ function NewsNavigator() {
 function MangaNavigator() {
   return (
     <MangaStack.Navigator screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}>
-      <MangaStack.Screen name="MangaHome" component={MangaScreen as any} />
-      <MangaStack.Screen name="MangaDetail" component={MangaDetailScreen as any} />
-      <MangaStack.Screen name="MangaReader" component={MangaReaderScreen as any} />
+      <MangaStack.Screen name="MangaHome" component={MangaScreen as any} options={{ title: 'Pixel - Mangas' }} />
+      <MangaStack.Screen name="MangaDetail" component={MangaDetailScreen as any} options={{ title: 'Pixel - Detalle Manga' }} />
+      <MangaStack.Screen name="MangaReader" component={MangaReaderScreen as any} options={{ title: 'Pixel - Lector Manga' }} />
     </MangaStack.Navigator>
   );
 }
@@ -221,6 +221,7 @@ function MainTabs({ route }: { route: any }) {
           name="Buscar"
           component={SearchScreen}
           options={{
+            title: 'Pixel - Buscar',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? 'search' : 'search-outline'} size={22} color={color} />
             ),
@@ -242,6 +243,7 @@ function MainTabs({ route }: { route: any }) {
         name="Emisión"
         component={AiringScreen}
         options={{
+          title: 'Pixel - Emisión',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'radio' : 'radio-outline'} size={22} color={color} />
           ),
@@ -262,6 +264,7 @@ function MainTabs({ route }: { route: any }) {
         name="MiLista"
         component={MyListScreen as any}
         options={{
+          title: 'Pixel - Mi Lista',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'bookmark' : 'bookmark-outline'} size={22} color={color} />
           ),
@@ -273,6 +276,7 @@ function MainTabs({ route }: { route: any }) {
           name="Perfil"
           component={ProfileScreen}
           options={{
+            title: 'Pixel - Mi Perfil',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={22} color={color} />
             ),
