@@ -391,7 +391,7 @@ export default function LoginScreen({ navigation }: any) {
         </View>
 
         {/* ═══ BOTTOM FORM SECTION (White) ═══ */}
-        <View style={mobileStyles.bottomFormContainer}>
+        <View style={[mobileStyles.bottomFormContainer, { minHeight: Math.max(0, screenHeight - heroHeight + 20) }]}>
           {/* Diagonal cut */}
           <View style={mobileStyles.diagonalCut} />
           <View style={mobileStyles.decorSquareOuter}>
@@ -704,7 +704,6 @@ const mobileStyles = StyleSheet.create({
 
   // ── BOTTOM FORM (White) ──
   bottomFormContainer: {
-    flex: 1,
     backgroundColor: '#fff',
     marginTop: -20, // Overlap with top section
     position: 'relative',
