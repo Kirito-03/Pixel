@@ -5,30 +5,51 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  withSequence,
+  withDelay,
   Easing,
 } from 'react-native-reanimated';
 
 export default function Loader() {
-  const rotation = useSharedValue(0);
+  const dot1 = useSharedValue(0);
+  const dot2 = useSharedValue(0);
+  const dot3 = useSharedValue(0);
+
+  const animateDot = (dot: Animated.SharedValue<number>, delay: number) => {
+    dot.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: 400, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1, // infinite repeat
+        true // reverse
+      )
+    );
+  };
 
   useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 1000, easing: Easing.linear }),
-      -1, // infinite repeat
-      false // do not reverse
-    );
+    animateDot(dot1, 0);
+    animateDot(dot2, 200);
+    animateDot(dot3, 400);
   }, []);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ rotateZ: `${rotation.value}deg` }],
-    };
-  });
+  const getStyle = (dot: Animated.SharedValue<number>) => {
+    return useAnimatedStyle(() => ({
+      transform: [{ translateY: dot.value * -10 }],
+      opacity: 0.3 + (dot.value * 0.7),
+    }));
+  };
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.spinner, animatedStyle]} />
-      <Text style={styles.text}>Cargando...</Text>
+      <View style={styles.dotsContainer}>
+        <Animated.View style={[styles.dot, getStyle(dot1)]} />
+        <Animated.View style={[styles.dot, getStyle(dot2)]} />
+        <Animated.View style={[styles.dot, getStyle(dot3)]} />
+      </View>
+      <Text style={styles.text}>CARGANDO DATOS</Text>
     </View>
   );
 }
@@ -38,18 +59,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  spinner: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderTopColor: '#E50914',
+  dotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     marginBottom: 16,
+    height: 24, // Para que el salto no desplace los textos
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#E50914',
+    shadowColor: '#E50914',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
   },
   text: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 2,
+    opacity: 0.6,
   },
 });

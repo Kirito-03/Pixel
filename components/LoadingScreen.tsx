@@ -473,22 +473,8 @@ const MobileLoadingAnimation: React.FC = () => {
 };
 
 export const LoadingScreen: React.FC = () => {
-    const hasSeenIntro = Storage.getString('hasSeenAppIntro');
-
-    useEffect(() => {
-        if (!hasSeenIntro) {
-            Storage.setString('hasSeenAppIntro', 'true');
-        }
-    }, [hasSeenIntro]);
-
-    if (hasSeenIntro) {
-        return (
-            <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-                <Loader />
-            </View>
-        );
-    }
-
+    // Siempre mostramos las animaciones premium de Pixel No Sekai
+    // en lugar del loader genérico tipo Netflix.
     return Platform.OS === 'web' ? <WebLoadingAnimation /> : <MobileLoadingAnimation />;
 };
 
