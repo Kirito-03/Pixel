@@ -12,6 +12,7 @@ import {
   scrapeEpisodes,
   syncAiringAnimes,
   syncAllCatalog,
+  fixMissingImages,
 } from '../services/smartBotService.js';
 import { findJkAnimeSlug } from '../services/jkanimeScraper.js';
 import { searchAniListMetadata } from '../services/anilistService.js';
@@ -235,6 +236,23 @@ router.post('/sync-all', async (req, res) => {
       ok: true,
       jobId: syncJob.jobId,
       message: `Crawl masivo iniciado (páginas ${startPage}-${endPage}).`,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/fix-missing-images
+ * Inicia el proceso para buscar animes sin foto y rellenarlos.
+ */
+router.post('/fix-missing-images', async (req, res) => {
+  try {
+    const fixJob = await fixMissingImages();
+    res.json({
+      ok: true,
+      jobId: fixJob.jobId,
+      message: 'Proceso de recuperación de imágenes iniciado.',
     });
   } catch (e) {
     res.status(500).json({ ok: false, message: e.message });
