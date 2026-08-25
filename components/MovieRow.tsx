@@ -75,7 +75,6 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
     const maxScroll = contentWidth - layoutWidth;
     
     setScrollX(offsetX);
-    scrollXRef.current = offsetX;
     setShowLeftArrow(offsetX > 5);
     setShowRightArrow(offsetX < maxScroll - 5);
   };
