@@ -76,11 +76,15 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   const title = isAnime ? getAnimeTitle((movie as AnimeDetail).title) : movie.title;
   const description = isAnime ? stripHtml((movie as any).description) : stripHtml((movie as any).overview);
   const imageUri = isAnime
-    ? getAnimeImageUrl((movie as AnimeDetail).bannerImage || (movie as AnimeDetail).coverImage?.large)
-    : getImageUrl(movie.backdrop_path, 'original');
+    ? getAnimeImageUrl(
+        isSmallScreen 
+          ? ((movie as AnimeDetail).coverImage?.extraLarge || (movie as AnimeDetail).coverImage?.large || (movie as AnimeDetail).bannerImage)
+          : ((movie as AnimeDetail).bannerImage || (movie as AnimeDetail).coverImage?.large)
+      )
+    : getImageUrl(isSmallScreen ? (movie.poster_path || movie.backdrop_path) : movie.backdrop_path, 'original');
 
   return (
-    <View style={[styles.container, { width, height: isSmallScreen ? height * 0.45 : height * 0.9 }]}>
+    <View style={[styles.container, { width, height: isSmallScreen ? height * 0.55 : height * 0.9 }]}>
       <Image
         source={{ uri: imageUri }}
         style={StyleSheet.absoluteFillObject}
