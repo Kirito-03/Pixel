@@ -51,6 +51,11 @@ const app = express();
 // Confiar en el proxy (Cloudflare/Traefik) para express-rate-limit
 app.set('trust proxy', 1);
 
+// ── Endpoints de salud (Health Check) ──────────────────────────
+app.get(['/health', '/api/health'], (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Seguridad: Cabeceras HTTP
 app.use(helmet({
   crossOriginResourcePolicy: false, // Permitir que la app móvil acceda a recursos estáticos (imágenes/videos)
