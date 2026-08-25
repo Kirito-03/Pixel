@@ -163,6 +163,74 @@ export async function syncAiringAnimes() {
 }
 
 /**
+ * Busca animes que no tengan póster/banner e intenta actualizarlos usando AniList.
+ */
+export async function fixMissingImages() {
+  const jobId = `bot-${Date.now()}-fiximages`;
+  const job = {
+    id: jobId,
+    type: 'fix_images',
+    animeId: null,
+    status: 'running',
+    progress: { current: 0, total: 0, message: 'Buscando animes sin foto...' },
+    errors: [],
+    result: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+  };
+  botJobs.set(jobId, job);
+
+  runFixMissingImagesJob(job).catch(err => {
+    job.status = 'error';
+    job.errors.push(err.message);
+    job.finishedAt = new Date().toISOString();
+  });
+
+  return { jobId, status: 'started' };
+}
+
+async function runFixMissingImagesJob(job) {
+  try {
+    const res = await pool.query(`SELECT id, title FROM anime_content WHERE poster_url IS NULL OR poster_url = '' OR banner_url IS NULL OR banner_url = ''`);
+    const animes = res.rows;
+    if (animes.length === 0) {
+      job.status = 'done';
+      job.progress.message = 'Todos los animes tienen sus fotos completas.';
+      job.finishedAt = new Date().toISOString();
+      return;
+    }
+
+    job.progress.total = animes.length;
+    let processed = 0;
+    
+    for (const anime of animes) {
+      processed++;
+      job.progress.current = processed;
+      job.progress.message = `Buscando foto de ${anime.title} (${processed}/${animes.length})...`;
+
+      try {
+        const metaJob = createJob('metadata', anime.id);
+        await runMetadataJob(metaJob, anime.id);
+        
+        // Esperamos para no sobrecargar la API de AniList (1 peticion / 1.5s)
+        await new Promise(r => setTimeout(r, 1500));
+      } catch (err) {
+        job.errors.push(`Error en ${anime.title}: ${err.message}`);
+      }
+    }
+
+    job.status = 'done';
+    job.progress.message = `Actualización de imágenes terminada. Se revisaron ${animes.length} animes.`;
+    job.result = { total: animes.length };
+    job.finishedAt = new Date().toISOString();
+  } catch (err) {
+    job.status = 'error';
+    job.errors.push(err.message);
+    job.finishedAt = new Date().toISOString();
+  }
+}
+
+/**
  * Explora el catálogo completo y añade los animes que no existan.
  */
 export async function syncAllCatalog(startPage = 1, endPage = 10) {

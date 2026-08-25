@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage } from './services/smartBotService.js';
+import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
 import pool from './db.js';
 
 export function startBotSchedulers() {
@@ -37,10 +37,22 @@ export function startBotSchedulers() {
     }
   });
 
+  // Tarea 4: Buscar imágenes/pósters faltantes (Cada 12 horas a las 5:30 y 17:30)
+  // '30 5,17 * * *'
+  cron.schedule('30 5,17 * * *', async () => {
+    console.log('[Cron] Ejecutando búsqueda de fotos faltantes (Fix Missing Images)...');
+    try {
+      await fixMissingImages();
+    } catch (e) {
+      console.error('[Cron] Error en fixMissingImages:', e.message);
+    }
+  });
+
   console.log('[Cron] Tareas del bot configuradas:');
   console.log(' - Update Ongoing: Cada 4 horas');
   console.log(' - Sync Airing: Diario a las 02:00 AM');
   console.log(' - Sync Catalog Incremental: Cada 10 minutos');
+  console.log(' - Fix Missing Images: Cada 12 horas');
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {
