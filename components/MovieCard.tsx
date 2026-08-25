@@ -37,6 +37,17 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
   const [hovered, setHovered] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [retryKey, setRetryKey] = useState(0);
+
+  const handleImageError = () => {
+    // Reintentar si falla la imagen (hasta 20 veces) para asegurar que intente cargarla de nuevo.
+    if (retryKey < 20) {
+      setTimeout(() => {
+        setRetryKey(prev => prev + 1);
+      }, 2000);
+    }
+  };
+
   const handleMouseEnter = useCallback(() => {
     hoverTimer.current = setTimeout(() => {
       setHovered(true);
@@ -54,11 +65,21 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
   }, [onHoverChange]);
 
   const getImageSource = () => {
+    let url = '';
     if ('source' in movie) {
-      if ((movie as any).source === 'anilist') return (movie as any).poster_path || (movie as any).coverImage?.extraLarge || (movie as any).coverImage?.large;
-      return getImageUrl((movie as any).poster_path, 'w500');
+      if ((movie as any).source === 'anilist') {
+        url = (movie as any).poster_path || (movie as any).coverImage?.extraLarge || (movie as any).coverImage?.large || '';
+      } else {
+        url = getImageUrl((movie as any).poster_path, 'w500');
+      }
+    } else {
+      url = getImageUrl((movie as any).poster_path, 'w500');
     }
-    return getImageUrl((movie as any).poster_path, 'w500');
+    
+    if (url && retryKey > 0) {
+      return `${url}${url.includes('?') ? '&' : '?'}retry=${retryKey}`;
+    }
+    return url;
   };
 
   const getTitle = (): string => {
@@ -135,6 +156,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
           source={{ uri: getImageSource() }}
           style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
           resizeMode="cover"
+          onError={handleImageError}
         />
 
         {/* Badge EN EMISIÓN — solo para animes en emisión */}
@@ -169,6 +191,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
               source={{ uri: getImageSource() }}
               style={{ width: '100%', height: '100%' } as any}
               resizeMode="cover"
+              onError={handleImageError}
             />
             <LinearGradient
               colors={['transparent', 'rgba(20,20,20,0.85)']}
