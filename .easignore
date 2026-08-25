@@ -1,0 +1,103 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# =============================================
+# Dependencies
+# =============================================
+node_modules/
+
+# =============================================
+# Expo / React Native
+# =============================================
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Generated native folders
+ios/
+android/
+
+# =============================================
+# Native build artifacts
+# =============================================
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# =============================================
+# IDE / Editor configs
+# =============================================
+.trae/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =============================================
+# Environment & credentials
+# =============================================
+.env
+.env.*
+!.env.example
+config/google-services.json
+
+# =============================================
+# OS files
+# =============================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.pem
+
+# =============================================
+# Debug logs
+# =============================================
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# =============================================
+# TypeScript build info
+# =============================================
+*.tsbuildinfo
+
+# =============================================
+# Local scripts (batch / shell)
+# =============================================
+*.bat
+*.sh
+!scripts/
+
+# =============================================
+# Scratch SQL files
+# =============================================
+*.sql
+
+# =============================================
+# Media / large files
+# =============================================
+*.m3u
+*.m3u8
+*.mp4
+*.mkv
+*.avi
+server/videos/*.ts
+
+# =============================================
+# Backend & Extra exclusions for EAS
+# =============================================
+server/
+frontend/
+data/
+*.db
+*.sqlite
+.git/
+

@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -672,11 +672,12 @@ const webStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════
 const mobileStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  scrollContent: { flexGrow: 1, minHeight: '100%' },
+  scrollContent: { flexGrow: 1 },
   
   // ── TOP HERO (Black) ──
   topHero: {
-    height: 320,
+    flex: 0.45,
+    minHeight: 250,
     width: '100%',
     backgroundColor: '#0a0a0a',
     position: 'relative',
@@ -700,9 +701,9 @@ const mobileStyles = StyleSheet.create({
 
   // ── BOTTOM FORM (White) ──
   bottomFormContainer: {
-    flex: 1,
+    flex: 0.55,
     backgroundColor: '#fff',
-    marginTop: 20, // Negative overlap handled by diagonal cut
+    marginTop: -20, // Overlap with top section
     position: 'relative',
   },
   diagonalCut: {
@@ -723,38 +724,38 @@ const mobileStyles = StyleSheet.create({
   formContent: {
     flex: 1,
     paddingHorizontal: 28,
-    paddingTop: 40,
-    paddingBottom: 40,
+    paddingTop: 30,
+    paddingBottom: 20,
     zIndex: 10,
   },
-  badge: { alignSelf: 'flex-start', backgroundColor: '#000', paddingHorizontal: 10, paddingVertical: 4, marginBottom: 16 },
+  badge: { alignSelf: 'flex-start', backgroundColor: '#000', paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   titleRow: { flexDirection: 'row' },
-  titleBlack: { color: '#111', fontSize: 28, fontWeight: '900', lineHeight: 30 },
-  titleRed: { color: '#E50914', fontSize: 28, fontWeight: '900', lineHeight: 30, marginBottom: 6 },
-  subtitle: { color: '#777', fontSize: 13, marginBottom: 24 },
+  titleBlack: { color: '#111', fontSize: 26, fontWeight: '900', lineHeight: 28 },
+  titleRed: { color: '#E50914', fontSize: 26, fontWeight: '900', lineHeight: 28, marginBottom: 4 },
+  subtitle: { color: '#777', fontSize: 13, marginBottom: 16 },
   
-  fieldLabel: { color: '#111', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 6, marginTop: 4 },
-  input: { borderWidth: 1, borderColor: '#ddd', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111', marginBottom: 16, backgroundColor: '#fff' },
+  fieldLabel: { color: '#111', fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 4, marginTop: 4 },
+  input: { borderWidth: 1, borderColor: '#ddd', paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: '#111', marginBottom: 12, backgroundColor: '#fff' },
   inputFocused: { borderColor: '#E50914' },
   inputWrap: { position: 'relative' },
-  eyeBtn: { position: 'absolute', right: 14, top: 12 },
+  eyeBtn: { position: 'absolute', right: 14, top: 10 },
   
-  rememberRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 4 },
+  rememberRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 0 },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   chk: { width: 16, height: 16, borderWidth: 1, borderColor: '#bbb', justifyContent: 'center', alignItems: 'center' },
   chkOn: { backgroundColor: '#E50914', borderColor: '#E50914' },
   rememberTxt: { color: '#666', fontSize: 13 },
   forgotTxt: { color: '#E50914', fontSize: 12, fontWeight: '700' },
   
-  primaryBtn: { backgroundColor: '#E50914', paddingVertical: 14, alignItems: 'center', marginBottom: 20 },
+  primaryBtn: { backgroundColor: '#E50914', paddingVertical: 12, alignItems: 'center', marginBottom: 16 },
   primaryBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 1.5 },
   
-  separatorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
+  separatorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
   separatorLine: { flex: 1, height: 1, backgroundColor: '#eee' },
   separatorDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1, borderColor: '#ccc', backgroundColor: '#fff' },
   
-  googleBtn: { borderWidth: 1, borderColor: '#000', paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 30 },
+  googleBtn: { borderWidth: 1, borderColor: '#000', paddingVertical: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 20 },
   googleBtnTxt: { color: '#000', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
   
   bottomRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' },

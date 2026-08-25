@@ -80,7 +80,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     : getImageUrl(movie.backdrop_path, 'original');
 
   return (
-    <View style={[styles.container, { width, height: isSmallScreen ? height * 0.72 : height * 0.9 }]}>
+    <View style={[styles.container, { width, height: isSmallScreen ? height * 0.60 : height * 0.9 }]}>
       <Image
         source={{ uri: imageUri }}
         style={StyleSheet.absoluteFillObject}

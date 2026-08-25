@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Modal,
   View,
@@ -564,7 +564,7 @@ export default function MovieModal({
               scrollEventThrottle={16}
             >
               {/* Hero Section con backdrop */}
-              <View style={styles.heroSection}>
+              <View style={[styles.heroSection, { height: isSmallScreen ? height * 0.55 : height * 0.65 }]}>
                 {/* Imagen de fondo o trailer */}
                 {trailerDelay && trailerKey && !trailerFinished ? (
                   <View style={styles.trailerBackground} pointerEvents="none">
@@ -852,7 +852,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroSection: {
-    height: '120%',
     position: 'relative',
     justifyContent: 'flex-end',
     paddingBottom: 0,

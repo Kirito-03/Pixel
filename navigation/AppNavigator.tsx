@@ -416,6 +416,7 @@ export default function AppNavigator() {
           headerShown: false,
           animation: 'fade',
           presentation: 'card',
+          gestureEnabled: false,
         }}
         initialRouteName={initialRoute === 'RESTORED_STATE' ? undefined : initialRoute}
       >

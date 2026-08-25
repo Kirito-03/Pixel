@@ -845,7 +845,7 @@ export default function AnimeSeriesModal({
             }
           >
             {/* HERO SECTION */}
-            <View style={[heroStyles.heroSection, { height: isSmallScreen ? height * 0.72 : height * 0.75 }]}>
+            <View style={[heroStyles.heroSection, { height: isSmallScreen ? height * 0.55 : height * 0.65 }]}>
               {/* Backdrop + gradiente cinematográfico */}
               {trailerDelay && trailerKey && !trailerFinished ? (
                 <View style={styles.trailerBackground}>
