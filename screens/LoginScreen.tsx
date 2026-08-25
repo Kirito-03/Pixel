@@ -341,6 +341,7 @@ export default function LoginScreen({ navigation }: any) {
       )}
 
       <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={[mobileStyles.scrollContent, { minHeight: screenHeight }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
