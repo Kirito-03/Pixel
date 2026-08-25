@@ -180,6 +180,9 @@ export async function searchAniListByMalId(malId) {
  */
 export async function searchJikanMetadata(title) {
   try {
+    // Pausa preventiva de 2 segundos obligatoria para evitar sobrecargar (HTTP 504/429) a MyAnimeList
+    await new Promise(r => setTimeout(r, 2000));
+
     const response = await axios.get(
       `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`,
       { timeout: 10000 }
