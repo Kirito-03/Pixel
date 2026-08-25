@@ -896,6 +896,7 @@ export const simStyles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   card: {
+    width: 110,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#1c1c1c',
