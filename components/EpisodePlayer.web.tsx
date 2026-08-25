@@ -19,7 +19,14 @@ const EpisodePlayer: React.FC<any> = ({
   const [serverIndex, setServerIndex] = useState(0);
 
   // Fallback to episode.url if external_servers is empty
-  const servers = episode?.external_servers || [];
+  let servers = [];
+  try {
+    servers = typeof episode?.external_servers === 'string' 
+      ? JSON.parse(episode.external_servers) 
+      : (episode?.external_servers || []);
+  } catch (e) {
+    console.error('Error parsing external_servers', e);
+  }
   
   // Resolve source based on serverIndex or default
   let source = '';
@@ -89,7 +96,7 @@ const EpisodePlayer: React.FC<any> = ({
             style={styles.video as any}
             allowFullScreen
             frameBorder="0"
-            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
           />
         </View>
       ) : (
