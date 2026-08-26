@@ -17,6 +17,7 @@ import {
   Alert,
   Pressable,
   Linking,
+  BackHandler,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -815,6 +816,7 @@ export default function AnimeSeriesModal({
       transparent
       animationType="slide"
       statusBarTranslucent
+      onRequestClose={handleClose}
     >
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
         <StatusBar style="light" translucent />
@@ -931,7 +933,7 @@ export default function AnimeSeriesModal({
                         transform: [{ scale: 1.05 }],
                       },
                     ]}
-                    resizeMode={Platform.OS !== 'web' ? 'contain' : 'cover'}
+                    resizeMode="cover"
                   />
                   {/* Gradiente multi-stop — más agresivo en la mitad inferior para legibilidad */}
                   <LinearGradient
