@@ -204,18 +204,20 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
 
           {/* Derecha: Búsqueda + Perfil */}
           <View style={dynamicStyles.rightContainer}>
-            {/* Botón buscar */}
-            <Animated.View style={{ transform: [{ scale: searchIconScale }] }}>
-              <TouchableOpacity
-                style={dynamicStyles.searchButton}
-                onPress={() => {
-                  animateIcon(searchIconScale);
-                  onSearchPress?.();
-                }}
-              >
-                <Ionicons name="search" size={isSmallScreen ? 18 : 20} color={colors.text} />
-              </TouchableOpacity>
-            </Animated.View>
+            {/* Botón buscar — solo en web; en mobile usa la tab de abajo */}
+            {Platform.OS === 'web' && (
+              <Animated.View style={{ transform: [{ scale: searchIconScale }] }}>
+                <TouchableOpacity
+                  style={dynamicStyles.searchButton}
+                  onPress={() => {
+                    animateIcon(searchIconScale);
+                    onSearchPress?.();
+                  }}
+                >
+                  <Ionicons name="search" size={isSmallScreen ? 18 : 20} color={colors.text} />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
 
             {/* Avatar/Perfil */}
             <TouchableOpacity
