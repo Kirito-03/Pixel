@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, Image, useWindowDimensions } from 'react-native';
+import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, Image, useWindowDimensions, BackHandler, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -172,22 +172,38 @@ export default function SearchScreen() {
     recordRecentSearch(text);
   };
 
-  const handleMoviePress = (id: number) => {
-    const contentItem = results.find(item => item.id === id);
+  const handleMoviePress = (id: number | string) => {
+    const contentItem = results.find(item => String(item.id) === String(id));
     if (contentItem) {
       setSelectedContent(contentItem);
       setModalVisible(true);
+    } else {
+      console.warn('Anime not found in results for id:', id);
     }
   };
 
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const onBackPress = () => {
+      if (modalVisible) return false;
+      if (selectedGenre || query.length > 0) {
+        clearSearch();
+        return true;
+      }
+      return false;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [selectedGenre, query, modalVisible]);
+
   const renderHighlight = (text: string, highlight: string) => {
-    if (!highlight.trim()) return <Text style={[styles.suggestionText, { color: colors.text }]}>{text}</Text>;
+    if (!highlight.trim()) return <Text style={[styles.suggestionText, { color: colors.text, flex: 1 }]} numberOfLines={2}>{text}</Text>;
     // Escapar caracteres especiales para regex
     const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(${escapedHighlight})`, 'gi');
     const parts = text.split(regex);
     return (
-      <Text style={[styles.suggestionText, { color: colors.text }]}>
+      <Text style={[styles.suggestionText, { color: colors.text, flex: 1 }]} numberOfLines={2}>
         {parts.map((part, i) =>
           regex.test(part) ? (
             <Text key={i} style={{ color: '#E50914', fontWeight: 'bold' }}>
@@ -221,7 +237,7 @@ export default function SearchScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* SafeAreaView solo en web; en Android controlamos el padding manualmente con insets */}
-      <View style={{ zIndex: 100 }}>
+      <View style={{ zIndex: 100, elevation: 100 }}>
         <View style={[styles.megaHeaderContainer, { paddingHorizontal: hPad, paddingTop: headerPaddingTop }]}>
           {/* Top mini-bar — solo en web */}
           {isWeb && (
@@ -264,7 +280,7 @@ export default function SearchScreen() {
 
           {/* Sugerencias — solo absolute en web */}
           {isWeb && suggestions.length > 0 && (
-            <View style={[styles.suggestionsDropdown, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#222' : '#ddd' }]}>
+            <ScrollView style={[styles.suggestionsDropdown, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#222' : '#ddd' }]} keyboardShouldPersistTaps="handled">
               {suggestions.map((item) => (
                 <TouchableOpacity
                   key={item.id}
@@ -285,36 +301,14 @@ export default function SearchScreen() {
                   </View>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           )}
         </View>
       </View>
 
-      {/* Sugerencias en Android — en el flujo normal, debajo del header */}
-      {!isWeb && suggestions.length > 0 && (
-        <View style={[styles.suggestionsNative, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#1a1a1a' : '#ddd' }]}>
-          {suggestions.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.suggestionItemRow}
-              onPress={() => handleSuggestionPress(item)}
-            >
-              <View style={styles.suggestionLeft}>
-                {item.poster_path ? (
-                  <Image source={{ uri: item.poster_path }} style={styles.suggestionThumb} />
-                ) : (
-                  <View style={styles.suggestionThumbFallback} />
-                )}
-                <Ionicons name="search" size={14} color={colors.textMuted || "#555"} style={{ marginHorizontal: 12 }} />
-                {renderHighlight(item.title, query)}
-              </View>
-              <View style={styles.suggestionBadge}>
-                <Text style={styles.suggestionBadgeText}>ANIME</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+
+
+
 
       {/* Main Content Area (Scrollable) */}
       <FlatList
@@ -325,6 +319,32 @@ export default function SearchScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
+            {/* Sugerencias en Android - Dentro de la lista para que scrollee natural sin desbordarse */}
+            {!isWeb && suggestions.length > 0 && (
+              <View style={[styles.suggestionsNative, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#1a1a1a' : '#ddd', marginBottom: 20 }]}>
+                {suggestions.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.suggestionItemRow}
+                    onPress={() => handleSuggestionPress(item)}
+                  >
+                    <View style={styles.suggestionLeft}>
+                      {item.poster_path ? (
+                        <Image source={{ uri: item.poster_path }} style={styles.suggestionThumb} />
+                      ) : (
+                        <View style={styles.suggestionThumbFallback} />
+                      )}
+                      <Ionicons name="search" size={14} color={colors.textMuted || "#555"} style={{ marginHorizontal: 12 }} />
+                      {renderHighlight(item.title, query)}
+                    </View>
+                    <View style={styles.suggestionBadge}>
+                      <Text style={styles.suggestionBadgeText}>ANIME</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {recentQueries.length > 0 && !selectedGenre && query.length === 0 && (
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeaderRow}>
@@ -521,7 +541,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a',
     borderBottomWidth: 1,
     borderColor: '#1a1a1a',
-    maxHeight: 320,
   },
   suggestionItemRow: {
     flexDirection: 'row',

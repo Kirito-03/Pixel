@@ -182,6 +182,13 @@ export default function AdminDashboardScreen() {
                                             primary
                                         />
                                         <QuickAction
+                                            title="Bot Inteligente"
+                                            subtitle="Asistente de scraping y reportes"
+                                            icon="hardware-chip-outline"
+                                            onPress={() => navigation.navigate('AdminBot' as never)}
+                                            primary
+                                        />
+                                        <QuickAction
                                             title="Actualizar noticias"
                                             subtitle="NewsAPI → cache"
                                             icon="refresh"

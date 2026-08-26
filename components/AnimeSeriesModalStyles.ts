@@ -683,8 +683,8 @@ export const continueStyles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#181818',
     marginHorizontal: 16,
-    marginTop: -52,
-    marginBottom: 4,
+    marginTop: -10, // Menor margen negativo para no tapar los botones
+    marginBottom: 16,
     borderRadius: 4,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,

@@ -374,17 +374,25 @@ export default function AnimeSeriesModal({
   const loadRelatedContent = async () => {
     if (!currentContent) return;
     
-    if ((currentContent.type as string) === 'anime') {
-      setRelatedContent([]);
-      return;
-    }
-
     setLoadingRelated(true);
     try {
       let similar: any[] = [];
       let recommended: any[] = [];
       
-      if (currentContent.type === 'movie') {
+      if (currentContent.type === 'anime') {
+        try {
+          const genres = currentContent.genres || [];
+          if (genres.length > 0) {
+            const response = await catalogService.getAnimeList({ genre: genres[0], limit: 15 });
+            similar = (response.data || []).filter(a => String(a.id) !== String(currentContent.id));
+          } else {
+            const response = await catalogService.getAnimeList({ limit: 15 });
+            similar = (response.data || []).filter(a => String(a.id) !== String(currentContent.id));
+          }
+        } catch (error) {
+          console.log('Error loading related anime');
+        }
+      } else if (currentContent.type === 'movie') {
         try {
           const movieDetails = await getMovieDetails(currentContent.id);
           similar = [movieDetails];
@@ -404,25 +412,33 @@ export default function AnimeSeriesModal({
           similar = [];
           recommended = [];
         }
-      } else {
-        similar = [];
-        recommended = [];
       }
       
       const combined = [...similar, ...recommended];
-      const unique = combined.filter((item, index, self) => index === self.findIndex(t => t.id === item.id));
+      const unique = combined.filter((item, index, self) => index === self.findIndex(t => String(t.id) === String(item.id)));
 
       // Mapear a ContentItem unificado según el tipo
       let mapped: ContentItem[] = [];
-      if ((currentContent.type as string) === 'anime') {
-        mapped = unique.map((anime: Anime) => animeToContentItem(anime));
+      if (currentContent.type === 'anime') {
+        mapped = unique.map((anime: any) => ({
+          id: Number(anime.id),
+          type: 'anime',
+          title: anime.title || anime.title_romaji || 'Sin título',
+          overview: anime.description || '',
+          poster_path: anime.poster_url || '',
+          backdrop_path: anime.banner_url || anime.poster_url || '',
+          release_date: anime.release_date || '',
+          vote_average: typeof anime.rating === 'number' ? anime.rating : 0,
+          source: 'anilist',
+          genres: Array.isArray(anime.genres) ? anime.genres : [],
+        }));
       } else if (currentContent.type === 'movie') {
         mapped = unique.map((movie: any) => tmdbToContentItem(movie as any, 'movie'));
       } else if (currentContent.type === 'tv') {
         mapped = unique.map((show: any) => tmdbToContentItem(show as any, 'tv'));
       }
 
-      setRelatedContent(mapped.slice(0, 20));
+      setRelatedContent(mapped.slice(0, 15));
     } catch (error) {
       console.error('Error loading related content:', error);
       setRelatedContent([]);
@@ -1186,50 +1202,7 @@ export default function AnimeSeriesModal({
                     )}
                   </View>
 
-                  {/* Botones de acción: Mi Lista y Descargas arriba de las temporadas */}
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity 
-                      style={[styles.myListButton, isTogglingMyList && { opacity: 0.6 }]}
-                      onPress={handleToggleList}
-                      disabled={isTogglingMyList}
-                    >
-                      {isTogglingMyList ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Ionicons 
-                          name={currentInMyList ? "checkmark" : "add"} 
-                          size={20} 
-                          color="#FFFFFF" 
-                        />
-                      )}
-                      <Text style={styles.myListButtonText}>
-                        {isTogglingMyList ? "Procesando..." : (currentInMyList ? "En mi lista" : "Mi lista")}
-                      </Text>
-                    </TouchableOpacity>
-
-                    {Platform.OS === 'android' && (
-                      <TouchableOpacity
-                        style={[styles.downloadButton, (isTogglingDownloads || isAnimeMovie() || !selectedSeason) && { opacity: 0.6 }]}
-                        onPress={() => currentInDownloads ? handleRemoveFromDownloads() : handleDownloadOptions()}
-                        disabled={isTogglingDownloads || isAnimeMovie() || !selectedSeason}
-                      >
-                        {isTogglingDownloads ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Ionicons
-                            name={currentInDownloads ? 'checkmark-circle' : 'download-outline'}
-                            size={20}
-                            color="#FFFFFF"
-                          />
-                        )}
-                        <Text style={styles.downloadButtonText}>
-                          {isTogglingDownloads
-                            ? 'Descargando...'
-                            : (currentInDownloads ? 'Descargado' : 'Descargar')}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  {/* Botones de acción eliminados porque ya existen en la cabecera principal */}
                   
                   {loadingStreaming ? (
                     <View style={styles.streamingLoading}>

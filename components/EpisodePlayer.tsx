@@ -13,8 +13,102 @@ import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { AnimeEpisode, VideoSource } from '../types';
 import { progressApi } from '../services/progressApi';
+
+const AD_BLOCK_SCRIPT = `
+(function() {
+  // Bloquear popups y nuevas ventanas
+  window.open = function() { return null; };
+  window.alert = function() {};
+  window.confirm = function() { return false; };
+
+  // Evitar que reescriban window.open
+  Object.defineProperty(window, 'open', {
+    get: function() { return function() { return null; }; },
+    set: function() {}
+  });
+
+  function removeAds() {
+    // Eliminar iframes maliciosos y elementos publicitarios
+    const adSelectors = [
+      'iframe[src*="ads"]', 'iframe[src*="ad."]', 'iframe[src*="doubleclick"]',
+      'iframe[src*="googlesyndication"]', 'iframe[src*="adsbygoogle"]',
+      'div[id*="overlay"]:not(#player)', 'div[id*="popup"]', 'div[id*="modal"]:not(#player)',
+      'div[class*="overlay"]:not(.player)', 'div[class*="popup"]',
+      'div[class*="ad-"]:not(.player)', 'div[class*="ads-"]',
+      'a[href*="claim"]', '.claim', '#claim',
+      '[class*="bonus"]', '[id*="bonus"]',
+      '[class*="promo"]', '[id*="promo"]',
+      'a[target="_blank"]' // Eliminar enlaces que abren nueva pestaña (suelen ser ads)
+    ];
+    
+    adSelectors.forEach(function(sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function(el) {
+          if (!el.closest('#player') && !el.closest('video')) {
+            el.remove();
+          }
+        });
+      } catch(e) {}
+    });
+
+    // Ocultar overlays posicionados absolutos/fixed que cubren el reproductor (trampa de clic de Voe)
+    document.querySelectorAll('body > div, body > section, body > a').forEach(function(el) {
+      var style = window.getComputedStyle(el);
+      if ((style.position === 'fixed' || style.position === 'absolute') &&
+          style.zIndex > 100 && !el.id.includes('player') && !el.id.includes('video') && !el.className.includes('plyr')) {
+        el.style.display = 'none';
+        el.style.pointerEvents = 'none';
+      }
+      
+      // Voe inyecta a veces un div gigante transparente para atrapar clics
+      if ((style.width === '100%' || style.height === '100%') && style.opacity == 0 && el.tagName === 'DIV') {
+         el.remove();
+      }
+    });
+  }
+
+  removeAds();
+  setInterval(removeAds, 500);
+
+  // Interceptar TODOS los clics a nivel de documento
+  document.addEventListener('click', function(e) {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('user_interaction');
+    
+    var target = e.target;
+    // Si el clic NO fue en el video o en los controles (plyr), bloquearlo agresivamente
+    if (target && !target.closest('.plyr') && !target.closest('video') && !target.closest('#player')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+
+    if (target && target.tagName === 'A') {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+  }, true);
+
+  // Interceptar touch también
+  document.addEventListener('touchstart', function(e) {
+     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('user_interaction');
+     
+     var target = e.target;
+     if (target && !target.closest('.plyr') && !target.closest('video') && !target.closest('#player')) {
+        // Permitimos el touch, pero si es un enlace lo bloqueamos
+        if (target.tagName === 'A') {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+     }
+  }, true);
+
+  true;
+})();
+`;
 
 interface EpisodePlayerProps {
   episode: AnimeEpisode;
@@ -60,6 +154,17 @@ const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   const player = useVideoPlayer(videoUrl, p => {
     p.play();
   });
+
+  useEffect(() => {
+    console.log('NATIVE VIDEO URL:', videoUrl);
+  }, [videoUrl]);
+
+  useEffect(() => {
+    console.log('Video Player Status:', player.status);
+    if (player.status === 'error' || player.error) {
+      console.error('Video Player Error:', player.error);
+    }
+  }, [player.status, player.error]);
 
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
@@ -108,8 +213,6 @@ const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
         style={{ flex: 1 }}
         contentFit="contain"
         nativeControls={false}
-        allowsFullscreen
-        allowsPictureInPicture
       />
 
       {showControls && (
@@ -193,6 +296,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   const [sources, setSources] = useState<VideoSource[]>([]);
   const [selectedSource, setSelectedSource] = useState<VideoSource | null>(null);
   const [loading, setLoading] = useState(true);
+  const [webViewLoading, setWebViewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUI, setShowUI] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -260,6 +364,20 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   useEffect(() => {
     try { StatusBar.setHidden(true, 'fade'); } catch {}
     return () => { try { StatusBar.setHidden(false, 'fade'); } catch {} };
+  }, []);
+
+  // ── Orientación: forzar landscape al entrar, restaurar al salir ──
+  useEffect(() => {
+    if (Platform.OS === 'android' || Platform.OS === 'ios') {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+        .catch(() => {});
+    }
+    return () => {
+      if (Platform.OS === 'android' || Platform.OS === 'ios') {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+          .catch(() => {});
+      }
+    };
   }, []);
 
   // ── HLS (web) ────────────────────────────────────────────────
@@ -393,6 +511,85 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     }
 
     // ── MOBILE: native expo-video ─────────────────────────────
+    // Si no es un enlace directo de video (mp4, m3u8, webm), usamos WebView
+    const isDirectVideo = ext === 'm3u8' || ext === 'mp4' || ext === 'webm' || ext === 'mov';
+    
+    if (!isDirectVideo) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <WebView
+            source={{ uri: videoUrl }}
+            style={{ flex: 1 }}
+            allowsFullscreenVideo
+            javaScriptEnabled
+            domStorageEnabled
+            mediaPlaybackRequiresUserAction={false}
+            injectedJavaScript={AD_BLOCK_SCRIPT}
+            injectedJavaScriptBeforeContentLoaded={AD_BLOCK_SCRIPT}
+            onMessage={(event) => {
+              if (event.nativeEvent.data === 'user_interaction') {
+                showUITemporarily();
+              }
+            }}
+            onLoadStart={() => setWebViewLoading(true)}
+            onLoadEnd={() => setWebViewLoading(false)}
+            onShouldStartLoadWithRequest={(request) => {
+              // Bloquear navegación a páginas de anuncios conocidas
+              const url = request.url || '';
+              const isAd = url.includes('doubleclick') ||
+                           url.includes('googlesyndication') ||
+                           url.includes('adserver') ||
+                           url.includes('clickadu') ||
+                           url.includes('propellerads') ||
+                           url.includes('popcash') ||
+                           url.includes('adcash');
+              return !isAd;
+            }}
+          />
+          {/* Indicador de carga propio del WebView */}
+          {webViewLoading && (
+            <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]} pointerEvents="none">
+              <ActivityIndicator size="large" color="#E50914" />
+              <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12, fontSize: 13 }}>Cargando reproductor...</Text>
+            </View>
+          )}
+          {/* Interfaz Animada */}
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: uiOpacity }]} pointerEvents={showUI ? 'box-none' : 'none'}>
+            <LinearGradient
+              colors={['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.4)', 'transparent']}
+              style={styles.gradTop}
+              pointerEvents="none"
+            />
+            
+            {/* Top Bar */}
+            <View style={styles.topBar}>
+              <TouchableOpacity style={styles.backBtn} onPress={onClose}>
+                <Ionicons name="arrow-back" size={20} color="#fff" />
+              </TouchableOpacity>
+              <View style={styles.titleBlock}>
+                <Text style={styles.animeTitleOverlay} numberOfLines={1}>{animeTitle}</Text>
+                <Text style={styles.episodeTitleOverlay} numberOfLines={1}>
+                  Ep. {episode.number} — {episode.title}
+                </Text>
+              </View>
+            </View>
+
+            {/* Navigation Buttons */}
+            {hasPreviousEpisode && (
+              <TouchableOpacity style={[styles.floatNav, styles.floatNavLeft]} onPress={onPreviousEpisode}>
+                <Ionicons name="chevron-back" size={28} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {hasNextEpisode && (
+              <TouchableOpacity style={[styles.floatNav, styles.floatNavRight]} onPress={onNextEpisode}>
+                <Ionicons name="chevron-forward" size={28} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        </View>
+      );
+    }
+
     return (
       <NativeVideoPlayer
         videoUrl={videoUrl}

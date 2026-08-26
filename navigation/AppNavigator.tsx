@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Storage } from '../services/storage';
+import * as SplashScreen from 'expo-splash-screen';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -335,24 +336,9 @@ export default function AppNavigator() {
 
   // Load navigation state on mount
   useEffect(() => {
-    const restoreState = async () => {
-      try {
-        const savedStateString = Storage.getString('NAVIGATION_STATE');
-        const state = savedStateString ? JSON.parse(savedStateString) : undefined;
-
-        if (state !== undefined) {
-          setInitialState(state);
-        }
-      } catch (e) {
-        console.error('Error loading navigation state:', e);
-      } finally {
-        setIsReady(true);
-      }
-    };
-
-    if (!isReady) {
-      restoreState();
-    }
+    // Hemos deshabilitado la restauración del estado de navegación
+    // porque estados guardados con estructuras antiguas causan pantalla negra.
+    setIsReady(true);
   }, [isReady]);
 
   useEffect(() => {
@@ -394,6 +380,11 @@ export default function AppNavigator() {
         // Si no hay perfil, ir a selección de perfil
         setInitialRoute('SeleccionPerfil');
       }
+      
+      // Ocultar la pantalla de carga (Splash Screen) nativa explícitamente
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {}
     };
 
     determineInitialRoute();
@@ -407,10 +398,6 @@ export default function AppNavigator() {
   return (
     <NavigationContainer
       linking={linking}
-      initialState={initialState}
-      onStateChange={(state) => {
-        Storage.setObject('NAVIGATION_STATE', state);
-      }}
     >
       <RootStack.Navigator
         screenOptions={{
