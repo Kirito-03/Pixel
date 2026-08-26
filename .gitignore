@@ -90,3 +90,4 @@ yarn-error.*
 *.mkv
 *.avi
 server/videos/*.ts
+*.apk
