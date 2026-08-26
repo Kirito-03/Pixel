@@ -217,8 +217,7 @@ function MainTabs({ route }: { route: any }) {
           tabBarLabel: 'Inicio',
         }}
       />
-      {Platform.OS === 'web' && (
-        <Tab.Screen
+      <Tab.Screen
           name="Buscar"
           component={SearchScreen}
           options={{
@@ -229,7 +228,6 @@ function MainTabs({ route }: { route: any }) {
             tabBarLabel: 'Buscar',
           }}
         />
-      )}
       <Tab.Screen
         name="Noticias"
         component={NewsNavigator}
@@ -272,8 +270,7 @@ function MainTabs({ route }: { route: any }) {
           tabBarLabel: 'Mi Lista',
         }}
       />
-      {Platform.OS === 'web' && (
-        <Tab.Screen
+      <Tab.Screen
           name="Perfil"
           component={ProfileScreen}
           options={{
@@ -284,7 +281,6 @@ function MainTabs({ route }: { route: any }) {
             tabBarLabel: 'Perfil',
           }}
         />
-      )}
 
     </Tab.Navigator>
   );
