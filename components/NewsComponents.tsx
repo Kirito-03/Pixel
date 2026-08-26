@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { NewsItem } from '../data/mockNews';
+import { useTheme } from '../contexts/ThemeContext';
 
 const BADGE_COLORS: Record<string, string> = {
   Estreno: '#E50914',
@@ -143,6 +144,7 @@ interface NewsCardProps {
 }
 
 export function NewsCard({ item, onPress }: NewsCardProps) {
+  const { colors, theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const isWeb = Platform.OS === 'web';
   const [imageError, setImageError] = useState(false);
@@ -163,7 +165,7 @@ export function NewsCard({ item, onPress }: NewsCardProps) {
         onHoverIn={() => setIsHovered(true)}
         onHoverOut={() => setIsHovered(false)}
       >
-        <Animated.View style={[styles.card, { transform: [{ scale }] }, isHovered && styles.cardHovered]}>
+        <Animated.View style={[styles.card, { backgroundColor: theme === 'dark' ? '#111' : '#fff', borderColor: theme === 'dark' ? '#222' : '#ddd' }, { transform: [{ scale }] }, isHovered && { borderColor: '#E50914', backgroundColor: theme === 'dark' ? '#161616' : '#f9f9f9' }]}>
         {/* Imagen */}
         <View style={styles.cardImageBox}>
           {!item.image || imageError ? (
@@ -188,14 +190,14 @@ export function NewsCard({ item, onPress }: NewsCardProps) {
         {/* Contenido */}
         <View style={styles.cardBody}>
           <View style={styles.dateRow}>
-            <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.45)" />
-            <Text style={styles.cardDate}>{formatDate(item.date)}</Text>
+            <Ionicons name="calendar-outline" size={11} color={colors.textMuted || "rgba(255,255,255,0.45)"} />
+            <Text style={[styles.cardDate, { color: colors.textMuted }]}>{formatDate(item.date)}</Text>
           </View>
-          <Text style={[styles.cardTitle, isHovered && styles.cardTitleHovered]} numberOfLines={2}>{item.title}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }, isHovered && styles.cardTitleHovered]} numberOfLines={2}>{item.title}</Text>
           {isHovered ? (
             <Text style={styles.readMoreText}>LEER MÁS {'>'}</Text>
           ) : (
-            <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
+            <Text style={[styles.cardDesc, { color: colors.textMuted }]} numberOfLines={2}>{item.description}</Text>
           )}
         </View>
       </Animated.View>
@@ -214,21 +216,22 @@ interface TrendingItemProps {
 }
 
 export function TrendingItem({ rank, title, description }: TrendingItemProps) {
+  const { colors, theme } = useTheme();
   const isTop = rank === 1;
   const rankStr = `#${rank}`;
 
   return (
-    <View style={[styles.trendingCard, isTop && styles.trendingCardTop]}>
+    <View style={[styles.trendingCard, isTop && styles.trendingCardTop, { backgroundColor: isTop ? (theme === 'dark' ? 'rgba(229,9,20,0.08)' : 'rgba(229,9,20,0.05)') : 'transparent', borderColor: isTop ? '#E50914' : (theme === 'dark' ? '#222' : '#ddd') }]}>
       {/* Número */}
-      <Text style={[styles.trendingRank, isTop && styles.trendingRankTop]}>{rankStr}</Text>
+      <Text style={[styles.trendingRank, isTop && styles.trendingRankTop, !isTop && { color: colors.textMuted }]}>{rankStr}</Text>
 
       {/* Separador vertical */}
-      <View style={[styles.trendingDivider, isTop && { backgroundColor: '#E50914' }]} />
+      <View style={[styles.trendingDivider, !isTop && { backgroundColor: theme === 'dark' ? '#333' : '#ccc' }, isTop && { backgroundColor: '#E50914' }]} />
 
       {/* Info */}
       <View style={styles.trendingInfo}>
-        <Text style={styles.trendingTitle} numberOfLines={1}>{title}</Text>
-        <Text style={styles.trendingDesc} numberOfLines={1}>{description}</Text>
+        <Text style={[styles.trendingTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.trendingDesc, { color: colors.textMuted }]} numberOfLines={1}>{description}</Text>
       </View>
 
       {isTop && <Ionicons name="flame" size={18} color="#E50914" style={{ marginLeft: 'auto' as any }} />}

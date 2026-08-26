@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../contexts/ThemeContext';
 import { Linking } from 'react-native';
 import { MOCK_TRENDING } from '../data/mockNews';
 import { NewsHero, NewsCard, TrendingItem } from '../components/NewsComponents';
@@ -48,12 +49,13 @@ function summarizeFromParts(title?: string | null, excerpt?: string | null, cont
 }
 
 export default function NewsScreen() {
+  const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
   const navigation = useNavigation<any>();
   const { navigateByLabel } = useTabNavigation();
-  const [blackHeader, setBlackHeader] = useState(true);
+  const [blackHeader, setBlackHeader] = useState(theme === 'dark');
   const [loading, setLoading] = useState(true);
   const [featured, setFeatured] = useState<NewsArticle | null>(null);
   const [items, setItems] = useState<NewsArticle[]>([]);
@@ -113,6 +115,10 @@ export default function NewsScreen() {
     };
   }, [category]);
 
+  useEffect(() => {
+    setBlackHeader(theme === 'dark');
+  }, [theme]);
+
   const toNewsItem = (a: NewsArticle) => ({
     id: a.slug,
     title: a.title,
@@ -137,7 +143,7 @@ export default function NewsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header flotante compartido — activeNav=Noticias */}
       <Header
         black={blackHeader}
@@ -154,12 +160,12 @@ export default function NewsScreen() {
         {/* ── PAGE HEADER ── */}
         <SafeAreaView>
           <View style={styles.pageHeader}>
-            <Text style={styles.superTitle}>ÚLTIMAS NOVEDADES</Text>
+            <Text style={[styles.superTitle, { color: colors.primary }]}>ÚLTIMAS NOVEDADES</Text>
             <View style={styles.titleRow}>
-              <Text style={styles.pageTitleWhite}>NOTI</Text>
+              <Text style={[styles.pageTitleWhite, { color: colors.text }]}>NOTI</Text>
               <Text style={styles.pageTitleRed}>CIAS</Text>
             </View>
-            <Text style={styles.pageSubtitle}>DEL MUNDO DEL ANIME Y MANGA</Text>
+            <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>DEL MUNDO DEL ANIME Y MANGA</Text>
           </View>
         </SafeAreaView>
 
@@ -182,9 +188,9 @@ export default function NewsScreen() {
                   key={c || 'all'}
                   activeOpacity={0.9}
                   onPress={() => setCategory(c)}
-                  style={[styles.categoryChip, active && styles.categoryChipActive]}
+                  style={[styles.categoryChip, active && styles.categoryChipActive, { backgroundColor: active ? (theme === 'dark' ? 'rgba(229,9,20,0.2)' : 'rgba(229,9,20,0.1)') : 'transparent', borderColor: active ? '#E50914' : (theme === 'dark' ? '#333' : '#ccc') }]}
                 >
-                  <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>{label}</Text>
+                  <Text style={[styles.categoryChipText, { color: colors.textMuted }, active && [styles.categoryChipTextActive, { color: colors.text }]]}>{label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -199,9 +205,9 @@ export default function NewsScreen() {
             </View>
           ) : grid.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Ionicons name="newspaper-outline" size={46} color="rgba(255,255,255,0.18)" />
-              <Text style={styles.emptyTitle}>Sin noticias</Text>
-              <Text style={styles.emptyText}>Intenta otra categoría o vuelve más tarde</Text>
+              <Ionicons name="newspaper-outline" size={46} color={theme === 'dark' ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.2)"} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>Sin noticias</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>Intenta otra categoría o vuelve más tarde</Text>
             </View>
           ) : (
             chunks.map((chunk, ci) => (
@@ -227,7 +233,7 @@ export default function NewsScreen() {
           {/* Título de sección con ícono */}
           <View style={styles.sectionHeader}>
             <Ionicons name="trending-up" size={20} color="#E50914" />
-            <Text style={styles.sectionTitle}>Tendencias</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Tendencias</Text>
           </View>
 
           {/* Lista en dos columnas en web */}
