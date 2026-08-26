@@ -144,14 +144,7 @@ export default function NewsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header flotante compartido — activeNav=Noticias */}
-      <Header
-        black={blackHeader}
-        activeSection="Noticias"
-        onNavPress={navigateByLabel}
-        onSearchPress={() => navigateByLabel('Buscar')}
-        onProfilePress={() => navigateByLabel('Perfil')}
-      />
+
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -266,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0A0A',
   },
   scrollContent: {
-    paddingTop: 80, // espacio para el header flotante
+    paddingTop: 10,
   },
 
   /* PAGE HEADER */

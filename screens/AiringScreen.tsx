@@ -17,12 +17,13 @@ import { catalogService, CatalogAnime } from '../services/catalogService';
 import { getCurrentBaseURL } from '../services/databaseService';
 import { animeToContentItem } from '../services/api';
 import Header from '../components/Header';
-import { useTabNavigation } from '../hooks/useTabNavigation';
 import MovieModal from '../components/MovieModal';
 import { ContentItem } from '../types';
 import axios from 'axios';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function AiringScreen({ navigation }: any) {
+  const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const gap = 12;
   const desiredItemWidth = width < 768 ? (width * 0.3) : 160;
@@ -167,8 +168,8 @@ export default function AiringScreen({ navigation }: any) {
             <Text style={styles.epText}>{item.total_episodes ? `Ep ${item.total_episodes}` : 'Emisión'}</Text>
           </View>
         </View>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>Emisión actual</Text>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>Emisión actual</Text>
       </TouchableOpacity>
     );
   };
@@ -197,8 +198,8 @@ export default function AiringScreen({ navigation }: any) {
             <Text style={styles.epText}>{item.broadcast?.time || '00:00'}</Text>
           </View>
         </View>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>{item.broadcast?.string || 'Emisión semanal'}</Text>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>{item.broadcast?.string || 'Emisión semanal'}</Text>
       </TouchableOpacity>
     );
   };
@@ -214,7 +215,7 @@ export default function AiringScreen({ navigation }: any) {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header 
         activeSection="Emisión" 
         onNavPress={navigateByLabel}
@@ -226,33 +227,32 @@ export default function AiringScreen({ navigation }: any) {
       <View style={{ height: 90 }} />
 
       <View style={styles.headerTitleContainer}>
-        <Text style={styles.superTitle}>EN VIVO</Text>
         <View style={styles.titleRow}>
-          <Text style={styles.pageTitleWhite}>EMI</Text>
+          <Text style={[styles.pageTitleWhite, { color: colors.text }]}>EMI</Text>
           <Text style={styles.pageTitleRed}>SIÓN</Text>
         </View>
-        <Text style={styles.pageSubtitle}>CALENDARIO DE EMISIÓN SEMANAL</Text>
+        <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>CALENDARIO DE EMISIÓN SEMANAL</Text>
       </View>
       
       <View style={styles.tabsContainer}>
         <TouchableOpacity 
-          style={[styles.tabBtn, activeTab === 'local' && styles.tabBtnActive]}
+          style={[styles.tabBtn, activeTab === 'local' && styles.tabBtnActive, { backgroundColor: activeTab === 'local' ? '#E50914' : (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') }]}
           onPress={() => setActiveTab('local')}
         >
-          <Ionicons name="list" size={16} color={activeTab === 'local' ? '#fff' : '#666'} style={{ marginRight: 6 }} />
+          <Ionicons name="list" size={16} color={activeTab === 'local' ? '#fff' : (theme === 'dark' ? '#666' : '#999')} style={{ marginRight: 6 }} />
           <Text style={[styles.tabText, activeTab === 'local' && styles.tabTextActive]}>VER DISPONIBLES</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.tabBtn, activeTab === 'calendar' && styles.tabBtnActiveCalendar]}
+          style={[styles.tabBtn, activeTab === 'calendar' && styles.tabBtnActiveCalendar, { backgroundColor: activeTab === 'calendar' ? '#E50914' : (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') }]}
           onPress={() => setActiveTab('calendar')}
         >
-          <Ionicons name="calendar-outline" size={16} color={activeTab === 'calendar' ? '#fff' : '#666'} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive]}>CALENDARIO GLOBAL</Text>
+          <Ionicons name="calendar-outline" size={16} color={activeTab === 'calendar' ? '#fff' : (theme === 'dark' ? '#666' : '#999')} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive, !activeTab && { color: theme === 'dark' ? '#666' : '#999' }]}>CALENDARIO GLOBAL</Text>
         </TouchableOpacity>
       </View>
 
       {activeTab === 'calendar' && (
-        <View style={styles.daysContainer}>
+        <View style={[styles.daysContainer, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
           {DAYS.map(d => (
             <TouchableOpacity 
               key={d.id} 
@@ -262,7 +262,7 @@ export default function AiringScreen({ navigation }: any) {
                 setCalendarDay(d.id);
               }}
             >
-              <Text style={[styles.dayText, calendarDay === d.id && styles.dayTextActive]}>{d.label.toUpperCase()}</Text>
+              <Text style={[styles.dayText, calendarDay === d.id && styles.dayTextActive, calendarDay !== d.id && { color: theme === 'dark' ? '#666' : '#999' }]}>{d.label.toUpperCase()}</Text>
               {calendarDay === d.id && <View style={styles.activeDayDot} />}
             </TouchableOpacity>
           ))}
@@ -286,16 +286,16 @@ export default function AiringScreen({ navigation }: any) {
           </View>
         ) : error ? (
           <View style={styles.center}>
-            <Ionicons name="alert-circle-outline" size={48} color={colors.textGray} />
-            <Text style={styles.errorText}>{error}</Text>
+            <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
+            <Text style={[styles.errorText, { color: colors.textMuted }]}>{error}</Text>
             <TouchableOpacity style={styles.retryBtn} onPress={fetchAiringAnimes}>
-              <Text style={styles.retryText}>Reintentar</Text>
+              <Text style={[styles.retryText, { color: colors.text }]}>Reintentar</Text>
             </TouchableOpacity>
           </View>
         ) : animes.length === 0 ? (
           <View style={styles.center}>
-            <Ionicons name="tv-outline" size={48} color={colors.textGray} />
-            <Text style={styles.errorText}>No hay animes en emisión actualmente.</Text>
+            <Ionicons name="tv-outline" size={48} color={colors.textMuted} />
+            <Text style={[styles.errorText, { color: colors.textMuted }]}>No hay animes en emisión actualmente.</Text>
           </View>
         ) : (
           <FlatList
@@ -317,8 +317,8 @@ export default function AiringScreen({ navigation }: any) {
           </View>
         ) : calendarData.length === 0 ? (
           <View style={styles.center}>
-            <Ionicons name="calendar-outline" size={48} color={'#666'} />
-            <Text style={styles.errorText}>No hay animes programados para este día.</Text>
+            <Ionicons name="calendar-outline" size={48} color={theme === 'dark' ? '#666' : '#999'} />
+            <Text style={[styles.errorText, { color: colors.textMuted }]}>No hay animes programados para este día.</Text>
           </View>
         ) : (
           <FlatList
