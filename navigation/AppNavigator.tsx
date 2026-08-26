@@ -180,8 +180,8 @@ function MainTabs({ route }: { route: any }) {
   const tabBarBaseStyle = (isWeb && !isSmallWeb)
     ? { display: 'none' as const }
     : {
-        backgroundColor: '#0a0a0a',
-        borderTopColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: colors.card,
+        borderTopColor: colors.divider,
         borderTopWidth: 1,
         height: Platform.OS === 'android' ? 60 + insets.bottom : 85,
         paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 8) : 28,
@@ -198,8 +198,8 @@ function MainTabs({ route }: { route: any }) {
       screenOptions={{
         headerShown: false,
         tabBarStyle: tabBarBaseStyle,
-        tabBarActiveTintColor: '#E50914',
-        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.4)',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
