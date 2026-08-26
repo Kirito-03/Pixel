@@ -17,6 +17,7 @@ import { catalogService, CatalogAnime } from '../services/catalogService';
 import { getCurrentBaseURL } from '../services/databaseService';
 import { animeToContentItem } from '../services/api';
 import Header from '../components/Header';
+import { useTabNavigation } from '../hooks/useTabNavigation';
 import MovieModal from '../components/MovieModal';
 import { ContentItem } from '../types';
 import axios from 'axios';
