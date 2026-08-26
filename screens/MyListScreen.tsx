@@ -18,9 +18,10 @@ import AnimeSeriesModalWrapper from '../components/AnimeSeriesModalWrapper';
 import Header from '../components/Header';
 import { ContinueWatchingCard, WatchListItem } from '../components/MyListComponents';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { colors } from '../theme';
+import { colors as staticColors } from '../theme';
 import { ContentItem } from '../types';
 import { useTabNavigation } from '../hooks/useTabNavigation';
+import { useTheme } from '../contexts/ThemeContext';
 import { myListApi, MyListEntry } from '../services/myListApi';
 import { continueWatchingApi, ContinueWatchingEntry } from '../services/continueWatchingApi';
 import { progressApi } from '../services/progressApi';
@@ -33,6 +34,7 @@ function normalizeImagePath(path?: string | null): string {
 }
 
 export default function MyListScreen() {
+  const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const { currentProfile, adultContentEnabled } = useProfile();
@@ -213,18 +215,18 @@ export default function MyListScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingView}>
-        <Header black activeSection="Mi Lista" onNavPress={navigateByLabel} />
+      <View style={[styles.loadingView, { backgroundColor: colors.background }]}>
+        <Header black={theme === 'dark'} activeSection="Mi Lista" onNavPress={navigateByLabel} />
         <ActivityIndicator size="large" color="#E50914" style={{ marginTop: 120 }} />
-        <Text style={styles.loadingText}>Cargando Mi Lista...</Text>
+        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Cargando Mi Lista...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
-        black
+        black={theme === 'dark'}
         activeSection="Mi Lista"
         onNavPress={navigateByLabel}
         onSearchPress={() => navigateByLabel('Buscar')}
@@ -237,8 +239,8 @@ export default function MyListScreen() {
       >
         {/* ── PAGE HEADER ── */}
         <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>Mi Lista</Text>
-          <Text style={styles.pageSubtitle}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Mi Lista</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
             {items.length} {items.length === 1 ? 'anime guardado' : 'animes guardados'}
           </Text>
         </View>
@@ -248,7 +250,7 @@ export default function MyListScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="play-circle" size={20} color="#E50914" />
-              <Text style={styles.sectionTitle}>Continuar viendo</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Continuar viendo</Text>
             </View>
 
             <ScrollView
@@ -298,9 +300,9 @@ export default function MyListScreen() {
         {items.length === 0 ? (
           /* ── EMPTY STATE ── */
           <View style={styles.emptyState}>
-            <Ionicons name="bookmark-outline" size={64} color="rgba(255,255,255,0.1)" />
-            <Text style={styles.emptyTitle}>Tu lista está vacía</Text>
-            <Text style={styles.emptyText}>
+            <Ionicons name="bookmark-outline" size={64} color={theme === 'dark' ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.15)"} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Tu lista está vacía</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
               Agrega anime a tu lista para verlos más tarde
             </Text>
           </View>
@@ -308,8 +310,8 @@ export default function MyListScreen() {
           /* ── TODOS LOS ANIMES ── */
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="list" size={20} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.sectionTitle}>Todos los animes</Text>
+              <Ionicons name="list" size={20} color={colors.textMuted} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Todos los animes</Text>
             </View>
 
             <View style={isSmallScreen ? styles.listCol : styles.listGrid}>

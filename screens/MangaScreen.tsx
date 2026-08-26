@@ -11,12 +11,14 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 import Header from '../components/Header';
 import { MangaCard, MangaRankingItem, MangaFilterChips, MangaFilter, MangaItemUI } from '../components/MangaComponents';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { mangaApi, Manga } from '../services/mangaApi';
 
 export default function MangaScreen() {
+  const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const navigation = useNavigation<any>();
@@ -97,9 +99,9 @@ export default function MangaScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
-        black
+        black={theme === 'dark'}
         activeSection="Manga"
         onNavPress={navigateByLabel}
         onSearchPress={() => navigateByLabel('Buscar')}
@@ -111,19 +113,19 @@ export default function MangaScreen() {
         contentContainerStyle={styles.scrollContent}
         stickyHeaderIndices={[0]}
       >
-        <View style={styles.headerArea}>
+        <View style={[styles.headerArea, { backgroundColor: colors.background }]}>
           <Text style={styles.superTitle}>LEE EN LÍNEA</Text>
-          <Text style={styles.mainTitle}>
+          <Text style={[styles.mainTitle, { color: colors.text }]}>
             MANG<Text style={{color: '#E50914'}}>A</Text>
           </Text>
           
-          <View style={styles.searchWrapper}>
+          <View style={[styles.searchWrapper, { backgroundColor: colors.card, borderColor: theme === 'dark' ? '#222' : 'rgba(0,0,0,0.1)' }]}>
             <View style={styles.searchRedLine} />
-            <Ionicons name="search" size={20} color="#444" style={{marginLeft: 16, marginRight: 12}} />
+            <Ionicons name="search" size={20} color={colors.textMuted || "#444"} style={{marginLeft: 16, marginRight: 12}} />
             <TextInput
-              style={[styles.searchInput, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}]}
+              style={[styles.searchInput, { color: colors.text }, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}]}
               placeholder="Buscar manga..."
-              placeholderTextColor="#444"
+              placeholderTextColor={colors.textMuted || "#444"}
               value={search}
               onChangeText={setSearch}
             />
@@ -134,7 +136,7 @@ export default function MangaScreen() {
         <View style={styles.section}>
           <View style={styles.filtersWrapper}>
             <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
-            <Text style={styles.resultsCount}>{mapped.length} resultados</Text>
+            <Text style={[styles.resultsCount, { color: colors.textMuted }]}>{mapped.length} resultados</Text>
           </View>
 
           {/* ── GRID DE CARDS ── */}
@@ -144,8 +146,8 @@ export default function MangaScreen() {
             </View>
           ) : mapped.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={48} color="rgba(255,255,255,0.15)" />
-              <Text style={styles.emptyText}>No hay manga para este filtro.</Text>
+              <Ionicons name="book-outline" size={48} color={theme === 'dark' ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.2)"} />
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No hay manga para este filtro.</Text>
             </View>
           ) : (
             <View style={{ marginTop: 24, gap: 12 }}>
@@ -172,7 +174,7 @@ export default function MangaScreen() {
         {!search.trim() && popular.length > 0 && (
           <View style={[styles.section, { marginTop: 40 }]}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Ranking Popular</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Ranking Popular</Text>
             </View>
             <View style={styles.rankingGrid}>
               {popular.map((p, idx) => (

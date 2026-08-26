@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { MangaStatus } from '../services/mangaApi';
+import { useTheme } from '../contexts/ThemeContext';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -68,6 +69,7 @@ interface MangaCardProps {
 }
 
 export function MangaCard({ item, onPress }: MangaCardProps) {
+  const { colors, theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const isWeb = Platform.OS === 'web';
   const [imageError, setImageError] = useState(false);
@@ -120,14 +122,14 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
 
         {/* Info */}
         <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
           <View style={styles.cardMeta}>
-            <Ionicons name="document-text-outline" size={10} color="rgba(255,255,255,0.45)" />
-            <Text style={styles.cardMetaText}>{item.chapters} caps.</Text>
+            <Ionicons name="document-text-outline" size={10} color={colors.textMuted} />
+            <Text style={[styles.cardMetaText, { color: colors.textMuted }]}>{item.chapters} caps.</Text>
             {item.updatedAt && (
               <>
-                <Ionicons name="time-outline" size={10} color="rgba(255,255,255,0.45)" style={{ marginLeft: 4 }} />
-                <Text style={styles.cardMetaText}>{formatDate(item.updatedAt)}</Text>
+                <Ionicons name="time-outline" size={10} color={colors.textMuted} style={{ marginLeft: 4 }} />
+                <Text style={[styles.cardMetaText, { color: colors.textMuted }]}>{formatDate(item.updatedAt)}</Text>
               </>
             )}
           </View>
@@ -146,6 +148,7 @@ interface MangaRankingItemProps {
 }
 
 export function MangaRankingItem({ item, onPress }: MangaRankingItemProps) {
+  const { colors, theme } = useTheme();
   const isTop = item.rank === 1;
   const scale = useRef(new Animated.Value(1)).current;
   const [imageError, setImageError] = useState(false);
@@ -163,7 +166,7 @@ export function MangaRankingItem({ item, onPress }: MangaRankingItemProps) {
       onPressOut={onOut}
       style={styles.rankOuter}
     >
-      <Animated.View style={[styles.rankCard, isTop && styles.rankCardTop, { transform: [{ scale }] }]}>
+      <Animated.View style={[styles.rankCard, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }, isTop && styles.rankCardTop, isTop && { backgroundColor: theme === 'dark' ? '#1a0a0a' : '#ffe5e5' }, { transform: [{ scale }] }]}>
         {/* Thumbnail */}
         <View style={styles.rankThumbBox}>
           {!item.image || imageError ? (
@@ -175,12 +178,12 @@ export function MangaRankingItem({ item, onPress }: MangaRankingItemProps) {
 
         {/* Info */}
         <View style={styles.rankInfo}>
-          <Text style={styles.rankTitle} numberOfLines={1}>{item.title}</Text>
+          <Text style={[styles.rankTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
           <View style={styles.rankRow}>
             <Ionicons name="star" size={12} color="#FFD700" />
             <Text style={styles.rankRating}>{item.rating.toFixed(1)}</Text>
           </View>
-          <Text style={styles.rankChapters}>{item.chapters} capítulos disponibles</Text>
+          <Text style={[styles.rankChapters, { color: colors.textMuted }]}>{item.chapters} capítulos disponibles</Text>
           <View style={[styles.rankStatusPill, { backgroundColor: STATUS_COLORS[item.status] + '33' }]}>
             <Text style={[styles.rankStatusText, { color: STATUS_COLORS[item.status] }]}>
               {item.status}
@@ -189,7 +192,7 @@ export function MangaRankingItem({ item, onPress }: MangaRankingItemProps) {
         </View>
 
         {/* Número ranking */}
-        <Text style={[styles.rankNumber, isTop && styles.rankNumberTop]}>
+        <Text style={[styles.rankNumber, { color: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)' }, isTop && styles.rankNumberTop]}>
           #{item.rank}
         </Text>
       </Animated.View>
@@ -210,16 +213,17 @@ interface FilterChipsProps {
 const FILTERS: MangaFilter[] = ['Todos', 'En emisión', 'Finalizado', 'Hiatus', 'Cancelado'];
 
 export function MangaFilterChips({ active, onChange }: FilterChipsProps) {
+  const { colors, theme } = useTheme();
   return (
     <View style={styles.chipsRow}>
       {FILTERS.map(f => (
         <TouchableOpacity
           key={f}
-          style={[styles.chip, active === f && styles.chipActive]}
+          style={[styles.chip, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)' }, active === f && styles.chipActive]}
           onPress={() => onChange(f)}
           activeOpacity={0.8}
         >
-          <Text style={[styles.chipText, active === f && styles.chipTextActive]}>{f}</Text>
+          <Text style={[styles.chipText, { color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }, active === f && styles.chipTextActive]}>{f}</Text>
         </TouchableOpacity>
       ))}
     </View>

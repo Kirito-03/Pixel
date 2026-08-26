@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { ContentItem } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 function resolveImageUrl(path: string | undefined, tmdbSize: 'w92' | 'w500') {
   if (!path) return undefined;
@@ -61,6 +62,7 @@ interface ContinueCardProps {
 }
 
 export function ContinueWatchingCard({ item, currentEpisode = 1, totalEpisodes, progress, onPress, onRemove }: ContinueCardProps) {
+  const { colors, theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const isWeb = Platform.OS === 'web';
   const computedProgress = totalEpisodes ? currentEpisode / totalEpisodes : 0;
@@ -80,7 +82,7 @@ export function ContinueWatchingCard({ item, currentEpisode = 1, totalEpisodes, 
       onPressOut={onOut}
       style={[cwStyles.outer, isWeb ? ({ cursor: 'pointer' } as any) : null]}
     >
-      <Animated.View style={[cwStyles.card, { transform: [{ scale }] }]}>
+      <Animated.View style={[cwStyles.card, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }, { transform: [{ scale }] }]}>
         {/* Imagen */}
         <View style={cwStyles.imageBox}>
           {image ? (
@@ -119,10 +121,10 @@ export function ContinueWatchingCard({ item, currentEpisode = 1, totalEpisodes, 
         {/* Info + progreso */}
         <View style={cwStyles.info}>
           <View style={cwStyles.infoRow}>
-            <Text style={cwStyles.title} numberOfLines={1}>{item.title}</Text>
+            <Text style={[cwStyles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
           </View>
           {totalEpisodes ? (
-            <Text style={cwStyles.episode}>
+            <Text style={[cwStyles.episode, { color: colors.textMuted }]}>
               Episodio {currentEpisode} de {totalEpisodes}
             </Text>
           ) : null}
@@ -212,6 +214,7 @@ interface WatchListItemProps {
 }
 
 export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, removing, onPress, onRemove }: WatchListItemProps) {
+  const { colors, theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const computedProgress = totalEpisodes && currentEpisode ? currentEpisode / totalEpisodes : 0;
   const progressValue = typeof progress === 'number' ? progress : computedProgress;
@@ -231,7 +234,7 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, r
       onPressIn={onIn}
       onPressOut={onOut}
     >
-      <Animated.View style={[wlStyles.card, { transform: [{ scale }] }]}>
+      <Animated.View style={[wlStyles.card, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }, { transform: [{ scale }] }]}>
         {/* Thumbnail */}
         <View style={wlStyles.thumb}>
           {poster ? (
@@ -245,19 +248,19 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, r
 
         {/* Info */}
         <View style={wlStyles.info}>
-          <Text style={wlStyles.title} numberOfLines={1}>{item.title}</Text>
+          <Text style={[wlStyles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
 
           <View style={wlStyles.metaRow}>
             {item.vote_average ? (
               <>
                 <Ionicons name="star" size={11} color="#FFD700" />
-                <Text style={wlStyles.metaText}>{item.vote_average.toFixed(1)}</Text>
+                <Text style={[wlStyles.metaText, { color: colors.textMuted }]}>{item.vote_average.toFixed(1)}</Text>
               </>
             ) : null}
             {totalEpisodes ? (
               <>
-                <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.4)" />
-                <Text style={wlStyles.metaText}>
+                <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+                <Text style={[wlStyles.metaText, { color: colors.textMuted }]}>
                   {currentEpisode ?? 0}/{totalEpisodes} episodios
                 </Text>
               </>
@@ -269,7 +272,7 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, r
             <View style={{ flex: 1 }}>
               <ProgressBar progress={progressValue} height={4} />
             </View>
-            <Text style={wlStyles.percent}>{percent}%</Text>
+            <Text style={[wlStyles.percent, { color: colors.textMuted }]}>{percent}%</Text>
           </View>
         </View>
 
