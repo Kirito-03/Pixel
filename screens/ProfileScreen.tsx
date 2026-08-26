@@ -417,7 +417,7 @@ export default function ProfileScreen() {
             <Text style={modalStyles.title}>Cerrar sesión</Text>
             <Text style={modalStyles.subtitle}>¿Estás seguro de que quieres cerrar sesión?</Text>
             <View style={modalStyles.row2}>
-              <TouchableOpacity style={modalStyles.btnSecondary} onPress={() => setLogoutVisible(false)}>
+              <TouchableOpacity style={[modalStyles.btnSecondary, { marginTop: 0 }]} onPress={() => setLogoutVisible(false)}>
                 <Text style={modalStyles.btnSecondaryText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
