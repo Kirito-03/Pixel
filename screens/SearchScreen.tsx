@@ -10,8 +10,10 @@ import { ContentItem } from '../types';
 import { useProfile } from '../contexts/ProfileContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { catalogService } from '../services/catalogService';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function SearchScreen() {
+  const { colors, theme } = useTheme();
   const navigation = useNavigation<any>();
   const { currentProfile } = useProfile();
   const [query, setQuery] = useState('');
@@ -179,13 +181,13 @@ export default function SearchScreen() {
   };
 
   const renderHighlight = (text: string, highlight: string) => {
-    if (!highlight.trim()) return <Text style={styles.suggestionText}>{text}</Text>;
+    if (!highlight.trim()) return <Text style={[styles.suggestionText, { color: colors.text }]}>{text}</Text>;
     // Escapar caracteres especiales para regex
     const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(${escapedHighlight})`, 'gi');
     const parts = text.split(regex);
     return (
-      <Text style={styles.suggestionText}>
+      <Text style={[styles.suggestionText, { color: colors.text }]}>
         {parts.map((part, i) =>
           regex.test(part) ? (
             <Text key={i} style={{ color: '#E50914', fontWeight: 'bold' }}>
@@ -210,7 +212,7 @@ export default function SearchScreen() {
   const headerPaddingTop = isWeb ? 30 : insets.top + 12;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* SafeAreaView solo en web; en Android controlamos el padding manualmente con insets */}
       <View style={{ zIndex: 100 }}>
         <View style={[styles.megaHeaderContainer, { paddingHorizontal: hPad, paddingTop: headerPaddingTop }]}>
@@ -220,7 +222,7 @@ export default function SearchScreen() {
               <View style={styles.logoRow}>
                 <Ionicons name="play" size={14} color="#E50914" style={{ marginRight: 6 }} />
                 <Text style={styles.logoText}>
-                  PIXEL <Text style={styles.logoTextWhite}>NO SEKAI</Text>
+                  PIXEL <Text style={[styles.logoTextWhite, { color: colors.text }]}>NO SEKAI</Text>
                 </Text>
               </View>
               <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
@@ -234,9 +236,9 @@ export default function SearchScreen() {
           <View style={styles.giantInputWrapper}>
             <Ionicons name="search" size={isWeb ? 32 : 22} color="#E50914" style={{ marginRight: isWeb ? 20 : 12 }} />
             <TextInput
-              style={[styles.giantInput, { fontSize: inputSize }, inputPlatformStyles as any]}
+              style={[styles.giantInput, { fontSize: inputSize, color: colors.text }, inputPlatformStyles as any]}
               placeholder="Buscar anime..."
-              placeholderTextColor="#333"
+              placeholderTextColor={colors.textMuted || '#555'}
               value={query}
               onChangeText={handleSearch}
               onSubmitEditing={({ nativeEvent }) => recordRecentSearch(nativeEvent.text)}
@@ -247,7 +249,7 @@ export default function SearchScreen() {
             {loading && <ActivityIndicator size="small" color="#E50914" style={{ marginLeft: 10 }} />}
             {query.length > 0 && !loading && (
               <TouchableOpacity onPress={clearSearch} style={{ padding: 10 }}>
-                <Ionicons name="close-circle" size={24} color="#444" />
+                <Ionicons name="close-circle" size={24} color={colors.textLight || "#444"} />
               </TouchableOpacity>
             )}
           </View>
@@ -255,7 +257,7 @@ export default function SearchScreen() {
 
           {/* Sugerencias — solo absolute en web */}
           {isWeb && suggestions.length > 0 && (
-            <View style={styles.suggestionsDropdown}>
+            <View style={[styles.suggestionsDropdown, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#222' : '#ddd' }]}>
               {suggestions.map((item) => (
                 <TouchableOpacity
                   key={item.id}
@@ -268,7 +270,7 @@ export default function SearchScreen() {
                     ) : (
                       <View style={styles.suggestionThumbFallback} />
                     )}
-                    <Ionicons name="search" size={14} color="#555" style={{ marginHorizontal: 12 }} />
+                    <Ionicons name="search" size={14} color={colors.textMuted || "#555"} style={{ marginHorizontal: 12 }} />
                     {renderHighlight(item.title, query)}
                   </View>
                   <View style={styles.suggestionBadge}>
@@ -283,7 +285,7 @@ export default function SearchScreen() {
 
       {/* Sugerencias en Android — en el flujo normal, debajo del header */}
       {!isWeb && suggestions.length > 0 && (
-        <View style={styles.suggestionsNative}>
+        <View style={[styles.suggestionsNative, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#1a1a1a' : '#ddd' }]}>
           {suggestions.map((item) => (
             <TouchableOpacity
               key={item.id}
@@ -296,7 +298,7 @@ export default function SearchScreen() {
                 ) : (
                   <View style={styles.suggestionThumbFallback} />
                 )}
-                <Ionicons name="search" size={14} color="#555" style={{ marginHorizontal: 12 }} />
+                <Ionicons name="search" size={14} color={colors.textMuted || "#555"} style={{ marginHorizontal: 12 }} />
                 {renderHighlight(item.title, query)}
               </View>
               <View style={styles.suggestionBadge}>
@@ -321,7 +323,7 @@ export default function SearchScreen() {
                 <View style={styles.sectionHeaderRow}>
                   <View style={styles.sectionHeaderLeft}>
                     <View style={styles.redBar} />
-                    <Text style={styles.sectionTitle}>ÚLTIMAS BÚSQUEDAS</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ÚLTIMAS BÚSQUEDAS</Text>
                   </View>
                   <TouchableOpacity onPress={clearRecent}>
                     <Text style={styles.clearRecentText}>BORRAR</Text>
@@ -340,8 +342,8 @@ export default function SearchScreen() {
                         recordRecentSearch(text);
                       }}
                     >
-                      <Ionicons name="time-outline" size={14} color="#666" style={{ marginRight: 8 }} />
-                      <Text style={styles.recentChipText}>{text}</Text>
+                      <Ionicons name="time-outline" size={14} color={colors.textMuted || "#666"} style={{ marginRight: 8 }} />
+                      <Text style={[styles.recentChipText, { color: colors.text }]}>{text}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -353,7 +355,7 @@ export default function SearchScreen() {
                 <View style={styles.sectionHeaderRow}>
                   <View style={styles.sectionHeaderLeft}>
                     <View style={styles.redBar} />
-                    <Text style={styles.sectionTitle}>EXPLORAR POR GÉNERO</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>EXPLORAR POR GÉNERO</Text>
                   </View>
                 </View>
                 <View style={styles.genresGrid}>
@@ -364,7 +366,7 @@ export default function SearchScreen() {
                       onPress={() => handleGenrePress(genre)}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.genreCardText}>{genre}</Text>
+                      <Text style={[styles.genreCardText, { color: colors.text }]}>{genre}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -375,7 +377,7 @@ export default function SearchScreen() {
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionHeaderLeft}>
                   <View style={styles.redBar} />
-                  <Text style={styles.sectionTitle}>
+                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
                     {selectedGenre ? `RESULTADOS PARA: ${selectedGenre.toUpperCase()}` : 'RESULTADOS'}
                   </Text>
                 </View>
@@ -391,8 +393,8 @@ export default function SearchScreen() {
         ListEmptyComponent={
           ((query.length > 2 || selectedGenre) && !loading && results.length === 0) ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color="#222" style={{ marginBottom: 16 }} />
-              <Text style={styles.emptyText}>No se encontraron resultados</Text>
+              <Ionicons name="search-outline" size={48} color={theme === 'dark' ? "#222" : "#ddd"} style={{ marginBottom: 16 }} />
+              <Text style={[styles.emptyText, { color: colors.textMuted || '#444' }]}>No se encontraron resultados</Text>
             </View>
           ) : null
         }
