@@ -80,7 +80,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   const imageUri = isAnime
     ? getAnimeImageUrl(
         isSmallScreen 
-          ? ((movie as AnimeDetail).coverImage?.extraLarge || (movie as AnimeDetail).coverImage?.large || (movie as AnimeDetail).bannerImage)
+          ? (((movie as AnimeDetail).coverImage as any)?.extraLarge || (movie as AnimeDetail).coverImage?.large || (movie as AnimeDetail).bannerImage)
           : ((movie as AnimeDetail).bannerImage || (movie as AnimeDetail).coverImage?.large)
       )
     : getImageUrl(isSmallScreen ? (movie.poster_path || movie.backdrop_path) : movie.backdrop_path, 'original');
