@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { auth } from '../services/firebase';
 import { useProfileScreenLogic } from '../hooks/useProfileScreenLogic';
 import { useAdmin } from '../contexts/AdminContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 // ── Tipos de sección del sidebar ──────────────────────────────
 type SectionKey = 'cuenta' | 'seguridad' | 'configuracion' | 'apariencia' | 'admin';
@@ -39,45 +40,49 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 
 // ── Card wrapper ───────────────────────────────────────────────
 function ProfileCard({ children }: { children: React.ReactNode }) {
-  return <View style={cardStyles.card}>{children}</View>;
+  const { colors, theme } = useTheme();
+  return <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>{children}</View>;
 }
 function CardRow({
   label, value, action, actionLabel, danger,
 }: {
   label: string; value?: string; action?: () => void; actionLabel?: string; danger?: boolean;
 }) {
+  const { colors, theme } = useTheme();
   return (
-    <View style={cardStyles.row}>
+    <View style={[cardStyles.row, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>
       <View style={cardStyles.rowLeft}>
-        <Text style={cardStyles.rowLabel}>{label}</Text>
-        {value ? <Text style={cardStyles.rowValue}>{value}</Text> : null}
+        <Text style={[cardStyles.rowLabel, { color: colors.text }]}>{label}</Text>
+        {value ? <Text style={[cardStyles.rowValue, { color: colors.textMuted || 'rgba(150,150,150,0.8)' }]}>{value}</Text> : null}
       </View>
       {action && actionLabel ? (
-        <TouchableOpacity style={[cardStyles.actionBtn, danger && cardStyles.actionBtnDanger]} onPress={action}>
-          <Text style={[cardStyles.actionBtnText, danger && cardStyles.actionBtnTextDanger]}>{actionLabel}</Text>
+        <TouchableOpacity style={[cardStyles.actionBtn, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)' }, danger && cardStyles.actionBtnDanger]} onPress={action}>
+          <Text style={[cardStyles.actionBtnText, { color: theme === 'dark' ? '#fff' : '#000' }, danger && cardStyles.actionBtnTextDanger]}>{actionLabel}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
   );
 }
 function CardToggleRow({ label, subtitle, value, onChange }: { label: string; subtitle?: string; value: boolean; onChange: (v: boolean) => void }) {
+  const { colors, theme } = useTheme();
   return (
-    <View style={cardStyles.row}>
+    <View style={[cardStyles.row, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>
       <View style={cardStyles.rowLeft}>
-        <Text style={cardStyles.rowLabel}>{label}</Text>
-        {subtitle ? <Text style={cardStyles.rowSubtitle}>{subtitle}</Text> : null}
+        <Text style={[cardStyles.rowLabel, { color: colors.text }]}>{label}</Text>
+        {subtitle ? <Text style={[cardStyles.rowSubtitle, { color: colors.textMuted || 'rgba(150,150,150,0.6)' }]}>{subtitle}</Text> : null}
       </View>
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#E50914' }}
-        thumbColor={value ? '#fff' : 'rgba(255,255,255,0.5)'}
+        trackColor={{ false: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', true: colors.primary }}
+        thumbColor={value ? '#fff' : theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'}
       />
     </View>
   );
 }
 function SectionTitle({ children }: { children: string }) {
-  return <Text style={cardStyles.sectionTitle}>{children}</Text>;
+  const { colors, theme } = useTheme();
+  return <Text style={[cardStyles.sectionTitle, { color: colors.textMuted || (theme === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)') }]}>{children}</Text>;
 }
 
 const cardStyles = StyleSheet.create({
@@ -302,7 +307,7 @@ export default function ProfileScreen() {
 
   // ── Sidebar ───────────────────────────────────────────────
   const SidebarContent = () => (
-    <View style={[sidebarStyles.sidebar, !isWide && sidebarStyles.sidebarMobile]}>
+    <View style={[sidebarStyles.sidebar, !isWide && sidebarStyles.sidebarMobile, { backgroundColor: theme === 'dark' ? '#111111' : '#f5f5f5', borderRightColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>
       {/* Avatar */}
       <TouchableOpacity
         style={sidebarStyles.avatarBox}
@@ -323,7 +328,7 @@ export default function ProfileScreen() {
               onError={() => setImageError(true)}
             />
           ) : (
-            <Ionicons name="person" size={40} color="rgba(255,255,255,0.3)" />
+            <Ionicons name="person" size={40} color={theme === 'dark' ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)"} />
           )}
         </View>
         <View style={sidebarStyles.avatarEditBadge}>
@@ -331,11 +336,11 @@ export default function ProfileScreen() {
         </View>
       </TouchableOpacity>
 
-      <Text style={sidebarStyles.name} numberOfLines={1}>{currentProfile?.name || 'Usuario'}</Text>
-      <Text style={sidebarStyles.email} numberOfLines={1}>{user?.email || ''}</Text>
+      <Text style={[sidebarStyles.name, { color: colors.text }]} numberOfLines={1}>{currentProfile?.name || 'Usuario'}</Text>
+      <Text style={[sidebarStyles.email, { color: colors.textMuted }]} numberOfLines={1}>{user?.email || ''}</Text>
 
       {/* Divider */}
-      <View style={sidebarStyles.divider} />
+      <View style={[sidebarStyles.divider, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)' }]} />
 
       {/* Nav items */}
       <View style={sidebarStyles.nav}>
@@ -344,19 +349,19 @@ export default function ProfileScreen() {
           return (
             <TouchableOpacity
               key={item.key}
-              style={[sidebarStyles.navItem, isActive && sidebarStyles.navItemActive]}
+              style={[sidebarStyles.navItem, isActive && sidebarStyles.navItemActive, { backgroundColor: isActive ? (theme === 'dark' ? 'rgba(229,9,20,0.1)' : 'rgba(229,9,20,0.05)') : 'transparent' }]}
               onPress={() => setActiveSection(item.key)}
               activeOpacity={0.7}
             >
               <Ionicons
                 name={item.icon as any}
                 size={18}
-                color={isActive ? '#E50914' : 'rgba(255,255,255,0.45)'}
+                color={isActive ? colors.primary : (theme === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)')}
               />
-              <Text style={[sidebarStyles.navLabel, isActive && sidebarStyles.navLabelActive]}>
+              <Text style={[sidebarStyles.navLabel, isActive && sidebarStyles.navLabelActive, { color: isActive ? colors.text : (theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') }]}>
                 {item.label}
               </Text>
-              {isActive && <View style={sidebarStyles.navActiveDot} />}
+              {isActive && <View style={[sidebarStyles.navActiveDot, { backgroundColor: colors.primary }]} />}
             </TouchableOpacity>
           );
         })}
@@ -366,9 +371,9 @@ export default function ProfileScreen() {
       <View style={{ flex: 1 }} />
 
       {/* Logout */}
-      <TouchableOpacity style={sidebarStyles.logoutBtn} onPress={() => setLogoutVisible(true)} activeOpacity={0.8}>
+      <TouchableOpacity style={[sidebarStyles.logoutBtn, { borderColor: theme === 'dark' ? 'rgba(229,9,20,0.2)' : 'rgba(229,9,20,0.3)' }]} onPress={() => setLogoutVisible(true)} activeOpacity={0.8}>
         <Ionicons name="log-out-outline" size={18} color="rgba(229,9,20,0.8)" />
-        <Text style={sidebarStyles.logoutText}>Cerrar sesión</Text>
+        <Text style={[sidebarStyles.logoutText, { color: colors.primary }]}>Cerrar sesión</Text>
       </TouchableOpacity>
     </View>
   );
@@ -379,8 +384,8 @@ export default function ProfileScreen() {
       {/* Modal: Información de cuenta */}
       <Modal visible={accountModalVisible} transparent animationType="slide" onRequestClose={() => setAccountModalVisible(false)}>
         <View style={modalStyles.overlay}>
-          <View style={modalStyles.content}>
-            <Text style={modalStyles.title}>Información de la cuenta</Text>
+          <View style={[modalStyles.content, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)' }]}>
+            <Text style={[modalStyles.title, { color: colors.text }]}>Información de la cuenta</Text>
             {[
               ['Email', user?.email || '—'],
               ['Proveedor', providerLabel],
@@ -388,9 +393,9 @@ export default function ProfileScreen() {
               ['Creación', auth.currentUser?.metadata?.creationTime || '—'],
               ['Último acceso', auth.currentUser?.metadata?.lastSignInTime || '—'],
             ].map(([label, value]) => (
-              <View key={label} style={modalStyles.row}>
-                <Text style={modalStyles.label}>{label}</Text>
-                <Text style={modalStyles.value}>{value}</Text>
+              <View key={label} style={[modalStyles.row, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>
+                <Text style={[modalStyles.label, { color: colors.textMuted }]}>{label}</Text>
+                <Text style={[modalStyles.value, { color: colors.text }]}>{value}</Text>
               </View>
             ))}
             {isEmailProvider && (
@@ -399,12 +404,12 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             )}
             {!isEmailVerified && (
-              <TouchableOpacity style={modalStyles.btnSecondary} onPress={handleEmailVerification}>
-                <Text style={modalStyles.btnSecondaryText}>Enviar verificación de email</Text>
+              <TouchableOpacity style={[modalStyles.btnSecondary, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} onPress={handleEmailVerification}>
+                <Text style={[modalStyles.btnSecondaryText, { color: colors.text }]}>Enviar verificación de email</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={modalStyles.btnClose} onPress={() => setAccountModalVisible(false)}>
-              <Text style={modalStyles.btnCloseText}>Cerrar</Text>
+            <TouchableOpacity style={[modalStyles.btnClose, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]} onPress={() => setAccountModalVisible(false)}>
+              <Text style={[modalStyles.btnCloseText, { color: colors.text }]}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -413,12 +418,12 @@ export default function ProfileScreen() {
       {/* Modal: Cerrar sesión */}
       <Modal visible={logoutVisible} transparent animationType="fade" onRequestClose={() => setLogoutVisible(false)}>
         <View style={modalStyles.overlay}>
-          <View style={modalStyles.content}>
-            <Text style={modalStyles.title}>Cerrar sesión</Text>
-            <Text style={modalStyles.subtitle}>¿Estás seguro de que quieres cerrar sesión?</Text>
+          <View style={[modalStyles.content, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)' }]}>
+            <Text style={[modalStyles.title, { color: colors.text }]}>Cerrar sesión</Text>
+            <Text style={[modalStyles.subtitle, { color: colors.textMuted }]}>¿Estás seguro de que quieres cerrar sesión?</Text>
             <View style={modalStyles.row2}>
-              <TouchableOpacity style={[modalStyles.btnSecondary, { marginTop: 0 }]} onPress={() => setLogoutVisible(false)}>
-                <Text style={modalStyles.btnSecondaryText}>Cancelar</Text>
+              <TouchableOpacity style={[modalStyles.btnSecondary, { marginTop: 0, backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} onPress={() => setLogoutVisible(false)}>
+                <Text style={[modalStyles.btnSecondaryText, { color: colors.text }]}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[modalStyles.btnDanger, logoutLoading && { opacity: 0.6 }]}
@@ -438,30 +443,29 @@ export default function ProfileScreen() {
 
   // ── Top bar con botón Volver ─────────────────────────────
   const TopBar = () => (
-    <View style={topBarStyles.bar}>
+    <View style={[topBarStyles.bar, { backgroundColor: colors.background, borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
       <TouchableOpacity
         style={topBarStyles.backBtn}
         onPress={() => navigation.goBack()}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.8)" />
-        <Text style={topBarStyles.backText}>Volver</Text>
+        <Ionicons name="arrow-back" size={20} color={colors.textMuted || "rgba(255,255,255,0.8)"} />
+        <Text style={[topBarStyles.backText, { color: colors.textMuted }]}>Volver</Text>
       </TouchableOpacity>
-      <Text style={topBarStyles.title}>Mi perfil</Text>
+      <Text style={[topBarStyles.title, { color: colors.text }]}>Mi perfil</Text>
       <View style={topBarStyles.backBtn} />{/* balance simétrico */}
     </View>
   );
 
   // ── LAYOUT ────────────────────────────────────────────────
   if (isWide) {
-    // Web: sidebar izquierda + contenido derecha
     return (
-      <SafeAreaView style={pageStyles.container}>
+      <SafeAreaView style={[pageStyles.container, { backgroundColor: colors.background }]}>
         <TopBar />
         <View style={pageStyles.layout}>
           <SidebarContent />
           <ScrollView style={pageStyles.main} contentContainerStyle={pageStyles.mainContent} showsVerticalScrollIndicator={false}>
-            <Text style={pageStyles.sectionHeading}>
+            <Text style={[pageStyles.sectionHeading, { color: colors.text }]}>
               {SIDEBAR_ITEMS.find(i => i.key === activeSection)?.label}
             </Text>
             {renderContent()}
@@ -474,7 +478,7 @@ export default function ProfileScreen() {
 
   // Mobile: sidebar colapsada arriba + contenido abajo
   return (
-    <SafeAreaView style={pageStyles.container}>
+    <SafeAreaView style={[pageStyles.container, { backgroundColor: colors.background }]}>
       <TopBar />
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Avatar + nombre */}
@@ -487,13 +491,13 @@ export default function ProfileScreen() {
             disabled={updatingAvatar}
             activeOpacity={0.85}
           >
-            {updatingAvatar ? <ActivityIndicator size="large" color="#E50914" />
+            {updatingAvatar ? <ActivityIndicator size="large" color={colors.primary} />
               : !imageError
                 ? <Image key={`${currentProfile?.avatar_url || 'default'}-${avatarKey}`} source={{ uri: getAvatarUrl() }} style={sidebarStyles.avatar} onError={() => setImageError(true)} />
-                : <Ionicons name="person" size={40} color="rgba(255,255,255,0.3)" />}
+                : <Ionicons name="person" size={40} color={theme === 'dark' ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)"} />}
           </TouchableOpacity>
-          <Text style={[sidebarStyles.name, { marginTop: 8 }]}>{currentProfile?.name || 'Usuario'}</Text>
-          <Text style={sidebarStyles.email}>{user?.email || ''}</Text>
+          <Text style={[sidebarStyles.name, { color: colors.text, marginTop: 8 }]}>{currentProfile?.name || 'Usuario'}</Text>
+          <Text style={[sidebarStyles.email, { color: colors.textMuted }]}>{user?.email || ''}</Text>
         </View>
 
         {/* Nav horizontal */}
@@ -503,11 +507,11 @@ export default function ProfileScreen() {
             return (
               <TouchableOpacity
                 key={item.key}
-                style={[mobileStyles.chip, isActive && mobileStyles.chipActive]}
+                style={[mobileStyles.chip, isActive && mobileStyles.chipActive, { backgroundColor: isActive ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', borderColor: isActive ? (theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)') : (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)') }]}
                 onPress={() => setActiveSection(item.key)}
               >
-                <Ionicons name={item.icon as any} size={14} color={isActive ? '#fff' : 'rgba(255,255,255,0.5)'} />
-                <Text style={[mobileStyles.chipText, isActive && mobileStyles.chipTextActive]}>{item.label}</Text>
+                <Ionicons name={item.icon as any} size={14} color={isActive ? colors.text : colors.textMuted} />
+                <Text style={[mobileStyles.chipText, { color: colors.textMuted }, isActive && [mobileStyles.chipTextActive, { color: colors.text }]]}>{item.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -515,7 +519,7 @@ export default function ProfileScreen() {
 
         {/* Contenido */}
         <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
-          <Text style={pageStyles.sectionHeading}>{SIDEBAR_ITEMS.find(i => i.key === activeSection)?.label}</Text>
+          <Text style={[pageStyles.sectionHeading, { color: colors.text }]}>{SIDEBAR_ITEMS.find(i => i.key === activeSection)?.label}</Text>
           {renderContent()}
         </View>
 
