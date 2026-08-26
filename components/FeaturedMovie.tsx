@@ -196,8 +196,9 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           <TouchableOpacity
             style={[
               styles.playButton,
+              { backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000' },
               isWeb && playHover && {
-                backgroundColor: '#E50914',
+                backgroundColor: theme === 'dark' ? '#E50914' : '#E50914',
                 transform: [{ scale: 1.04 }],
               } as any,
             ]}
@@ -208,9 +209,10 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
               onMouseLeave: () => setPlayHover(false),
             } : {})}
           >
-            <Ionicons name="play" size={18} color={isWeb && playHover ? '#fff' : '#000'} />
+            <Ionicons name="play" size={18} color={isWeb && playHover ? '#fff' : (theme === 'dark' ? '#000' : '#fff')} />
             <Text style={[
               styles.playButtonText,
+              { color: theme === 'dark' ? '#000' : '#fff' },
               isWeb && playHover && { color: '#fff' },
             ]}>
               Reproducir
@@ -220,9 +222,10 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           <TouchableOpacity
             style={[
               styles.infoButton,
+              { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' },
               isWeb && infoHover && {
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                borderColor: '#fff',
+                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
+                borderColor: theme === 'dark' ? '#fff' : '#000',
                 transform: [{ scale: 1.04 }],
               } as any,
             ]}
@@ -233,8 +236,8 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
               onMouseLeave: () => setInfoHover(false),
             } : {})}
           >
-            <Ionicons name="information-circle-outline" size={18} color="#fff" />
-            <Text style={styles.infoButtonText}>Más información</Text>
+            <Ionicons name="information-circle-outline" size={18} color={theme === 'dark' ? '#fff' : '#000'} />
+            <Text style={[styles.infoButtonText, { color: theme === 'dark' ? '#fff' : '#000' }]}>Más información</Text>
           </TouchableOpacity>
         </View>
       </View>
