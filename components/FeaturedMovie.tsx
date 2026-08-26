@@ -5,9 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { MovieDetail, AnimeDetail } from '../types';
 import { getImageUrl } from '../services/api';
 import { getAnimeImageUrl, getAnimeTitle, getAnimeYear, getAnimeScore } from '../services/anilistService';
-import { colors, spacing, typography, gradients, badgeStyles } from '../theme';
+import { colors as staticColors, spacing, typography, gradients, badgeStyles } from '../theme';
 import { useProfile } from '../contexts/ProfileContext';
 import { useMyList } from '../contexts/MyListContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const stripHtml = (html?: string) => html ? html.replace(/<[^>]*>/g, '') : '';
 
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }: Props) {
+  const { theme, colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
@@ -83,6 +85,18 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
       )
     : getImageUrl(isSmallScreen ? (movie.poster_path || movie.backdrop_path) : movie.backdrop_path, 'original');
 
+  const heroTopColors = theme === 'dark' 
+    ? ['rgba(0,0,0,0.5)', 'transparent'] 
+    : ['rgba(255,255,255,0.8)', 'transparent'];
+    
+  const heroBottomColors = theme === 'dark'
+    ? ['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.6)', '#000']
+    : ['transparent', 'rgba(255,255,255,0.1)', 'rgba(255,255,255,0.8)', '#FFF'];
+    
+  const heroLeftColors = theme === 'dark'
+    ? ['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.3)', 'transparent']
+    : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.5)', 'transparent'];
+
   return (
     <View style={[styles.container, { width, height: isSmallScreen ? height * 0.55 : height * 0.9 }]}>
       <Image
@@ -93,14 +107,14 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
 
       {/* Top vignette para navbar */}
       <LinearGradient
-        colors={gradients.heroTop as any}
+        colors={heroTopColors as any}
         style={[StyleSheet.absoluteFillObject, { height: '30%' }]}
         pointerEvents="none"
       />
 
       {/* Bottom gradient — cinematográfico */}
       <LinearGradient
-        colors={gradients.heroBottom as any}
+        colors={heroBottomColors as any}
         locations={[0, 0.3, 0.7, 1]}
         style={StyleSheet.absoluteFillObject}
         pointerEvents="none"
@@ -109,7 +123,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
       {/* Left gradient — para texto legible */}
       {!isSmallScreen && (
         <LinearGradient
-          colors={gradients.heroLeft as any}
+          colors={heroLeftColors as any}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           locations={[0, 0.4, 0.8]}
@@ -137,7 +151,8 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         <Text
           style={[
             isSmallScreen ? styles.titleMobile : styles.title,
-            isWeb ? { textShadow: '0px 4px 20px rgba(0,0,0,0.8)' } as any : null,
+            { color: colors.text },
+            isWeb ? { textShadow: theme === 'dark' ? '0px 4px 20px rgba(0,0,0,0.8)' : '0px 4px 20px rgba(255,255,255,0.8)' } as any : null,
           ]}
           numberOfLines={2}
         >
@@ -148,14 +163,14 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         <View style={styles.metaRow}>
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={13} color="#E50914" />
-            <Text style={styles.ratingText}>{voteAverage}</Text>
+            <Text style={[styles.ratingText, { color: colors.text }]}>{voteAverage}</Text>
           </View>
-          <Text style={styles.metaDot}>•</Text>
-          <Text style={styles.metaText}>{releaseYear}</Text>
+          <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
+          <Text style={[styles.metaText, { color: colors.text }]}>{releaseYear}</Text>
           {!isAnime && (movie as MovieDetail).runtime && (
             <>
-              <Text style={styles.metaDot}>•</Text>
-              <Text style={styles.metaText}>{(movie as MovieDetail).runtime} min</Text>
+              <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
+              <Text style={[styles.metaText, { color: colors.text }]}>{(movie as MovieDetail).runtime} min</Text>
             </>
           )}
         </View>
@@ -164,16 +179,16 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         {genres.length > 0 && (
           <View style={styles.genreRow}>
             {genres.slice(0, 4).map((genre, idx) => (
-              <View key={idx} style={styles.genrePill}>
-                <Text style={styles.genrePillText}>{genre}</Text>
+              <View key={idx} style={[styles.genrePill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}>
+                <Text style={[styles.genrePillText, { color: colors.text }]}>{genre}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Descripción */}
-        <Text style={styles.description} numberOfLines={3}>
-          {description}
+        {/* Descripción corta */}
+        <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={isSmallScreen ? 3 : 4}>
+          {description || 'Sin descripción disponible.'}
         </Text>
 
         {/* Botones */}

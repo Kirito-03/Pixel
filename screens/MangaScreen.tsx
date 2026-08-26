@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'web' ? 80 : 10,
+    paddingTop: Platform.OS === 'web' ? 80 : 50,
     paddingBottom: 10,
     zIndex: 10,
   },

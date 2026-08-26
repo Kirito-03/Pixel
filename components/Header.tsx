@@ -166,7 +166,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
               {/* View con row: única forma fiable en RN Web de tener dos colores distintos en la misma línea */}
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={styles.logoPrimary}>PIXEL </Text>
-                <Text style={[styles.logoPrimary, { color: colors.text, fontWeight: '300' }]}>NO SEKAI</Text>
+                <Text style={[styles.logoPrimary, { color: colors.text, fontWeight: '900' }]}>NO SEKAI</Text>
               </View>
             </TouchableOpacity>
           </Animated.View>
