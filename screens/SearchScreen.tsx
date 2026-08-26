@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, Image } from 'react-native';
+import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, Image, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import MovieCard from '../components/MovieCard';
@@ -200,30 +200,36 @@ export default function SearchScreen() {
 
   // En web usamos outlineStyle none. En native lo ignoramos
   const inputPlatformStyles = Platform.OS === 'web' ? { outlineStyle: 'none' } : {};
+  const { width } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const hPad = isWeb ? 40 : 16;
+  const inputSize = isWeb ? 36 : 24;
 
   return (
     <View style={styles.container}>
       <SafeAreaView style={{ zIndex: 100 }}>
-        <View style={styles.megaHeaderContainer}>
-          {/* Top mini-bar */}
-          <View style={styles.topMiniBar}>
-            <View style={styles.logoRow}>
-              <Ionicons name="play" size={14} color="#E50914" style={{ marginRight: 6 }} />
-              <Text style={styles.logoText}>
-                PIXEL <Text style={styles.logoTextWhite}>NO SEKAI</Text>
-              </Text>
+        <View style={[styles.megaHeaderContainer, { paddingHorizontal: hPad, paddingTop: isWeb ? 30 : 12 }]}>
+          {/* Top mini-bar — solo en web */}
+          {isWeb && (
+            <View style={styles.topMiniBar}>
+              <View style={styles.logoRow}>
+                <Ionicons name="play" size={14} color="#E50914" style={{ marginRight: 6 }} />
+                <Text style={styles.logoText}>
+                  PIXEL <Text style={styles.logoTextWhite}>NO SEKAI</Text>
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
+                <Ionicons name="close" size={12} color="#888" style={{ marginRight: 4 }} />
+                <Text style={styles.closeBtnText}>CERRAR</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-              <Ionicons name="close" size={12} color="#888" style={{ marginRight: 4 }} />
-              <Text style={styles.closeBtnText}>CERRAR</Text>
-            </TouchableOpacity>
-          </View>
+          )}
           
           {/* Giant Input */}
           <View style={styles.giantInputWrapper}>
-            <Ionicons name="search" size={32} color="#E50914" style={{ marginRight: 20 }} />
+            <Ionicons name="search" size={isWeb ? 32 : 22} color="#E50914" style={{ marginRight: isWeb ? 20 : 12 }} />
             <TextInput
-              style={[styles.giantInput, inputPlatformStyles as any]}
+              style={[styles.giantInput, { fontSize: inputSize }, inputPlatformStyles as any]}
               placeholder="Buscar anime..."
               placeholderTextColor="#333"
               value={query}
@@ -242,8 +248,8 @@ export default function SearchScreen() {
           </View>
           <View style={styles.redDivider} />
 
-          {/* Sugerencias Dropdown */}
-          {suggestions.length > 0 && (
+          {/* Sugerencias — solo absolute en web */}
+          {isWeb && suggestions.length > 0 && (
             <View style={styles.suggestionsDropdown}>
               {suggestions.map((item) => (
                 <TouchableOpacity
@@ -270,12 +276,38 @@ export default function SearchScreen() {
         </View>
       </SafeAreaView>
 
+      {/* Sugerencias en Android — en el flujo normal, debajo del header */}
+      {!isWeb && suggestions.length > 0 && (
+        <View style={styles.suggestionsNative}>
+          {suggestions.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.suggestionItemRow}
+              onPress={() => handleSuggestionPress(item)}
+            >
+              <View style={styles.suggestionLeft}>
+                {item.poster_path ? (
+                  <Image source={{ uri: item.poster_path }} style={styles.suggestionThumb} />
+                ) : (
+                  <View style={styles.suggestionThumbFallback} />
+                )}
+                <Ionicons name="search" size={14} color="#555" style={{ marginHorizontal: 12 }} />
+                {renderHighlight(item.title, query)}
+              </View>
+              <View style={styles.suggestionBadge}>
+                <Text style={styles.suggestionBadgeText}>ANIME</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Main Content Area (Scrollable) */}
       <FlatList
         data={results}
-        numColumns={Platform.OS === 'web' ? 5 : 3}
-        key={Platform.OS === 'web' ? 'web' : 'mobile'} // Force render on column change
-        contentContainerStyle={styles.mainContentScroll}
+        numColumns={isWeb ? 5 : 3}
+        key={isWeb ? 'web' : 'mobile'}
+        contentContainerStyle={[styles.mainContentScroll, { paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
@@ -394,7 +426,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingTop: 30,
     position: 'relative',
-    zIndex: 100, // para asegurar que las sugerencias floten por encima
+    zIndex: 100,
   },
   topMiniBar: {
     flexDirection: 'row',
@@ -455,15 +487,22 @@ const styles = StyleSheet.create({
   },
   suggestionsDropdown: {
     position: 'absolute',
-    top: '100%',
-    left: 40,
-    right: 40,
-    backgroundColor: 'rgba(5, 5, 5, 0.98)',
+    top: '100%' as any,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(10,10,10,0.99)',
     borderWidth: 1,
     borderTopWidth: 0,
     borderColor: '#222',
-    maxHeight: 400,
+    maxHeight: 320,
     zIndex: 999,
+    elevation: 20,
+  },
+  suggestionsNative: {
+    backgroundColor: '#0a0a0a',
+    borderBottomWidth: 1,
+    borderColor: '#1a1a1a',
+    maxHeight: 320,
   },
   suggestionItemRow: {
     flexDirection: 'row',
