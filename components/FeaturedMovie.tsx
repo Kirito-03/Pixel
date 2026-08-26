@@ -251,12 +251,12 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.heroTitle,
-    color: colors.text,
+    color: '#FFFFFF',
     marginBottom: 12,
   },
   titleMobile: {
     ...typography.heroTitleMobile,
-    color: colors.text,
+    color: '#FFFFFF',
     marginBottom: 10,
   },
   metaRow: {
