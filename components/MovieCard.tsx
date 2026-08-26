@@ -13,6 +13,7 @@ import { Movie, TVShow, ContentItem } from '../types';
 import { getImageUrl } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, badgeStyles } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface Props {
   movie: Movie | TVShow | ContentItem;
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function MovieCard({ movie, onPress, isFirst = false, isLast = false, onHoverChange }: Props) {
+  const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
@@ -147,7 +149,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
           height: CARD_HEIGHT,
           borderRadius: 0,
           overflow: 'hidden',
-          backgroundColor: '#1a1a1a',
+          backgroundColor: theme === 'dark' ? '#1a1a1a' : '#f0f0f0',
         }}
         onPress={onPress}
         activeOpacity={0.9}
@@ -178,6 +180,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
               left: isFirst ? 0 : isLast ? -(POPUP_WIDTH - CARD_WIDTH) : -(POPUP_WIDTH - CARD_WIDTH) / 2,
               // Empezar 60px arriba de la card para que quede centrado verticalmente
               top: -60,
+              backgroundColor: theme === 'dark' ? '#141414' : '#ffffff',
             },
           ]}
           {...(isWeb ? {
@@ -194,13 +197,13 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
               onError={handleImageError}
             />
             <LinearGradient
-              colors={['transparent', 'rgba(20,20,20,0.85)']}
+              colors={['transparent', theme === 'dark' ? 'rgba(20,20,20,0.85)' : 'rgba(255,255,255,0.85)']}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
             {/* El título superpuesto en la imagen (al no tener logo) */}
             <View style={styles.popupTitleOverlay}>
-               <Text style={styles.popupTitleText} numberOfLines={2}>{getTitle()}</Text>
+               <Text style={[styles.popupTitleText, { color: theme === 'dark' ? '#fff' : '#000', textShadowColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>{getTitle()}</Text>
             </View>
           </View>
 
@@ -210,28 +213,28 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
             {/* Fila de controles circulares */}
             <View style={styles.popupActionsRow}>
               <View style={styles.popupActionsLeft}>
-                <TouchableOpacity style={styles.actionBtnPlay} onPress={onPress}>
-                  <Ionicons name="play" size={20} color="#000" style={{ marginLeft: 3 }} />
+                <TouchableOpacity style={[styles.actionBtnPlay, { backgroundColor: theme === 'dark' ? '#fff' : '#000' }]} onPress={onPress}>
+                  <Ionicons name="play" size={20} color={theme === 'dark' ? '#000' : '#fff'} style={{ marginLeft: 3 }} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtnRound}>
-                  <Ionicons name="add" size={22} color="#fff" />
+                <TouchableOpacity style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
+                  <Ionicons name="add" size={22} color={colors.text} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.actionBtnRound} onPress={onPress}>
-                <Ionicons name="chevron-down" size={20} color="#fff" />
+              <TouchableOpacity style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]} onPress={onPress}>
+                <Ionicons name="chevron-down" size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             {/* Fila de Meta: 13+ | 4 temporadas | HD */}
             <View style={styles.popupMetaNetflix}>
-              <View style={styles.netflixBadgeBorder}>
-                <Text style={styles.netflixBadgeText}>13+</Text>
+              <View style={[styles.netflixBadgeBorder, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
+                <Text style={[styles.netflixBadgeText, { color: colors.text }]}>13+</Text>
               </View>
-              <Text style={styles.netflixSeasonsText}>
+              <Text style={[styles.netflixSeasonsText, { color: colors.text }]}>
                 {getEpisodesCount() || (getYear() ? `Año ${getYear()}` : 'Anime')}
               </Text>
-              <View style={styles.netflixBadgeBorder}>
-                <Text style={styles.netflixBadgeText}>HD</Text>
+              <View style={[styles.netflixBadgeBorder, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
+                <Text style={[styles.netflixBadgeText, { color: colors.text }]}>HD</Text>
               </View>
             </View>
 
@@ -240,8 +243,8 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
               <View style={styles.popupGenreRow}>
                 {getGenres().map((g, i) => (
                   <React.Fragment key={i}>
-                    {i > 0 && <Text style={styles.popupGenreDot}>•</Text>}
-                    <Text style={styles.popupGenre}>{g}</Text>
+                    {i > 0 && <Text style={[styles.popupGenreDot, { color: colors.textMuted || 'rgba(150,150,150,0.6)' }]}>•</Text>}
+                    <Text style={[styles.popupGenre, { color: colors.text }]}>{g}</Text>
                   </React.Fragment>
                 ))}
               </View>

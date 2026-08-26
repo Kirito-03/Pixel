@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions, Alert, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList, MovieDetail, ContentItem, AnimeDetail } from '../types';
-import { colors } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import Header from '../components/Header';
 import FeaturedCarousel from '../components/FeaturedCarousel';
 import MovieRow from '../components/MovieRow';
@@ -20,6 +20,7 @@ export default function HomeScreen({ navigation }: Props) {
     const { currentProfile, adultContentEnabled } = useProfile();
     const { addToMyList: addToMyListContext } = useMyList();
     const { navigateByLabel } = useTabNavigation();
+    const { colors } = useTheme();
 
     const [contentSections, setContentSections] = useState<{ [key: string]: ContentItem[] }>({});
     const [featuredMovies, setFeaturedMovies] = useState<(MovieDetail | AnimeDetail)[]>([]);
@@ -292,7 +293,7 @@ export default function HomeScreen({ navigation }: Props) {
 
     if (loading) {
         return (
-            <View style={styles.loading}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
                 <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
@@ -323,7 +324,7 @@ export default function HomeScreen({ navigation }: Props) {
         contentSections.upcoming?.length;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <Header
                 black={blackHeader}
                 activeSection="Inicio"
@@ -472,8 +473,8 @@ export default function HomeScreen({ navigation }: Props) {
                     {/* Empty state */}
                     {!hasAnyContent && (
                         <View style={styles.emptyState}>
-                            <Text style={styles.emptyTitle}>Aún no hay anime disponible</Text>
-                            <Text style={styles.emptySubtitle}>Agrega contenido desde el panel de administrador.</Text>
+                            <Text style={[styles.emptyTitle, { color: colors.text }]}>Aún no hay anime disponible</Text>
+                            <Text style={[styles.emptySubtitle, { color: colors.textMuted || 'rgba(255,255,255,0.5)' }]}>Agrega contenido desde el panel de administrador.</Text>
                         </View>
                     )}
 
@@ -520,7 +521,6 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
     },
     scrollView: {
         flex: 1,
@@ -540,20 +540,17 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: colors.background,
     },
     emptyState: {
         paddingHorizontal: 24,
         paddingTop: 40,
     },
     emptyTitle: {
-        color: '#FFFFFF',
         fontSize: 18,
         fontWeight: '700',
         marginBottom: 6,
     },
     emptySubtitle: {
-        color: 'rgba(255,255,255,0.5)',
         fontSize: 14,
     },
 });

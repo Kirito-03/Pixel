@@ -12,7 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Movie, TVShow, ContentItem } from '../types';
 import MovieCard from './MovieCard';
-import { colors, spacing, typography } from '../theme';
+import { spacing, typography } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface Props {
   title: string;
@@ -21,7 +22,9 @@ interface Props {
   accentColor?: string;
 }
 
-export default function MovieRow({ title, movies, onMoviePress, accentColor = colors.primary }: Props) {
+export default function MovieRow({ title, movies, onMoviePress, accentColor }: Props) {
+  const { colors, theme } = useTheme();
+  const effectiveAccentColor = accentColor || colors.primary;
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
@@ -83,15 +86,18 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
     <View style={styles.container}>
       {/* Título de la sección con barra de acento */}
       <View style={styles.titleRow}>
-        <View style={[styles.titleAccent, { backgroundColor: accentColor }]} />
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={[styles.titleAccent, { backgroundColor: effectiveAccentColor }]} />
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
       </View>
       
       <View style={styles.listContainer}>
         {/* Flecha izquierda — glassmorphism */}
         {showLeftArrow && !isSmallScreen && (
           <TouchableOpacity 
-            style={[styles.arrow, styles.leftArrow]}
+            style={[styles.arrow, styles.leftArrow, { 
+              backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)',
+              borderRightColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' 
+            }]}
             onPress={handleLeftArrow}
             activeOpacity={0.85}
           >
@@ -143,7 +149,10 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor = co
         {/* Flecha derecha — glassmorphism */}
         {showRightArrow && !isSmallScreen && (
           <TouchableOpacity 
-            style={[styles.arrow, styles.rightArrow]}
+            style={[styles.arrow, styles.rightArrow, { 
+              backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)',
+              borderLeftColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' 
+            }]}
             onPress={handleRightArrow}
             activeOpacity={0.85}
           >
@@ -173,7 +182,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.sectionTitle,
-    color: colors.text,
   },
   listContainer: {
     position: 'relative',
@@ -188,7 +196,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 48,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 99,
@@ -198,13 +205,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
     borderRightWidth: 1,
-    borderRightColor: 'rgba(255,255,255,0.06)',
   },
   rightArrow: {
     right: 0,
     borderTopLeftRadius: 8,
     borderBottomLeftRadius: 8,
     borderLeftWidth: 1,
-    borderLeftColor: 'rgba(255,255,255,0.06)',
   },
 });
