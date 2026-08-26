@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Image, Text, TouchableOpacity, StyleSheet, Animated, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, shadows, typography } from '../theme';
+import { shadows, typography } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import CategoriesMenu from './CategoriesMenu';
 import PressableScale from './PressableScale';
 import { useProfile } from '../contexts/ProfileContext';
@@ -25,6 +26,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const { currentProfile } = useProfile();
+  const { colors, theme } = useTheme();
   const avatarUrl = currentProfile?.avatar_url || null;
   // activeNav es controlado por el prop activeSection — sin estado interno
   // para evitar que React Navigation cache un valor incorrecto entre navegaciones
@@ -43,7 +45,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
 
   const backgroundColor = backgroundOpacity.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(0, 0, 0, 0)', 'rgba(8, 8, 8, 0.92)'],
+    outputRange: ['rgba(0, 0, 0, 0)', theme === 'dark' ? 'rgba(8, 8, 8, 0.92)' : 'rgba(255, 255, 255, 0.92)'],
   });
 
   const handleCategorySelect = (categoryId: string, categoryName: string) => {
@@ -108,7 +110,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
       justifyContent: 'center' as const,
       alignItems: 'center' as const,
     },
@@ -137,7 +139,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
     >
       {/* Fallback for missing BlurView */}
       {black && Platform.OS !== 'web' && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8, 8, 8, 0.92)' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(8, 8, 8, 0.92)' : 'rgba(255, 255, 255, 0.92)' }]} />
         // <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
       )}
       <SafeAreaView>
@@ -164,7 +166,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
               {/* View con row: única forma fiable en RN Web de tener dos colores distintos en la misma línea */}
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={styles.logoPrimary}>PIXEL </Text>
-                <Text style={styles.logoPrimary}>NO SEKAI</Text>
+                <Text style={[styles.logoPrimary, { color: colors.text, fontWeight: '300' }]}>NO SEKAI</Text>
               </View>
             </TouchableOpacity>
           </Animated.View>
@@ -190,12 +192,13 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
                   />
                   <Text style={[
                     styles.navLinkText,
-                    activeSection === link.label && styles.navLinkTextActive,
+                    { color: colors.textLight },
+                    activeSection === link.label && { color: colors.text, fontWeight: '600' },
                   ]}>
                     {link.label}
                   </Text>
                   {activeSection === link.label && (
-                    <View style={styles.navActiveIndicator} />
+                    <View style={[styles.navActiveIndicator, { backgroundColor: colors.primary }]} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -278,11 +281,6 @@ const styles = StyleSheet.create({
   },
   navLinkText: {
     ...typography.navLink,
-    color: colors.textLight,   // #b3b3b3 — más visible que textGray en fondo oscuro
-  },
-  navLinkTextActive: {
-    color: colors.text,
-    fontWeight: '600',
   },
   navActiveIndicator: {
     position: 'absolute',
@@ -290,7 +288,6 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     height: 2,
-    backgroundColor: colors.primary,
     borderRadius: 1,
   },
   headerAvatar: {
