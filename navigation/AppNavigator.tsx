@@ -367,12 +367,14 @@ export default function AppNavigator() {
         // If user is logged out but state is for internal screens, React Nav might handle it 
         // by resetting to restricted screens, or we should verify user.
         // For now, assuming if user exists, state is valid.
+        // BUT due to layout changes (moving screens to tabs), old state might crash.
+        // So we will just ignore it and do standard routing if user exists.
         if (user) {
-          console.log('AppNavigator: Using restored state');
-          setInitialRoute('RESTORED_STATE');
-          return;
+          console.log('AppNavigator: Ignoring restored state to prevent routing errors with old layouts');
+          // We intentionally do NOT set RESTORED_STATE here to force standard routing below
+        } else {
+            // If no user, we ignore state and force Login
         }
-        // If no user, we ignore state and force Login
       }
 
       if (!user) {
@@ -432,12 +434,6 @@ export default function AppNavigator() {
               component={ProfileSelectionScreen as any}
             />
             <RootStack.Screen name="Principal" component={MainTabs} />
-            {Platform.OS !== 'web' && (
-              <>
-                <RootStack.Screen name="Buscar" component={SearchScreen} />
-                <RootStack.Screen name="Perfil" component={ProfileScreen} />
-              </>
-            )}
             <RootStack.Screen name="Apariencia" component={AppearanceScreen} />
             <RootStack.Screen name="Descargas" component={DownloadsScreen as any} />
             <RootStack.Screen name="LegalScreen" component={LegalScreen} />
