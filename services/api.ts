@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { setupCache } from 'axios-cache-interceptor';
 import { Movie, MovieDetail, TVShow, TVShowDetail, Anime, AnimeDetail, ContentItem } from '../types';
 import * as AniListService from './anilistService';
 
@@ -6,12 +7,16 @@ const API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY as string;
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
-const api = axios.create({
+const axiosInstance = axios.create({
   baseURL: BASE_URL,
   params: {
     api_key: API_KEY,
     language: 'es-ES',
   },
+});
+
+const api = setupCache(axiosInstance, {
+  ttl: 1000 * 60 * 15, // 15 minutos de caché para TMDB
 });
 
 // ===== PELÍCULAS =====

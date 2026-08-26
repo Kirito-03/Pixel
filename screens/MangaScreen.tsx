@@ -100,13 +100,7 @@ export default function MangaScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header
-        black={theme === 'dark'}
-        activeSection="Manga"
-        onNavPress={navigateByLabel}
-        onSearchPress={() => navigateByLabel('Buscar')}
-        onProfilePress={() => navigateByLabel('Perfil')}
-      />
+
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -208,9 +202,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#050505',
   },
   headerArea: {
-    backgroundColor: '#050505',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'web' ? 80 : 50, // Added padding to clear the absolute Header
+    paddingTop: Platform.OS === 'web' ? 80 : 10,
     paddingBottom: 10,
     zIndex: 10,
   },

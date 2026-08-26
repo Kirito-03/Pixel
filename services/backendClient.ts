@@ -1,11 +1,12 @@
 import axios from 'axios';
+import { setupCache } from 'axios-cache-interceptor';
 import { getCurrentBaseURL } from './databaseService';
 
 function getBaseURL() {
   return getCurrentBaseURL() || 'http://localhost:3001';
 }
 
-export const backendClient = axios.create({
+const axiosInstance = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
   headers: {
@@ -14,8 +15,11 @@ export const backendClient = axios.create({
   },
 });
 
-backendClient.interceptors.request.use((config) => {
+axiosInstance.interceptors.request.use((config) => {
   config.baseURL = getBaseURL();
   return config;
 });
 
+export const backendClient = setupCache(axiosInstance, {
+  ttl: 1000 * 60 * 5, // 5 minutos de caché para el VPS (manga, noticias, etc)
+});
