@@ -62,7 +62,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { useAdmin } from '../contexts/AdminContext';
-import { LoadingScreen } from '../components/LoadingScreen';
+import LoadingScreen from '../components/LoadingScreen';
 
 const RootStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
