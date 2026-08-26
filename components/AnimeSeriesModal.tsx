@@ -908,15 +908,20 @@ export default function AnimeSeriesModal({
                   {/* Imagen backdrop — posición dinámica por contenido */}
                   <Image
                     source={{
-                      uri: currentContent?.backdrop_path
-                        ? (currentContent.type === 'anime'
-                            ? getAnimeImageUrl(currentContent.backdrop_path)
-                            : getImageUrl(currentContent.backdrop_path, 'original'))
-                        : (currentContent?.poster_path
-                            ? (currentContent.type === 'anime'
-                                ? getAnimeImageUrl(currentContent.poster_path)
-                                : getImageUrl(currentContent.poster_path, 'w500'))
-                            : '')
+                      uri: (() => {
+                        // On mobile prefer bannerImage (landscape) for anime, fallback to coverImage
+                        if (currentContent?.type === 'anime') {
+                          const d = detailData as any;
+                          const bannerImg = d?.bannerImage || currentContent?.backdrop_path;
+                          const coverImg = d?.coverImage?.extraLarge || d?.coverImage?.large || currentContent?.poster_path;
+                          if (Platform.OS !== 'web') {
+                            return bannerImg ? getAnimeImageUrl(bannerImg) : getAnimeImageUrl(coverImg);
+                          }
+                          return bannerImg ? getAnimeImageUrl(bannerImg) : getAnimeImageUrl(coverImg);
+                        }
+                        const path = currentContent?.backdrop_path || currentContent?.poster_path;
+                        return path ? getImageUrl(path, 'original') : '';
+                      })()
                     }}
                     style={[
                       heroStyles.backdropImage,
@@ -925,11 +930,8 @@ export default function AnimeSeriesModal({
                         objectPosition: (currentContent as any)?.banner_position ?? '52% 40%',
                         transform: [{ scale: 1.05 }],
                       },
-                      Platform.OS !== 'web' && {
-                        transform: [{ scale: 1.05 }, { translateY: 10 }],
-                      },
                     ]}
-                    resizeMode="cover"
+                    resizeMode={Platform.OS !== 'web' ? 'contain' : 'cover'}
                   />
                   {/* Gradiente multi-stop — más agresivo en la mitad inferior para legibilidad */}
                   <LinearGradient

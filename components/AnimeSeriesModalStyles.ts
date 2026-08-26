@@ -685,7 +685,7 @@ export const continueStyles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: -52,
     marginBottom: 4,
-    borderRadius: 10,
+    borderRadius: 4,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.09)',
