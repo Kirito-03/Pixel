@@ -11,10 +11,12 @@ import {
   Platform,
   Modal,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as Updates from 'expo-updates';
 import { auth } from '../services/firebase';
 import { useProfileScreenLogic } from '../hooks/useProfileScreenLogic';
 import { useAdmin } from '../contexts/AdminContext';
@@ -173,6 +175,36 @@ export default function ProfileScreen() {
   const isEmailProvider = auth.currentUser?.providerData?.some((p: any) => p.providerId === 'password');
   const isEmailVerified = !!auth.currentUser?.emailVerified;
 
+  const handleCheckForUpdate = async () => {
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        Alert.alert(
+          'Actualización disponible',
+          'Hay una nueva versión de la app. ¿Deseas descargarla e instalarla ahora?',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Actualizar',
+              onPress: async () => {
+                try {
+                  await Updates.fetchUpdateAsync();
+                  await Updates.reloadAsync();
+                } catch (e) {
+                  Alert.alert('Error', 'No se pudo descargar la actualización.');
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Al día', 'Tienes la versión más reciente.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo verificar la actualización.');
+    }
+  };
+
   // ── Contenido de cada sección ────────────────────────────
   const renderContent = () => {
     switch (activeSection) {
@@ -249,6 +281,14 @@ export default function ProfileScreen() {
                 value={notificationsEnabled}
                 onChange={setNotificationsEnabled}
               />
+              {Platform.OS === 'android' && (
+                <CardRow
+                  label="Actualizaciones"
+                  value="Buscar nueva versión de la app"
+                  action={handleCheckForUpdate}
+                  actionLabel="Buscar"
+                />
+              )}
             </ProfileCard>
 
             <SectionTitle>Descargas</SectionTitle>
