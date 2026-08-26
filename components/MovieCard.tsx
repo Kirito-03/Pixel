@@ -21,14 +21,15 @@ interface Props {
   isFirst?: boolean;
   isLast?: boolean;
   onHoverChange?: (isHovered: boolean) => void;
+  cardWidth?: number;
 }
 
-export default function MovieCard({ movie, onPress, isFirst = false, isLast = false, onHoverChange }: Props) {
+export default function MovieCard({ movie, onPress, isFirst = false, isLast = false, onHoverChange, cardWidth }: Props) {
   const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
-  const CARD_WIDTH = isSmallScreen ? width * 0.34 : 155;
+  const CARD_WIDTH = cardWidth || (isSmallScreen ? width * 0.31 : 155);
   const CARD_HEIGHT = CARD_WIDTH * 1.5;
 
   // Popup dimensions — más ancho como Netflix (aprox 2.2x)

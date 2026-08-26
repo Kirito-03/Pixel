@@ -207,6 +207,13 @@ export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';
   const hPad = isWeb ? 40 : 16;
+  const numCols = isWeb ? 5 : 3;
+  // Calculamos el ancho de cada tarjeta restando el padding horizontal y los gaps
+  const gap = 15;
+  const availableWidth = width - (hPad * 2);
+  const totalGapSpace = gap * (numCols - 1);
+  const cardWidth = (availableWidth - totalGapSpace) / numCols;
+
   const inputSize = isWeb ? 36 : 24;
   // En Android: paddingTop = insets.top (altura status bar) + 12 extra
   const headerPaddingTop = isWeb ? 30 : insets.top + 12;
@@ -312,7 +319,7 @@ export default function SearchScreen() {
       {/* Main Content Area (Scrollable) */}
       <FlatList
         data={results}
-        numColumns={isWeb ? 5 : 3}
+        numColumns={numCols}
         key={isWeb ? 'web' : 'mobile'}
         contentContainerStyle={[styles.mainContentScroll, { paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
@@ -381,15 +388,20 @@ export default function SearchScreen() {
                     {selectedGenre ? `RESULTADOS PARA: ${selectedGenre.toUpperCase()}` : 'RESULTADOS'}
                   </Text>
                 </View>
+                {selectedGenre && (
+                  <TouchableOpacity onPress={() => clearSearch()} style={{ padding: 6, backgroundColor: 'rgba(229,9,20,0.1)', borderRadius: 6, borderWidth: 1, borderColor: 'rgba(229,9,20,0.2)' }}>
+                    <Text style={{ color: '#E50914', fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>VOLVER A GÉNEROS</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </>
         }
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
-          <MovieCard movie={item} onPress={() => handleMoviePress(item.id)} />
+          <MovieCard movie={item} onPress={() => handleMoviePress(item.id)} cardWidth={cardWidth} />
         )}
-        columnWrapperStyle={results.length > 0 ? styles.gridColumns : undefined}
+        columnWrapperStyle={results.length > 0 ? { gap: 15, marginBottom: 20 } : undefined}
         ListEmptyComponent={
           ((query.length > 2 || selectedGenre) && !loading && results.length === 0) ? (
             <View style={styles.emptyContainer}>
@@ -612,10 +624,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  gridColumns: {
-    justifyContent: 'flex-start', // Let them pack naturally
-    marginBottom: 20,
-    gap: 15, // Using flex gap instead of space-between
+  genresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  genreCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(150,150,150,0.2)',
+  },
+  genreCardText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
