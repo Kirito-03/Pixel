@@ -434,6 +434,9 @@ export default function AppNavigator() {
               component={ProfileSelectionScreen as any}
             />
             <RootStack.Screen name="Principal" component={MainTabs} />
+            {Platform.OS !== 'web' && (
+              <RootStack.Screen name="Perfil" component={ProfileScreen} />
+            )}
             <RootStack.Screen name="Apariencia" component={AppearanceScreen} />
             <RootStack.Screen name="Descargas" component={DownloadsScreen as any} />
             <RootStack.Screen name="LegalScreen" component={LegalScreen} />
