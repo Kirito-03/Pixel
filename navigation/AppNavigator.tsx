@@ -270,7 +270,9 @@ function MainTabs({ route }: { route: any }) {
           tabBarLabel: 'Mi Lista',
         }}
       />
-      <Tab.Screen
+      {/* Perfil solo en web — en Android se accede desde el avatar del Header */}
+      {Platform.OS === 'web' && (
+        <Tab.Screen
           name="Perfil"
           component={ProfileScreen}
           options={{
@@ -281,6 +283,7 @@ function MainTabs({ route }: { route: any }) {
             tabBarLabel: 'Perfil',
           }}
         />
+      )}
 
     </Tab.Navigator>
   );

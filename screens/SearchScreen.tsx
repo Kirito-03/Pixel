@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, Image, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import MovieCard from '../components/MovieCard';
@@ -201,14 +202,18 @@ export default function SearchScreen() {
   // En web usamos outlineStyle none. En native lo ignoramos
   const inputPlatformStyles = Platform.OS === 'web' ? { outlineStyle: 'none' } : {};
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';
   const hPad = isWeb ? 40 : 16;
   const inputSize = isWeb ? 36 : 24;
+  // En Android: paddingTop = insets.top (altura status bar) + 12 extra
+  const headerPaddingTop = isWeb ? 30 : insets.top + 12;
 
   return (
     <View style={styles.container}>
-      <SafeAreaView style={{ zIndex: 100 }}>
-        <View style={[styles.megaHeaderContainer, { paddingHorizontal: hPad, paddingTop: isWeb ? 30 : 12 }]}>
+      {/* SafeAreaView solo en web; en Android controlamos el padding manualmente con insets */}
+      <View style={{ zIndex: 100 }}>
+        <View style={[styles.megaHeaderContainer, { paddingHorizontal: hPad, paddingTop: headerPaddingTop }]}>
           {/* Top mini-bar — solo en web */}
           {isWeb && (
             <View style={styles.topMiniBar}>
@@ -274,7 +279,7 @@ export default function SearchScreen() {
             </View>
           )}
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Sugerencias en Android — en el flujo normal, debajo del header */}
       {!isWeb && suggestions.length > 0 && (
