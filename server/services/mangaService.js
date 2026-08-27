@@ -6,7 +6,7 @@ const TIMEOUT = 60000;
 
 let browserInstance = null;
 
-async function getBrowserPage() {
+export async function getBrowserPage() {
   if (!browserInstance) {
     browserInstance = await launch({ 
       headless: true, 
@@ -54,6 +54,14 @@ export async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = T
       }
       if (!found) {
         console.warn(`No se encontró ${waitSelector}, quizás no hay resultados o Cloudflare tardó demasiado.`);
+        try {
+          await page.screenshot({ path: '/app/cloudflare_timeout.png', fullPage: true });
+          const errorHtml = await page.content();
+          import('fs').then(fs => fs.writeFileSync('/app/cloudflare_timeout.html', errorHtml));
+          console.warn('Screenshot and HTML saved for debugging.');
+        } catch(e) {
+          console.error('Failed to save debug info:', e.message);
+        }
       }
     } else {
       await new Promise(r => setTimeout(r, 5000));
