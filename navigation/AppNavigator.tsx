@@ -301,9 +301,22 @@ const linking = {
         screens: {
           Inicio: 'home',
           Buscar: 'search',
-          Noticias: 'news',
+          Noticias: {
+            path: 'news',
+            screens: {
+              NoticiasHome: '',
+              NewsDetail: 'detail/:id'
+            }
+          },
           Emisión: 'airing',
-          Manga: 'manga',
+          Manga: {
+            path: 'manga',
+            screens: {
+              MangaHome: '',
+              MangaDetail: 'detail/:id',
+              MangaReader: 'read/:id/:chapterId'
+            }
+          },
           MiLista: 'mylist',
           Perfil: 'profile',
         },
