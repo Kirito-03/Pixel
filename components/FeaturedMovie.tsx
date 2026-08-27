@@ -98,7 +98,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.5)', 'transparent'];
 
   return (
-    <View style={[styles.container, { width, height: isSmallScreen ? height * 0.55 : height * 0.9 }]}>
+    <View style={[styles.container, { width, height: isSmallScreen ? height * 0.75 : height * 0.9 }]}>
       <Image
         source={{ uri: imageUri }}
         style={StyleSheet.absoluteFillObject}
