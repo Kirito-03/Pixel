@@ -16,6 +16,24 @@ import fs from 'fs';
   console.log('Estado HTTP:', res.status());
   
   try {
+    console.log('Buscando iframe de Cloudflare Turnstile...');
+    const iframe = await page.waitForSelector('iframe[src*="challenges.cloudflare.com"]', { timeout: 5000 });
+    if (iframe) {
+      console.log('Iframe de Turnstile encontrado, intentando hacer clic como humano...');
+      const box = await iframe.boundingBox();
+      if (box) {
+        // Clic en el centro del widget, simulando comportamiento humano
+        await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2, { steps: 10 });
+        await new Promise(r => setTimeout(r, 1000));
+        await page.mouse.click(box.x + 30, box.y + box.height / 2);
+        console.log('Clic enviado al widget de Turnstile.');
+      }
+    }
+  } catch (e) {
+    console.log('No se mostró el widget interactivo de Turnstile (es invisible o no cargó).');
+  }
+
+  try {
     console.log('Esperando .acard hasta 30 segundos...');
     await page.waitForSelector('.acard', { timeout: 30000 });
     console.log('¡.acard ENCONTRADO! El bypass funcionó.');
