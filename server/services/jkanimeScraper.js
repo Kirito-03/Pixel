@@ -12,6 +12,35 @@
  */
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { launch } from 'cloakbrowser';
+
+let browserInstance = null;
+
+async function getBrowserPage() {
+  if (!browserInstance) {
+    browserInstance = await launch({ headless: true, humanize: true });
+  }
+  const page = await browserInstance.newPage();
+  return { browser: browserInstance, page };
+}
+
+async function fetchHtmlWithCloak(url, timeoutMs) {
+  const { page } = await getBrowserPage();
+  try {
+    const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    if (res && res.status() === 404) {
+       const err = new Error('Not Found');
+       err.status = 404;
+       throw err;
+    }
+    const html = await page.content();
+    await page.close();
+    return html;
+  } catch (err) {
+    await page.close().catch(() => {});
+    throw err;
+  }
+}
 
 const BASE_URL = 'https://jkanime.net';
 const TIMEOUT = 20000;
@@ -41,12 +70,8 @@ export async function findJkAnimeSlug(title) {
     const query = encodeURIComponent(title.replace(/\s+/g, ' ').trim());
     const searchUrl = `${BASE_URL}/buscar/${query}/`;
 
-    const response = await axios.get(searchUrl, {
-      headers: BROWSER_HEADERS,
-      timeout: TIMEOUT,
-    });
-
-    const $ = cheerio.load(response.data);
+    const html = await fetchHtmlWithCloak(searchUrl, TIMEOUT);
+    const $ = cheerio.load(html);
 
     // Buscar resultados de búsqueda - los links tienen la forma /anime-slug/
     let bestMatch = null;
@@ -89,13 +114,13 @@ export async function findJkAnimeSlug(title) {
 export async function getAnimePageData(slug) {
   try {
     const url = `${BASE_URL}/${slug}/`;
-    const response = await axios.get(url, { headers: BROWSER_HEADERS, timeout: TIMEOUT });
-    const $ = cheerio.load(response.data);
+    const html = await fetchHtmlWithCloak(url, TIMEOUT);
+    const $ = cheerio.load(html);
 
     // Extraer ID del anime (usado para el AJAX de episodios)
     // Está en el script: ajax/episodes/{id}/{page}
     let animeId = null;
-    const pageHtml = response.data;
+    const pageHtml = html;
     const idMatch = pageHtml.match(/ajax\/episodes\/(\d+)\//);
     if (idMatch) animeId = idMatch[1];
 
@@ -124,17 +149,17 @@ export async function getAnimePageData(slug) {
 export async function getEpisodePlayerUrl(slug, episodeNumber) {
   try {
     const url = `${BASE_URL}/${slug}/${episodeNumber}/`;
-    const response = await axios.get(url, { headers: BROWSER_HEADERS, timeout: TIMEOUT });
+    const html = await fetchHtmlWithCloak(url, TIMEOUT);
 
     // Extraer todos los iframes de las variables de video
-    const videoMatches = response.data.matchAll(/video\[\d+\]\s*=\s*'<iframe[^']*src="([^"]+)"/g);
+    const videoMatches = html.matchAll(/video\[\d+\]\s*=\s*'<iframe[^']*src="([^"]+)"/g);
     let allIframes = [];
     for (const match of videoMatches) {
       allIframes.push(match[1]);
     }
 
     if (allIframes.length === 0) {
-      const $ = cheerio.load(response.data);
+      const $ = cheerio.load(html);
       const src = $('iframe.player_conte').first().attr('src');
       if (src) allIframes.push(src);
     }
@@ -158,16 +183,16 @@ export async function getEpisodePlayerUrl(slug, episodeNumber) {
 
     // Ahora hacemos una petición al iframe para extraer el link directo
     try {
-      const iframeResponse = await axios.get(iframeUrl, { headers: { ...BROWSER_HEADERS, Referer: url }, timeout: TIMEOUT });
+      const iframeHtml = await fetchHtmlWithCloak(iframeUrl, TIMEOUT);
       
       // Intentar extraer <source src="..."> (típico de video.js)
-      const sourceMatch = iframeResponse.data.match(/<source\s+src=['"]([^'"]+)['"]/);
+      const sourceMatch = iframeHtml.match(/<source\s+src=['"]([^'"]+)['"]/);
       if (sourceMatch) {
         return sourceMatch[1];
       }
 
       // Intentar extraer url: '...' (típico de DPlayer)
-      const urlMatch = iframeResponse.data.match(/url:\s*['"](http[^'"]+)['"]/);
+      const urlMatch = iframeHtml.match(/url:\s*['"](http[^'"]+)['"]/);
       if (urlMatch) {
         return urlMatch[1];
       }
@@ -180,7 +205,7 @@ export async function getEpisodePlayerUrl(slug, episodeNumber) {
     }
 
   } catch (error) {
-    if (error.response?.status === 404) {
+    if (error.status === 404) {
       return null; // Episodio no existe
     }
     console.error(`[JKScraper] Error en ep ${episodeNumber} de "${slug}":`, error.message);

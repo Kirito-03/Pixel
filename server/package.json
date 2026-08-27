@@ -17,6 +17,7 @@
     "axios": "^1.13.5",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.2.0",
+    "cloakbrowser": "^0.5.9",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -33,7 +34,8 @@
     "p-limit": "^7.3.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "playwright-core": "^1.62.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
