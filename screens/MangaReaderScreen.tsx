@@ -259,8 +259,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listContent: { paddingHorizontal: 10, paddingBottom: 30, gap: 10 },
+  listContent: { paddingHorizontal: 10, paddingBottom: 30, gap: 10, alignItems: 'stretch' },
   imageWrap: {
+    width: '100%',
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#0F0F0F',
