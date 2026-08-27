@@ -1,5 +1,6 @@
 import app from './app.js';
 import { ensurePixelNoSekaiTables } from './db/ensureTables.js';
+import pool from './db.js';
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
