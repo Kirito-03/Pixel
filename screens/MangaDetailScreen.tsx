@@ -96,7 +96,9 @@ export default function MangaDetailScreen() {
 
   const openChapter = async (chapter: MangaChapter, index: number) => {
     navigation.navigate('MangaReader', {
-      chapterId: chapter.id,
+      id,
+      mangaId: id,
+      chapterId: encodeURIComponent(chapter.id),
       chapters,
       currentIndex: index,
       mangaTitle: manga?.title || 'Manga',

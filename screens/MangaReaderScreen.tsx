@@ -75,7 +75,8 @@ export default function MangaReaderScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { navigateByLabel } = useTabNavigation();
-  const { chapterId, chapters = [], currentIndex = 0, mangaTitle = 'Manga' } = (route?.params || {}) as RouteParams;
+  const { chapterId: rawChapterId, chapters = [], currentIndex = 0, mangaTitle = 'Manga' } = (route?.params || {}) as RouteParams;
+  const chapterId = rawChapterId ? decodeURIComponent(rawChapterId) : '';
 
   const [loading, setLoading] = useState(true);
   const [pages, setPages] = useState<string[]>([]);
