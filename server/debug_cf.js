@@ -10,6 +10,13 @@ import fs from 'fs';
   });
   
   const page = await browser.newPage();
+  
+  // Aceptar automáticamente cualquier alerta o confirmación (window.confirm, window.alert)
+  page.on('dialog', async dialog => {
+    console.log('Dialog detectado:', dialog.message());
+    await dialog.accept();
+  });
+  
   console.log('Navegando a DragonTranslation...');
   const res = await page.goto('https://dragontranslation.org/manga/?m_orderby=latest', { waitUntil: 'domcontentloaded', timeout: 30000 });
   

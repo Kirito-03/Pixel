@@ -15,6 +15,12 @@ async function getBrowserPage() {
     });
   }
   const page = await browserInstance.newPage();
+  
+  // Aceptar automáticamente confirmaciones (window.confirm)
+  page.on('dialog', async dialog => {
+    await dialog.accept();
+  });
+  
   return { browser: browserInstance, page };
 }
 
