@@ -8,7 +8,11 @@ let browserInstance = null;
 
 async function getBrowserPage() {
   if (!browserInstance) {
-    browserInstance = await launch({ headless: true, humanize: true });
+    browserInstance = await launch({ 
+      headless: true, 
+      humanize: true,
+      args: ['--fingerprint-platform=linux']
+    });
   }
   const page = await browserInstance.newPage();
   return { browser: browserInstance, page };
