@@ -24,7 +24,7 @@ async function getBrowserPage() {
   return { browser: browserInstance, page };
 }
 
-async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = TIMEOUT) {
+export async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = TIMEOUT) {
   const { page } = await getBrowserPage();
   try {
     const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
@@ -150,7 +150,7 @@ async function queryMangaCache(pool, { page, limit, status, search, order }) {
   };
 }
 
-async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
+export async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
   await pool.query(
     `
     INSERT INTO manga_cache
@@ -198,7 +198,7 @@ async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
 // SCRAPERS
 // ----------------------------------------------------------------------
 
-async function scrapeMangaList(url) {
+export async function scrapeMangaList(url) {
   const html = await fetchHtmlWithCloak(url, '.acard');
   const $ = cheerio.load(html);
   const items = [];

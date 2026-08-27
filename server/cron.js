@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
+import { runIncrementalMangaScraping } from './services/mangaBotService.js';
 import pool from './db.js';
 
 export function startBotSchedulers() {
@@ -48,11 +49,22 @@ export function startBotSchedulers() {
     }
   });
 
+  // Tarea 5: Manga Bot Incremental (Cada 1 hora)
+  cron.schedule('0 * * * *', async () => {
+    console.log('[Cron] Ejecutando Manga Bot Incremental...');
+    try {
+      await runIncrementalMangaScraping(pool, 1, 1);
+    } catch (e) {
+      console.error('[Cron] Error en Manga Bot:', e.message);
+    }
+  });
+
   console.log('[Cron] Tareas del bot configuradas:');
   console.log(' - Update Ongoing: Cada 4 horas');
   console.log(' - Sync Airing: Diario a las 02:00 AM');
   console.log(' - Sync Catalog Incremental: Cada 10 minutos');
   console.log(' - Fix Missing Images: Cada 12 horas');
+  console.log(' - Manga Bot Incremental: Cada 1 hora');
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {

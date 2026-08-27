@@ -1,0 +1,431 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import Header from '../components/Header';
+import { useTabNavigation } from '../hooks/useTabNavigation';
+import { mangaApi, Manga, MangaChapter } from '../services/mangaApi';
+
+function formatDate(iso?: string | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function fallbackDescription(title?: string | null) {
+  const t = String(title || '').trim();
+  return t ? `Lee ${t} en Pixel no Sekai.` : 'Descripción no disponible.';
+}
+
+export default function MangaDetailScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const { navigateByLabel } = useTabNavigation();
+  const id = String(route?.params?.id || '').trim();
+
+  const [loading, setLoading] = useState(true);
+  const [manga, setManga] = useState<Manga | null>(null);
+  const [chapters, setChapters] = useState<MangaChapter[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
+  const [totalAvailableChapters, setTotalAvailableChapters] = useState(0);
+  const [spanishAvailableChapters, setSpanishAvailableChapters] = useState(0);
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>('es');
+  const [usedFallbackToEnglish, setUsedFallbackToEnglish] = useState(false);
+  const [languageNotice, setLanguageNotice] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState<'es' | 'es-la' | 'en'>('es');
+  const [allowEnglishFallback, setAllowEnglishFallback] = useState(true);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      try {
+        const [m, c] = await Promise.all([
+          mangaApi.getById(id),
+          mangaApi.chapters(id, {
+            limit: 300,
+            preferredLanguage,
+            allowEnglishFallback,
+          }),
+        ]);
+        if (cancelled) return;
+        setManga(m);
+        setChapters(c.chapters || c.items || []);
+        setAvailableLanguages(Array.isArray(c.availableLanguages) ? c.availableLanguages : []);
+        setTotalAvailableChapters(Number(c.totalAvailableChapters || 0));
+        setSpanishAvailableChapters(Number(c.spanishAvailableChapters || 0));
+        setSelectedLanguage(c.selectedLanguage || preferredLanguage);
+        setUsedFallbackToEnglish(c.usedFallbackToEnglish === true);
+        const notice = c.noSpanishMessage
+          ? c.noSpanishMessage
+          : (c.usedFallbackToEnglish ? 'Mostrando capítulos en inglés por falta de traducción en español' : '');
+        setLanguageNotice(notice);
+        setImageError(false);
+      } catch {
+        if (cancelled) return;
+        setManga(null);
+        setChapters([]);
+        setAvailableLanguages([]);
+        setTotalAvailableChapters(0);
+        setSpanishAvailableChapters(0);
+        setSelectedLanguage(preferredLanguage);
+        setUsedFallbackToEnglish(false);
+        setLanguageNotice('');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    if (id) run();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, preferredLanguage, allowEnglishFallback]);
+
+  const tags = useMemo(() => {
+    const t = manga?.tags || [];
+    return t.slice(0, 12);
+  }, [manga?.tags]);
+
+  const openChapter = async (chapter: MangaChapter, index: number) => {
+    navigation.navigate('MangaReader', {
+      chapterId: chapter.id,
+      chapters,
+      currentIndex: index,
+      mangaTitle: manga?.title || 'Manga',
+    });
+  };
+
+  const updatedText = manga?.updated_at ? formatDate(manga.updated_at) : '';
+
+  return (
+    <View style={styles.container}>
+      <Header
+        black
+        activeSection="Manga"
+        onNavPress={navigateByLabel}
+        onSearchPress={() => navigateByLabel('Buscar')}
+        onProfilePress={() => navigateByLabel('Perfil')}
+      />
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <SafeAreaView>
+          <View style={styles.topBar}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
+              <Ionicons name="arrow-back" size={20} color="#fff" />
+              <Text style={styles.backText}>Volver</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+
+        {loading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator size="large" color="#E50914" />
+          </View>
+        ) : !manga ? (
+          <View style={styles.empty}>
+            <Ionicons name="book-outline" size={46} color="rgba(255,255,255,0.18)" />
+            <Text style={styles.emptyTitle}>Manga no disponible</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.hero}>
+              {manga.cover_url && !imageError ? (
+                <Image
+                  source={{ uri: manga.cover_url }}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="cover"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
+                  <LinearGradient
+                    colors={['#191919', '#111111', '#0A0A0A']}
+                    locations={[0, 0.62, 1]}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <Text style={styles.imageFallbackText}>PIXEL NO SEKAI MANGA</Text>
+                  {manga.status ? (
+                    <View style={styles.imageFallbackBadge}>
+                      <Text style={styles.imageFallbackBadgeText}>{String(manga.status).toUpperCase()}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+
+              <LinearGradient
+                colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.78)', 'rgba(0,0,0,0.98)']}
+                locations={[0, 0.55, 1]}
+                style={StyleSheet.absoluteFillObject}
+              />
+
+              <View style={styles.heroContent}>
+                <View style={styles.metaRow}>
+                  {manga.status ? (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{String(manga.status).toUpperCase()}</Text>
+                    </View>
+                  ) : null}
+                  {updatedText ? (
+                    <View style={styles.dateRow}>
+                      <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.6)" />
+                      <Text style={styles.dateText}>Act. {updatedText}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <Text style={styles.title}>{manga.title}</Text>
+                <Text style={styles.excerpt} numberOfLines={4}>{manga.description || fallbackDescription(manga.title)}</Text>
+
+                <View style={styles.actions}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!chapters.length) return;
+                      openChapter(chapters[0], 0);
+                    }}
+                    style={styles.primaryBtn}
+                    activeOpacity={0.9}
+                    disabled={!chapters.length}
+                  >
+                    <Ionicons name="book-outline" size={18} color="#000" />
+                    <Text style={styles.primaryText}>Leer ahora</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.body}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoPill}>
+                  <Ionicons name="book-outline" size={12} color="rgba(255,255,255,0.55)" />
+                  <Text style={styles.infoText}>{spanishAvailableChapters} capítulos ES</Text>
+                </View>
+                <View style={styles.infoPill}>
+                  <Ionicons name="layers-outline" size={12} color="rgba(255,255,255,0.55)" />
+                  <Text style={styles.infoText}>{totalAvailableChapters} totales</Text>
+                </View>
+                {manga.year ? (
+                  <View style={styles.infoPill}>
+                    <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.55)" />
+                    <Text style={styles.infoText}>{manga.year}</Text>
+                  </View>
+                ) : null}
+                {manga.content_rating ? (
+                  <View style={styles.infoPill}>
+                    <Ionicons name="shield-checkmark-outline" size={12} color="rgba(255,255,255,0.55)" />
+                    <Text style={styles.infoText}>{String(manga.content_rating).toUpperCase()}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <Text style={styles.availabilityNote}>
+                La disponibilidad de capítulos depende de las traducciones publicadas en MangaDex
+              </Text>
+
+              <View style={styles.languageControls}>
+                <View style={styles.languageRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setPreferredLanguage('es')}
+                    style={[styles.langChip, preferredLanguage === 'es' && styles.langChipActive]}
+                  >
+                    <Text style={[styles.langChipText, preferredLanguage === 'es' && styles.langChipTextActive]}>ES</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setPreferredLanguage('es-la')}
+                    style={[styles.langChip, preferredLanguage === 'es-la' && styles.langChipActive]}
+                  >
+                    <Text style={[styles.langChipText, preferredLanguage === 'es-la' && styles.langChipTextActive]}>ES-LA</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setPreferredLanguage('en')}
+                    style={[styles.langChip, preferredLanguage === 'en' && styles.langChipActive]}
+                  >
+                    <Text style={[styles.langChipText, preferredLanguage === 'en' && styles.langChipTextActive]}>EN</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => setAllowEnglishFallback((prev) => !prev)}
+                  style={[styles.fallbackChip, allowEnglishFallback && styles.fallbackChipActive]}
+                >
+                  <Text style={[styles.fallbackChipText, allowEnglishFallback && styles.fallbackChipTextActive]}>
+                    Fallback inglés {allowEnglishFallback ? 'ON' : 'OFF'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.languageBadgeRow}>
+                <View style={styles.languageBadge}>
+                  <Text style={styles.languageBadgeText}>Idioma: {(selectedLanguage || 'N/A').toUpperCase()}</Text>
+                </View>
+                {usedFallbackToEnglish ? (
+                  <View style={[styles.languageBadge, styles.languageBadgeWarn]}>
+                    <Text style={styles.languageBadgeWarnText}>Fallback EN</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {availableLanguages.length ? (
+                <Text style={styles.availableLanguagesText}>
+                  Idiomas disponibles: {availableLanguages.map((l) => l.toUpperCase()).join(', ')}
+                </Text>
+              ) : null}
+              {languageNotice ? <Text style={styles.languageNotice}>{languageNotice}</Text> : null}
+
+              {(manga.author || manga.artist) ? (
+                <View style={styles.byline}>
+                  {manga.author ? <Text style={styles.bylineText}>Autor: {manga.author}</Text> : null}
+                  {manga.artist ? <Text style={styles.bylineText}>Artista: {manga.artist}</Text> : null}
+                </View>
+              ) : null}
+
+              {tags.length ? (
+                <View style={styles.tagsWrap}>
+                  {tags.map((t) => (
+                    <View key={t} style={styles.tagChip}>
+                      <Text style={styles.tagText}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <View style={styles.sectionHeader}>
+                <Ionicons name="list" size={18} color="#E50914" />
+                <Text style={styles.sectionTitle}>Capítulos</Text>
+              </View>
+
+              {chapters.length === 0 ? (
+                <View style={styles.emptyChapters}>
+                  <Text style={styles.emptyChaptersText}>Sin capítulos disponibles.</Text>
+                </View>
+              ) : (
+                <View style={styles.chapterList}>
+                  {chapters.slice(0, 60).map((c, idx) => (
+                    <TouchableOpacity key={c.id} style={styles.chapterRow} activeOpacity={0.9} onPress={() => openChapter(c, idx)}>
+                      <View style={styles.chapterLeft}>
+                        <Text style={styles.chapterNum}>
+                          {c.chapter ? `Cap. ${c.chapter}` : 'Capítulo'}
+                        </Text>
+                        {c.title ? <Text style={styles.chapterTitle} numberOfLines={1}>{c.title}</Text> : null}
+                        <Text style={styles.chapterMeta} numberOfLines={1}>
+                          {(c.translated_language || '').toUpperCase()} {c.readable_at ? `• ${formatDate(c.readable_at)}` : ''}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.35)" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0A0A0A' },
+  scroll: { paddingTop: 80, paddingBottom: 40 },
+  topBar: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  backText: { color: 'rgba(255,255,255,0.9)', fontWeight: '800' },
+  loading: { paddingTop: 40, alignItems: 'center', justifyContent: 'center' },
+  empty: { paddingTop: 40, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  hero: { marginHorizontal: 20, borderRadius: 16, overflow: 'hidden', height: 360, backgroundColor: '#111' },
+  heroContent: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' },
+  badge: { backgroundColor: 'rgba(229,9,20,0.22)', borderWidth: 1, borderColor: 'rgba(229,9,20,0.35)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dateText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700' },
+  title: { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.4, lineHeight: 34, marginBottom: 10 },
+  excerpt: { color: 'rgba(255,255,255,0.68)', fontSize: 14, lineHeight: 20, marginBottom: 14, maxWidth: 760 },
+  actions: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  primaryText: { color: '#000', fontWeight: '900' },
+  body: { paddingHorizontal: 20, paddingTop: 22, gap: 14 },
+  infoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  infoPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  infoText: { color: 'rgba(255,255,255,0.72)', fontSize: 12, fontWeight: '800' },
+  availabilityNote: { color: 'rgba(255,255,255,0.56)', fontSize: 12, fontWeight: '700' },
+  languageControls: { gap: 10 },
+  languageRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  langChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  langChipActive: {
+    backgroundColor: 'rgba(229,9,20,0.22)',
+    borderColor: 'rgba(229,9,20,0.36)',
+  },
+  langChipText: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '900' },
+  langChipTextActive: { color: '#FFFFFF' },
+  fallbackChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  fallbackChipActive: { backgroundColor: 'rgba(38,166,154,0.20)', borderColor: 'rgba(38,166,154,0.38)' },
+  fallbackChipText: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '900' },
+  fallbackChipTextActive: { color: '#D5FFF8' },
+  languageBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  languageBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  languageBadgeWarn: { backgroundColor: 'rgba(255,193,7,0.18)', borderColor: 'rgba(255,193,7,0.35)' },
+  languageBadgeText: { color: 'rgba(255,255,255,0.82)', fontSize: 11, fontWeight: '900' },
+  languageBadgeWarnText: { color: '#FFE082', fontSize: 11, fontWeight: '900' },
+  availableLanguagesText: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '700' },
+  languageNotice: { color: '#FFD54F', fontSize: 12, fontWeight: '800' },
+  byline: { gap: 4 },
+  bylineText: { color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: '700' },
+  tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  tagText: { color: 'rgba(255,255,255,0.70)', fontSize: 12, fontWeight: '800' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  sectionTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.2 },
+  chapterList: { gap: 10, marginTop: 8 },
+  chapterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: '#161616', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  chapterLeft: { flex: 1, paddingRight: 10 },
+  chapterNum: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
+  chapterTitle: { color: 'rgba(255,255,255,0.75)', fontWeight: '700', fontSize: 12, marginTop: 2 },
+  chapterMeta: { color: 'rgba(255,255,255,0.45)', fontWeight: '700', fontSize: 11, marginTop: 3 },
+  emptyChapters: { paddingVertical: 22, alignItems: 'center', justifyContent: 'center' },
+  emptyChaptersText: { color: 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: '800' },
+  imageFallback: { backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
+  imageFallbackText: { color: 'rgba(255,255,255,0.4)', fontSize: 12, letterSpacing: 2, fontWeight: '900' },
+  imageFallbackBadge: { position: 'absolute', right: 14, bottom: 14, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  imageFallbackBadgeText: { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+});

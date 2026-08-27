@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +25,8 @@ export default function MangaDetailScreen() {
   const route = useRoute<any>();
   const { navigateByLabel } = useTabNavigation();
   const id = String(route?.params?.id || '').trim();
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 768;
 
   const [loading, setLoading] = useState(true);
   const [manga, setManga] = useState<Manga | null>(null);
@@ -131,54 +133,69 @@ export default function MangaDetailScreen() {
             <Text style={styles.emptyTitle}>Manga no disponible</Text>
           </View>
         ) : (
-          <>
-            <View style={styles.hero}>
+          <View style={styles.contentWrap}>
+            {/* Background Blur */}
+            <View style={styles.backdropImageContainer}>
               {manga.cover_url && !imageError ? (
                 <Image
                   source={{ uri: manga.cover_url }}
-                  style={StyleSheet.absoluteFillObject}
-                  resizeMode="cover"
+                  style={styles.backdropImage}
+                  blurRadius={Platform.OS === 'web' ? 10 : 5}
                   onError={() => setImageError(true)}
+                  resizeMode="cover"
                 />
-              ) : (
-                <View style={[StyleSheet.absoluteFillObject, styles.imageFallback]}>
-                  <LinearGradient
-                    colors={['#191919', '#111111', '#0A0A0A']}
-                    locations={[0, 0.62, 1]}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <Text style={styles.imageFallbackText}>PIXEL NO SEKAI MANGA</Text>
-                  {manga.status ? (
-                    <View style={styles.imageFallbackBadge}>
-                      <Text style={styles.imageFallbackBadgeText}>{String(manga.status).toUpperCase()}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              )}
-
+              ) : null}
+              <View style={styles.backdropOverlay} />
               <LinearGradient
-                colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.78)', 'rgba(0,0,0,0.98)']}
-                locations={[0, 0.55, 1]}
+                colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)', '#0B0B0B', '#0B0B0B']}
+                locations={[0, 0.4, 0.7, 1]}
                 style={StyleSheet.absoluteFillObject}
               />
+            </View>
 
-              <View style={styles.heroContent}>
+            <View style={[styles.heroContent, isSmallScreen ? styles.heroContentMobile : styles.heroContentWeb]}>
+              <View style={[styles.posterContainer, isSmallScreen ? styles.posterMobile : styles.posterWeb]}>
+                {manga.cover_url && !imageError ? (
+                  <Image source={{ uri: manga.cover_url }} style={styles.posterImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.posterFallback}>
+                    <Ionicons name="image-outline" size={40} color="rgba(255,255,255,0.2)" />
+                  </View>
+                )}
+              </View>
+
+              <View style={[styles.infoContainer, isSmallScreen && styles.infoMobile]}>
+                <Text style={styles.title}>{manga.title}</Text>
+                
                 <View style={styles.metaRow}>
                   {manga.status ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{String(manga.status).toUpperCase()}</Text>
-                    </View>
+                    <Text style={styles.metaText}>{String(manga.status).toUpperCase()}</Text>
+                  ) : null}
+                  {manga.year ? (
+                    <>
+                      <Text style={styles.metaDot}>•</Text>
+                      <Text style={styles.metaText}>{manga.year}</Text>
+                    </>
                   ) : null}
                   {updatedText ? (
-                    <View style={styles.dateRow}>
-                      <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.6)" />
-                      <Text style={styles.dateText}>Act. {updatedText}</Text>
-                    </View>
+                    <>
+                      <Text style={styles.metaDot}>•</Text>
+                      <Text style={styles.metaText}>Act. {updatedText}</Text>
+                    </>
                   ) : null}
                 </View>
 
-                <Text style={styles.title}>{manga.title}</Text>
-                <Text style={styles.excerpt} numberOfLines={4}>{manga.description || fallbackDescription(manga.title)}</Text>
+                {tags.length > 0 && (
+                  <View style={styles.tagsContainer}>
+                    {tags.map((t, idx) => (
+                      <View key={idx} style={styles.tag}>
+                        <Text style={styles.tagText}>{t}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <Text style={styles.excerpt}>{manga.description || fallbackDescription(manga.title)}</Text>
 
                 <View style={styles.actions}>
                   <TouchableOpacity
@@ -186,47 +203,30 @@ export default function MangaDetailScreen() {
                       if (!chapters.length) return;
                       openChapter(chapters[0], 0);
                     }}
-                    style={styles.primaryBtn}
+                    style={[styles.primaryBtn, !chapters.length && styles.btnDisabled]}
                     activeOpacity={0.9}
                     disabled={!chapters.length}
                   >
-                    <Ionicons name="book-outline" size={18} color="#000" />
+                    <Ionicons name="play" size={18} color="#000" />
                     <Text style={styles.primaryText}>Leer ahora</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity style={styles.secondaryBtn}>
+                    <Ionicons name="add" size={20} color="#fff" />
+                    <Text style={styles.secondaryText}>Mi lista</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.iconBtn}>
+                    <Ionicons name="heart-outline" size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
 
-            <View style={styles.body}>
-              <View style={styles.infoRow}>
-                <View style={styles.infoPill}>
-                  <Ionicons name="book-outline" size={12} color="rgba(255,255,255,0.55)" />
-                  <Text style={styles.infoText}>{spanishAvailableChapters} capítulos ES</Text>
-                </View>
-                <View style={styles.infoPill}>
-                  <Ionicons name="layers-outline" size={12} color="rgba(255,255,255,0.55)" />
-                  <Text style={styles.infoText}>{totalAvailableChapters} totales</Text>
-                </View>
-                {manga.year ? (
-                  <View style={styles.infoPill}>
-                    <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.55)" />
-                    <Text style={styles.infoText}>{manga.year}</Text>
-                  </View>
-                ) : null}
-                {manga.content_rating ? (
-                  <View style={styles.infoPill}>
-                    <Ionicons name="shield-checkmark-outline" size={12} color="rgba(255,255,255,0.55)" />
-                    <Text style={styles.infoText}>{String(manga.content_rating).toUpperCase()}</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              <Text style={styles.availabilityNote}>
-                La disponibilidad de capítulos depende de las traducciones publicadas en MangaDex
-              </Text>
-
-              <View style={styles.languageControls}>
-                <View style={styles.languageRow}>
+            <View style={[styles.chaptersSection, isSmallScreen ? styles.chaptersSectionMobile : styles.chaptersSectionWeb]}>
+              <View style={styles.chaptersHeader}>
+                <Text style={styles.sectionTitle}>Capítulos</Text>
+                
+                <View style={styles.languageControls}>
                   <TouchableOpacity
                     activeOpacity={0.9}
                     onPress={() => setPreferredLanguage('es')}
@@ -236,94 +236,47 @@ export default function MangaDetailScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     activeOpacity={0.9}
-                    onPress={() => setPreferredLanguage('es-la')}
-                    style={[styles.langChip, preferredLanguage === 'es-la' && styles.langChipActive]}
-                  >
-                    <Text style={[styles.langChipText, preferredLanguage === 'es-la' && styles.langChipTextActive]}>ES-LA</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    activeOpacity={0.9}
                     onPress={() => setPreferredLanguage('en')}
                     style={[styles.langChip, preferredLanguage === 'en' && styles.langChipActive]}
                   >
                     <Text style={[styles.langChipText, preferredLanguage === 'en' && styles.langChipTextActive]}>EN</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => setAllowEnglishFallback((prev) => !prev)}
-                  style={[styles.fallbackChip, allowEnglishFallback && styles.fallbackChipActive]}
-                >
-                  <Text style={[styles.fallbackChipText, allowEnglishFallback && styles.fallbackChipTextActive]}>
-                    Fallback inglés {allowEnglishFallback ? 'ON' : 'OFF'}
-                  </Text>
-                </TouchableOpacity>
               </View>
-
-              <View style={styles.languageBadgeRow}>
-                <View style={styles.languageBadge}>
-                  <Text style={styles.languageBadgeText}>Idioma: {(selectedLanguage || 'N/A').toUpperCase()}</Text>
-                </View>
-                {usedFallbackToEnglish ? (
-                  <View style={[styles.languageBadge, styles.languageBadgeWarn]}>
-                    <Text style={styles.languageBadgeWarnText}>Fallback EN</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {availableLanguages.length ? (
-                <Text style={styles.availableLanguagesText}>
-                  Idiomas disponibles: {availableLanguages.map((l) => l.toUpperCase()).join(', ')}
-                </Text>
-              ) : null}
-              {languageNotice ? <Text style={styles.languageNotice}>{languageNotice}</Text> : null}
-
-              {(manga.author || manga.artist) ? (
-                <View style={styles.byline}>
-                  {manga.author ? <Text style={styles.bylineText}>Autor: {manga.author}</Text> : null}
-                  {manga.artist ? <Text style={styles.bylineText}>Artista: {manga.artist}</Text> : null}
-                </View>
+              
+              {languageNotice ? (
+                <Text style={styles.availabilityNote}>{languageNotice}</Text>
               ) : null}
 
-              {tags.length ? (
-                <View style={styles.tagsWrap}>
-                  {tags.map((t) => (
-                    <View key={t} style={styles.tagChip}>
-                      <Text style={styles.tagText}>{t}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-
-              <View style={styles.sectionHeader}>
-                <Ionicons name="list" size={18} color="#E50914" />
-                <Text style={styles.sectionTitle}>Capítulos</Text>
-              </View>
-
-              {chapters.length === 0 ? (
-                <View style={styles.emptyChapters}>
-                  <Text style={styles.emptyChaptersText}>Sin capítulos disponibles.</Text>
-                </View>
-              ) : (
-                <View style={styles.chapterList}>
-                  {chapters.slice(0, 60).map((c, idx) => (
-                    <TouchableOpacity key={c.id} style={styles.chapterRow} activeOpacity={0.9} onPress={() => openChapter(c, idx)}>
-                      <View style={styles.chapterLeft}>
-                        <Text style={styles.chapterNum}>
-                          {c.chapter ? `Cap. ${c.chapter}` : 'Capítulo'}
+              <View style={styles.chaptersList}>
+                {chapters.length === 0 ? (
+                  <Text style={styles.noChaptersText}>No hay capítulos disponibles.</Text>
+                ) : (
+                  chapters.map((chap, idx) => (
+                    <TouchableOpacity
+                      key={chap.id}
+                      style={styles.chapterCard}
+                      activeOpacity={0.8}
+                      onPress={() => openChapter(chap, idx)}
+                    >
+                      <View style={styles.chapterNumber}>
+                        <Text style={styles.chapterNumberText}>{chap.chapter}</Text>
+                      </View>
+                      <View style={styles.chapterInfo}>
+                        <Text style={styles.chapterCardTitle} numberOfLines={1}>
+                          {chap.title || `Capítulo ${chap.chapter}`}
                         </Text>
-                        {c.title ? <Text style={styles.chapterTitle} numberOfLines={1}>{c.title}</Text> : null}
-                        <Text style={styles.chapterMeta} numberOfLines={1}>
-                          {(c.translated_language || '').toUpperCase()} {c.readable_at ? `• ${formatDate(c.readable_at)}` : ''}
+                        <Text style={styles.chapterDate}>
+                          {chap.publishAt ? formatDate(chap.publishAt) : 'Sin fecha'}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.35)" />
+                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
                     </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                  ))
+                )}
+              </View>
             </View>
-          </>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -331,101 +284,304 @@ export default function MangaDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0A' },
-  scroll: { paddingTop: 80, paddingBottom: 40 },
-  topBar: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 },
+  container: { flex: 1, backgroundColor: '#0B0B0B' },
+  scroll: { flexGrow: 1, paddingBottom: 60 },
+  topBar: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 5,
+    zIndex: 10,
+  },
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: 6,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
-  backText: { color: 'rgba(255,255,255,0.9)', fontWeight: '800' },
-  loading: { paddingTop: 40, alignItems: 'center', justifyContent: 'center' },
-  empty: { paddingTop: 40, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  hero: { marginHorizontal: 20, borderRadius: 16, overflow: 'hidden', height: 360, backgroundColor: '#111' },
-  heroContent: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' },
-  badge: { backgroundColor: 'rgba(229,9,20,0.22)', borderWidth: 1, borderColor: 'rgba(229,9,20,0.35)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dateText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700' },
-  title: { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.4, lineHeight: 34, marginBottom: 10 },
-  excerpt: { color: 'rgba(255,255,255,0.68)', fontSize: 14, lineHeight: 20, marginBottom: 14, maxWidth: 760 },
-  actions: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  primaryText: { color: '#000', fontWeight: '900' },
-  body: { paddingHorizontal: 20, paddingTop: 22, gap: 14 },
-  infoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  infoPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
-  infoText: { color: 'rgba(255,255,255,0.72)', fontSize: 12, fontWeight: '800' },
-  availabilityNote: { color: 'rgba(255,255,255,0.56)', fontSize: 12, fontWeight: '700' },
-  languageControls: { gap: 10 },
-  languageRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  langChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  backText: { color: '#fff', fontSize: 14, fontWeight: '600', marginLeft: 6 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100, gap: 12 },
+  emptyTitle: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '600' },
+  
+  contentWrap: {
+    position: 'relative',
+    flex: 1,
+  },
+  backdropImageContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 600,
+    zIndex: 0,
+  },
+  backdropImage: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.6,
+  },
+  backdropOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  heroContent: {
+    paddingTop: 40,
+    paddingHorizontal: 20,
+    zIndex: 1,
+  },
+  heroContentWeb: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    maxWidth: 1100,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  heroContentMobile: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  posterContainer: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#1A1A1A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  posterWeb: {
+    width: 240,
+    height: 360,
+    marginRight: 40,
+    flexShrink: 0,
+  },
+  posterMobile: {
+    width: 180,
+    height: 270,
+    marginBottom: 24,
+  },
+  posterImage: {
+    width: '100%',
+    height: '100%',
+  },
+  posterFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoContainer: {
+    flex: 1,
+  },
+  infoMobile: {
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  metaDot: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
+    marginHorizontal: 8,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  tag: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  tagText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  excerpt: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 15,
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 6,
+    gap: 8,
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  primaryText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(60,60,60,0.85)',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    gap: 8,
+  },
+  secondaryText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  iconBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  
+  chaptersSection: {
+    marginTop: 40,
+    paddingHorizontal: 20,
+    zIndex: 1,
+  },
+  chaptersSectionWeb: {
+    maxWidth: 1100,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  chaptersSectionMobile: {
+    width: '100%',
+  },
+  chaptersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  languageControls: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 6,
+    padding: 2,
+  },
+  langChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
   },
   langChipActive: {
-    backgroundColor: 'rgba(229,9,20,0.22)',
-    borderColor: 'rgba(229,9,20,0.36)',
+    backgroundColor: '#E50914',
   },
-  langChipText: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '900' },
-  langChipTextActive: { color: '#FFFFFF' },
-  fallbackChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+  langChipText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '700',
   },
-  fallbackChipActive: { backgroundColor: 'rgba(38,166,154,0.20)', borderColor: 'rgba(38,166,154,0.38)' },
-  fallbackChipText: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '900' },
-  fallbackChipTextActive: { color: '#D5FFF8' },
-  languageBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  languageBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  langChipTextActive: {
+    color: '#fff',
+  },
+  availabilityNote: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginBottom: 16,
+  },
+  chaptersList: {
+    gap: 8,
+  },
+  noChaptersText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 30,
+  },
+  chapterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.05)',
   },
-  languageBadgeWarn: { backgroundColor: 'rgba(255,193,7,0.18)', borderColor: 'rgba(255,193,7,0.35)' },
-  languageBadgeText: { color: 'rgba(255,255,255,0.82)', fontSize: 11, fontWeight: '900' },
-  languageBadgeWarnText: { color: '#FFE082', fontSize: 11, fontWeight: '900' },
-  availableLanguagesText: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '700' },
-  languageNotice: { color: '#FFD54F', fontSize: 12, fontWeight: '800' },
-  byline: { gap: 4 },
-  bylineText: { color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: '700' },
-  tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tagChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
-  tagText: { color: 'rgba(255,255,255,0.70)', fontSize: 12, fontWeight: '800' },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  sectionTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.2 },
-  chapterList: { gap: 10, marginTop: 8 },
-  chapterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: '#161616', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  chapterLeft: { flex: 1, paddingRight: 10 },
-  chapterNum: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
-  chapterTitle: { color: 'rgba(255,255,255,0.75)', fontWeight: '700', fontSize: 12, marginTop: 2 },
-  chapterMeta: { color: 'rgba(255,255,255,0.45)', fontWeight: '700', fontSize: 11, marginTop: 3 },
-  emptyChapters: { paddingVertical: 22, alignItems: 'center', justifyContent: 'center' },
-  emptyChaptersText: { color: 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: '800' },
-  imageFallback: { backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  imageFallbackText: { color: 'rgba(255,255,255,0.4)', fontSize: 12, letterSpacing: 2, fontWeight: '900' },
-  imageFallbackBadge: { position: 'absolute', right: 14, bottom: 14, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  imageFallbackBadgeText: { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  chapterNumber: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1E1E1E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  chapterNumberText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  chapterInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  chapterCardTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  chapterDate: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+  },
 });
