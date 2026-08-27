@@ -5,10 +5,10 @@ import { myListApi } from '../services/myListApi';
 interface MyListContextType {
   // Guardamos claves compuestas con el tipo para evitar colisiones entre TMDB y AniList
   myListItems: Set<string>;
-  isInMyList: (contentId: number, contentType?: 'movie' | 'tv' | 'anime') => boolean;
-  addToMyList: (contentId: number, contentType?: 'movie' | 'tv' | 'anime') => Promise<void>;
-  removeFromMyList: (contentId: number, contentType?: 'movie' | 'tv' | 'anime') => Promise<void>;
-  toggleMyList: (contentId: number, contentType?: 'movie' | 'tv' | 'anime') => Promise<void>;
+  isInMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => boolean;
+  addToMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => Promise<void>;
+  removeFromMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => Promise<void>;
+  toggleMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => Promise<void>;
   refreshMyList: () => Promise<void>;
   loading: boolean;
 }
@@ -39,7 +39,7 @@ export const MyListProvider: React.FC<MyListProviderProps> = ({ children }) => {
     try {
       const entries = await myListApi.getMyList(currentProfile.id);
       const keyed = new Set<string>(
-        entries.map((entry: { content_id: number; content_type: 'movie' | 'tv' | 'anime' }) => {
+        entries.map((entry: { content_id: string | number; content_type: 'movie' | 'tv' | 'anime' | 'manga' }) => {
           const type = entry.content_type;
           return `${type}:${entry.content_id}`;
         })
@@ -52,12 +52,12 @@ export const MyListProvider: React.FC<MyListProviderProps> = ({ children }) => {
     }
   };
 
-  const isInMyList = (contentId: number, contentType: 'movie' | 'tv' | 'anime' = 'movie'): boolean => {
+  const isInMyList = (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie'): boolean => {
     const key = `${contentType}:${contentId}`;
     return myListItems.has(key);
   };
 
-  const addToMyList = async (contentId: number, contentType: 'movie' | 'tv' | 'anime' = 'movie') => {
+  const addToMyList = async (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie') => {
     if (!currentProfile) {
       throw new Error('No hay perfil seleccionado');
     }
@@ -71,7 +71,7 @@ export const MyListProvider: React.FC<MyListProviderProps> = ({ children }) => {
     }
   };
 
-  const removeFromMyList = async (contentId: number, contentType: 'movie' | 'tv' | 'anime' = 'movie') => {
+  const removeFromMyList = async (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie') => {
     if (!currentProfile) {
       throw new Error('No hay perfil seleccionado');
     }
@@ -88,7 +88,7 @@ export const MyListProvider: React.FC<MyListProviderProps> = ({ children }) => {
     }
   };
 
-  const toggleMyList = async (contentId: number, contentType: 'movie' | 'tv' | 'anime' = 'movie') => {
+  const toggleMyList = async (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie') => {
     if (!currentProfile) {
       return;
     }

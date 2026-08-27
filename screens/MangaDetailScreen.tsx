@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Header from '../components/Header';
 import { useTabNavigation } from '../hooks/useTabNavigation';
+import { useMyList } from '../contexts/MyListContext';
 import { mangaApi, Manga, MangaChapter } from '../services/mangaApi';
 
 function formatDate(iso?: string | null) {
@@ -24,6 +25,7 @@ export default function MangaDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { navigateByLabel } = useTabNavigation();
+  const { isInMyList, toggleMyList } = useMyList();
   const id = String(route?.params?.id || '').trim();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
@@ -211,8 +213,11 @@ export default function MangaDetailScreen() {
                     <Text style={styles.primaryText}>Leer ahora</Text>
                   </TouchableOpacity>
                   
-                  <TouchableOpacity style={styles.secondaryBtn}>
-                    <Ionicons name="add" size={20} color="#fff" />
+                  <TouchableOpacity 
+                    style={styles.secondaryBtn} 
+                    onPress={() => toggleMyList(id, 'manga')}
+                  >
+                    <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color="#fff" />
                     <Text style={styles.secondaryText}>Mi lista</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.iconBtn}>
@@ -288,7 +293,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingBottom: 60 },
   topBar: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: Platform.OS === 'web' ? 90 : 10,
     paddingBottom: 5,
     zIndex: 10,
   },

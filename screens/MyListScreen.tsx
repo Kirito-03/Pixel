@@ -86,6 +86,19 @@ export default function MyListScreen() {
 
       const detailPromises = entries.map(async (entry) => {
         try {
+          if (entry.content_type === 'manga') {
+            return {
+              id: entry.content_id,
+              type: 'manga',
+              title: entry.anime_title || `Manga #${entry.content_id}`,
+              overview: '',
+              poster_path: normalizeImagePath(entry.poster_url),
+              backdrop_path: normalizeImagePath(entry.banner_url),
+              release_date: '',
+              vote_average: 0,
+              source: 'anilist',
+            } as ContentItem;
+          }
           if (entry.content_type !== 'anime') return null;
           return {
             id: Number(entry.content_id),
@@ -303,21 +316,21 @@ export default function MyListScreen() {
             <Ionicons name="bookmark-outline" size={64} color={theme === 'dark' ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.15)"} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>Tu lista está vacía</Text>
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Agrega anime a tu lista para verlos más tarde
+              Agrega animes o mangas a tu lista para verlos más tarde
             </Text>
           </View>
         ) : (
-          /* ── TODOS LOS ANIMES ── */
+          /* ── TODOS LOS CONTENIDOS ── */
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="list" size={20} color={colors.textMuted} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Todos los animes</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Todo tu contenido</Text>
             </View>
 
             <View style={isSmallScreen ? styles.listCol : styles.listGrid}>
               {allItems.map((item) => (
                 (() => {
-                  const meta = metaByAnimeId.get(item.id);
+                  const meta = metaByAnimeId.get(Number(item.id)) || metaByAnimeId.get(item.id as any);
                   const currentEpisode = typeof meta?.episode_number === 'number' ? meta.episode_number : undefined;
                   const totalEpisodes = typeof meta?.total_episodes === 'number' ? meta.total_episodes : undefined;
                   const progress = Number(meta?.progress_percent ?? 0) / 100;
@@ -332,8 +345,14 @@ export default function MyListScreen() {
                     totalEpisodes={totalEpisodes}
                     progress={progress}
                     removing={removingKey === `${item.type}:${item.id}`}
-                    onPress={() => openModal(item)}
-                    onRemove={() => openConfirmRemove({ animeId: item.id, title: item.title, source: 'mylist' })}
+                    onPress={() => {
+                      if (item.type === 'manga') {
+                        navigation.navigate('MangaDetail', { id: item.id });
+                      } else {
+                        openModal(item);
+                      }
+                    }}
+                    onRemove={() => openConfirmRemove({ animeId: item.id as any, title: item.title, source: 'mylist' })}
                   />
                 </View>
                   );

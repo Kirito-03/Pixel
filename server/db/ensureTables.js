@@ -5,12 +5,17 @@ export async function ensurePixelNoSekaiTables() {
     CREATE TABLE IF NOT EXISTS pns_my_list_items (
       id SERIAL PRIMARY KEY,
       profile_id BIGINT NOT NULL,
-      content_id INTEGER NOT NULL,
-      content_type TEXT NOT NULL CHECK (content_type IN ('movie', 'tv', 'anime')),
+      content_id TEXT NOT NULL,
+      content_type TEXT NOT NULL CHECK (content_type IN ('movie', 'tv', 'anime', 'manga')),
       added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT uniq_pns_my_list_item UNIQUE (profile_id, content_id, content_type)
     );
   `);
+  // Try to migrate if already exists (safe to run)
+  await pool.query(`ALTER TABLE pns_my_list_items DROP CONSTRAINT IF EXISTS pns_my_list_items_content_type_check;`).catch(() => {});
+  await pool.query(`ALTER TABLE pns_my_list_items ALTER COLUMN content_id TYPE TEXT;`).catch(() => {});
+  await pool.query(`ALTER TABLE pns_my_list_items ADD CONSTRAINT pns_my_list_items_content_type_check CHECK (content_type IN ('movie', 'tv', 'anime', 'manga'));`).catch(() => {});
+  
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pns_my_list_profile_id ON pns_my_list_items(profile_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pns_my_list_content ON pns_my_list_items(content_type, content_id);`);
 

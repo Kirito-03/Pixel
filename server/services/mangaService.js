@@ -36,13 +36,26 @@ export async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = T
     
     // Esperar a que Cloudflare termine su verificación y cargue el contenido real
     if (waitSelector) {
-      try {
-        await page.waitForSelector(waitSelector, { timeout: 15000 });
-      } catch (e) {
+      let found = false;
+      let attempts = 0;
+      while (!found && attempts < 15) {
+        try {
+          // Check if it exists immediately
+          if (await page.$(waitSelector).catch(() => null)) {
+            found = true;
+            break;
+          }
+          await new Promise(r => setTimeout(r, 2000));
+          attempts++;
+        } catch (e) {
+          // Ignore execution context errors during reload
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+      if (!found) {
         console.warn(`No se encontró ${waitSelector}, quizás no hay resultados o Cloudflare tardó demasiado.`);
       }
     } else {
-      // Si no hay selector, esperamos un poco genéricamente para Cloudflare
       await new Promise(r => setTimeout(r, 5000));
     }
     

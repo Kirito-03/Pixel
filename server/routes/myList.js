@@ -15,15 +15,14 @@ router.get('/', async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `
       SELECT
         m.content_id,
         m.content_type,
         m.added_at,
-        ac.title AS anime_title,
-        ac.poster_url,
+        COALESCE(ac.title, mc.title) AS anime_title,
+        COALESCE(ac.poster_url, mc.cover_url) AS poster_url,
         ac.banner_url,
-        ac.total_episodes,
+        COALESCE(ac.total_episodes, mc.chapter_count) AS total_episodes,
         p.episode_id,
         p.current_seconds AS current_time,
         p.duration_seconds AS duration,
@@ -39,13 +38,16 @@ router.get('/', async (req, res) => {
       LEFT JOIN pns_watch_progress p
         ON m.content_type = 'anime'
        AND p.profile_id = m.profile_id
-       AND p.anime_id = m.content_id
+       AND p.anime_id::text = m.content_id
       LEFT JOIN anime_content ac
         ON m.content_type = 'anime'
-       AND ac.id = m.content_id
+       AND ac.id::text = m.content_id
       LEFT JOIN anime_episodes ae
         ON m.content_type = 'anime'
        AND ae.id = p.episode_id
+      LEFT JOIN manga_cache mc
+        ON m.content_type = 'manga'
+       AND mc.manga_id = m.content_id
       WHERE m.profile_id = $1
       ORDER BY m.added_at DESC
       `,
@@ -59,13 +61,13 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const perfilId = getPerfilId(req);
-  const contentId = Number(req.body?.content_id ?? req.body?.contentId ?? req.body?.animeId ?? req.body?.anime_id);
+  const contentId = req.body?.content_id ?? req.body?.contentId ?? req.body?.animeId ?? req.body?.anime_id;
   const contentTypeRaw = String(req.body?.content_type ?? req.body?.contentType ?? 'anime').toLowerCase();
 
   if (!perfilId) return res.status(400).json({ message: 'perfilId requerido (header x-profile-id)' });
-  if (!Number.isFinite(contentId) || contentId <= 0) return res.status(400).json({ message: 'content_id requerido' });
-  if (!['movie', 'tv', 'anime'].includes(contentTypeRaw)) {
-    return res.status(400).json({ message: 'content_type inválido', allowed: ['movie', 'tv', 'anime'] });
+  if (!contentId) return res.status(400).json({ message: 'content_id requerido' });
+  if (!['movie', 'tv', 'anime', 'manga'].includes(contentTypeRaw)) {
+    return res.status(400).json({ message: 'content_type inválido', allowed: ['movie', 'tv', 'anime', 'manga'] });
   }
 
   try {
@@ -84,13 +86,13 @@ router.post('/', async (req, res) => {
 
 router.delete('/:contentId', async (req, res) => {
   const perfilId = getPerfilId(req);
-  const contentId = Number(req.params.contentId);
+  const contentId = req.params.contentId;
   const contentTypeRaw = String(req.query?.type ?? req.query?.content_type ?? req.header('x-content-type') ?? 'anime').toLowerCase();
 
   if (!perfilId) return res.status(400).json({ message: 'perfilId requerido (header x-profile-id)' });
-  if (!Number.isFinite(contentId) || contentId <= 0) return res.status(400).json({ message: 'contentId inválido' });
-  if (!['movie', 'tv', 'anime'].includes(contentTypeRaw)) {
-    return res.status(400).json({ message: 'content_type inválido', allowed: ['movie', 'tv', 'anime'] });
+  if (!contentId) return res.status(400).json({ message: 'contentId inválido' });
+  if (!['movie', 'tv', 'anime', 'manga'].includes(contentTypeRaw)) {
+    return res.status(400).json({ message: 'content_type inválido', allowed: ['movie', 'tv', 'anime', 'manga'] });
   }
 
   try {
