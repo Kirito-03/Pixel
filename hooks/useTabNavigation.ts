@@ -13,18 +13,23 @@ export function useTabNavigation() {
   }, [navigation]);
 
   const navigateByLabel = useCallback((label: string) => {
-    const labelToRoute: Record<string, string> = {
-      'Inicio': 'HomeMain',
-      'Noticias': 'NoticiasHome',
-      'Emisión': 'Emisión',
-      'Manga': 'MangaHome',
-      'Mi Lista': 'MiLista',
-      'Buscar': 'Buscar',
-      'Perfil': 'Perfil',
+    const labelToRoute: Record<string, { tab: string; screen?: string }> = {
+      'Inicio': { tab: 'Inicio', screen: 'HomeMain' },
+      'Noticias': { tab: 'Noticias', screen: 'NoticiasHome' },
+      'Emisión': { tab: 'Emisión' },
+      'Manga': { tab: 'Manga', screen: 'MangaHome' },
+      'Mi Lista': { tab: 'MiLista' },
+      'Buscar': { tab: 'Buscar' },
+      'Perfil': { tab: 'Perfil' },
     };
-    const routeName = labelToRoute[label];
-    if (routeName) {
-      navigation.navigate(routeName);
+    
+    const route = labelToRoute[label];
+    if (route) {
+      if (route.screen) {
+        navigation.navigate(route.tab, { screen: route.screen });
+      } else {
+        navigation.navigate(route.tab);
+      }
     }
   }, [navigation]);
 
