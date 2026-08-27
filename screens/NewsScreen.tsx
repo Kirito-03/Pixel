@@ -144,8 +144,13 @@ export default function NewsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-
-
+      <Header
+        black={blackHeader}
+        activeSection="Noticias"
+        onProfilePress={() => navigateByLabel('Perfil')}
+        onSearchPress={() => navigateByLabel('Buscar')}
+        onNavPress={navigateByLabel}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

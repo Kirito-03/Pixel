@@ -145,11 +145,12 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
 interface MangaRankingItemProps {
   item: MangaItemUI & { rank: number };
   onPress: () => void;
+  isTop?: boolean;
 }
 
-export function MangaRankingItem({ item, onPress }: MangaRankingItemProps) {
+export function MangaRankingItem({ item, onPress, isTop: propIsTop }: MangaRankingItemProps) {
   const { colors, theme } = useTheme();
-  const isTop = item.rank === 1;
+  const isTop = propIsTop ?? item.rank === 1;
   const scale = useRef(new Animated.Value(1)).current;
   const [imageError, setImageError] = useState(false);
 

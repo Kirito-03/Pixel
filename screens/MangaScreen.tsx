@@ -100,8 +100,13 @@ export default function MangaScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-
-
+      <Header
+        black={true}
+        activeSection="Manga"
+        onProfilePress={() => navigateByLabel('Perfil')}
+        onSearchPress={() => navigateByLabel('Buscar')}
+        onNavPress={navigateByLabel}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
