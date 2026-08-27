@@ -11,10 +11,10 @@ import fs from 'fs';
   
   const page = await browser.newPage();
   
-  // Aceptar automáticamente cualquier alerta o confirmación (window.confirm, window.alert)
+  // Cancelar automáticamente cualquier alerta o confirmación para evitar popups de publicidad
   page.on('dialog', async dialog => {
-    console.log('Dialog detectado:', dialog.message());
-    await dialog.accept();
+    console.log('Dialog detectado:', dialog.message(), '- Cancelando.');
+    await dialog.dismiss();
   });
   
   console.log('Navegando a DragonTranslation...');

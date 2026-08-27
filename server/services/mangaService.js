@@ -16,9 +16,9 @@ async function getBrowserPage() {
   }
   const page = await browserInstance.newPage();
   
-  // Aceptar automáticamente confirmaciones (window.confirm)
+  // Cancelar (Dismiss) automáticamente alertas/confirmaciones para evitar popups de publicidad
   page.on('dialog', async dialog => {
-    await dialog.accept();
+    await dialog.dismiss();
   });
   
   return { browser: browserInstance, page };
