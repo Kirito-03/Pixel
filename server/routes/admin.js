@@ -10,7 +10,7 @@ import { basename, dirname, join } from 'path';
 import { spawn } from 'child_process';
 import { uploadHlsFolderToR2, deleteLocalHlsFolder, deleteR2Prefix } from '../services/r2Service.js';
 import { refreshNews } from '../services/newsService.js';
-import { refreshMangaPopularCache } from '../services/mangaService.js';
+
 import { importAnimeFromSources } from '../services/animeImportService.js';
 import { listTranscodeJobs, getTranscodeJobSummary, retryTranscodeJob } from '../services/transcodeQueueService.js';
 import { ensureImportsDir, saveM3uText } from '../services/importM3uStorageService.js';
