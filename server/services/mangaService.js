@@ -14,7 +14,7 @@ async function getBrowserPage() {
   return { browser: browserInstance, page };
 }
 
-async function fetchHtmlWithCloak(url, timeoutMs = TIMEOUT) {
+async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = TIMEOUT) {
   const { page } = await getBrowserPage();
   try {
     const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
@@ -23,6 +23,19 @@ async function fetchHtmlWithCloak(url, timeoutMs = TIMEOUT) {
        err.status = 404;
        throw err;
     }
+    
+    // Esperar a que Cloudflare termine su verificación y cargue el contenido real
+    if (waitSelector) {
+      try {
+        await page.waitForSelector(waitSelector, { timeout: 15000 });
+      } catch (e) {
+        console.warn(`No se encontró ${waitSelector}, quizás no hay resultados o Cloudflare tardó demasiado.`);
+      }
+    } else {
+      // Si no hay selector, esperamos un poco genéricamente para Cloudflare
+      await new Promise(r => setTimeout(r, 5000));
+    }
+    
     const html = await page.content();
     await page.close();
     return html;
@@ -176,17 +189,12 @@ async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
 // ----------------------------------------------------------------------
 
 async function scrapeMangaList(url) {
-  const html = await fetchHtmlWithCloak(url);
+  const html = await fetchHtmlWithCloak(url, '.acard');
   const $ = cheerio.load(html);
   const items = [];
 
-  $('.page-item-detail, .c-tabs-item__content, .manga-item').each((i, el) => {
-    const $el = $(el);
-    const $a = $el.find('h3 a, h4 a, .post-title a').first();
-    let link = $a.attr('href');
-    if (!link) {
-      link = $el.find('a').first().attr('href');
-    }
+  $('.acard').each((i, el) => {
+    const link = $(el).attr('href');
     if (!link) return;
 
     // Extraer el slug del href: https://dragontranslation.org/manga/slug/
@@ -194,22 +202,14 @@ async function scrapeMangaList(url) {
     if (!match) return;
     const id = match[1];
 
-    const title = $a.text().trim() || $el.find('.post-title').text().trim();
-    if (!title) return;
-
-    let cover_url = $el.find('img').attr('data-src') || $el.find('img').attr('data-lazy-src') || $el.find('img').attr('src');
+    const title = $(el).find('.ac-t').text().trim();
+    let cover_url = $(el).find('.ac-cover').attr('src') || $(el).find('.ac-cover').attr('data-src');
     if (cover_url && cover_url.includes(' ')) cover_url = cover_url.split(' ')[0];
 
-    // Madara list pages usually don't have explicit status text, we assume ongoing
-    const statusText = $el.text().toLowerCase();
-    const status = (statusText.includes('completed') || statusText.includes('finalizado')) ? 'completed' : 'ongoing';
+    const statusText = $(el).find('.ac-status').text().trim().toLowerCase();
+    const status = statusText.includes('ongoing') ? 'ongoing' : 'completed';
 
-    let latest_chapter = null;
-    const chapterText = $el.find('.chapter-item .chapter a, .list-chapter a, .chapter a').first().text().trim();
-    if (chapterText) {
-      const numMatch = chapterText.match(/\d+(\.\d+)?/);
-      if (numMatch) latest_chapter = numMatch[0];
-    }
+    const latest_chapter = $(el).find('.ac-ch').text().replace('Capitulo', '').trim() || null;
     const chapter_count = parseInt(latest_chapter) || 0;
 
     items.push({
@@ -397,7 +397,7 @@ export async function getMangaDetail(pool, id) {
   // Scrape detail
   const url = `${BASE_URL}/manga/${mangaId}/`;
   try {
-    const html = await fetchHtmlWithCloak(url);
+    const html = await fetchHtmlWithCloak(url, '.htitle');
     const $ = cheerio.load(html);
 
     const title = $('.htitle').text().trim();
