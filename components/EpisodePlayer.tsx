@@ -517,6 +517,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     if (!isDirectVideo) {
       return (
         <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <StatusBar hidden />
           <WebView
             source={{ uri: videoUrl }}
             style={{ flex: 1 }}

@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'web' ? 80 : 50,
+    paddingTop: Platform.OS === 'web' ? 80 : 100, // Increased to clear Android status bar + header
     paddingBottom: 10,
     zIndex: 10,
   },
@@ -222,11 +222,11 @@ const styles = StyleSheet.create({
   },
   mainTitle: {
     color: '#FFF',
-    fontSize: 52,
+    fontSize: 36, // Reduced from 52
     fontWeight: '900',
-    letterSpacing: -2,
+    letterSpacing: -1,
     marginBottom: 20,
-    lineHeight: 52,
+    lineHeight: 38,
   },
   searchWrapper: {
     flexDirection: 'row',
