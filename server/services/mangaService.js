@@ -642,3 +642,19 @@ export async function getChapterPages(pool, chapterUrl) {
     return { baseUrl: '', pages: [], chapterId: url };
   }
 }
+export async function refreshMangaPopularCache(pool) {
+  try {
+    const list = await scrapeMangaList('https://dragontranslation.net/manga');
+    let count = 0;
+    for (let i = 0; i < list.length; i++) {
+      const manga = list[i];
+      // Popularity score base to rank them higher
+      await upsertManga(pool, manga, { popularityScore: 100 - i });
+      count++;
+    }
+    return { ok: true, count };
+  } catch (e) {
+    console.error('refreshMangaPopularCache error:', e);
+    return { ok: false, error: e.message };
+  }
+}
