@@ -11,7 +11,7 @@ export async function getBrowserPage() {
     browserInstance = await launch({ 
       headless: true, 
       humanize: true,
-      args: ['--fingerprint-platform=linux', '--disable-http2']
+      args: ['--fingerprint-platform=linux', '--disable-http2', '--proxy-server=socks5://100.95.206.57:1080']
     });
   }
   const page = await browserInstance.newPage();
