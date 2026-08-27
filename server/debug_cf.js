@@ -6,7 +6,7 @@ import fs from 'fs';
   const browser = await launch({ 
     headless: true, 
     humanize: true,
-    args: ['--fingerprint-platform=linux']
+    args: ['--fingerprint-platform=linux', '--disable-http2']
   });
   
   const page = await browser.newPage();
