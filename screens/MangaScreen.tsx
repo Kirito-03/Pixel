@@ -107,6 +107,7 @@ export default function MangaScreen() {
         onSearchPress={() => navigateByLabel('Buscar')}
         onNavPress={navigateByLabel}
       />
+      <View style={{ height: Platform.OS === 'web' ? 90 : 0 }} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
