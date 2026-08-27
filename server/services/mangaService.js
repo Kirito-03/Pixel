@@ -528,7 +528,7 @@ export async function getMangaChapters(pool, id, { limit = 200, forceRefresh = f
   const url = `${BASE_URL}/manga/${mangaId}/`;
   const chapters = [];
   try {
-    const html = await fetchHtmlWithCloak(url);
+    const html = await fetchHtmlWithCloak(url, '#mk-chapters-data');
     const $ = cheerio.load(html);
     const scriptJson = $('#mk-chapters-data').html();
     

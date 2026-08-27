@@ -1,1 +1,16 @@
-const fs = require('fs'); const html = fs.readFileSync('horario.html', 'utf8'); const matches = [...html.matchAll(/href=\"\\/media\\/([^/\"]+)/g)]; console.log(matches.map(m => m[1]).slice(0,20));
+import fs from 'fs';
+import * as cheerio from 'cheerio';
+const html = fs.readFileSync('temp_detail.html', 'utf-8');
+const $ = cheerio.load(html);
+const scriptJson = $('#mk-chapters-data').html();
+if(scriptJson){
+  try {
+    const data = JSON.parse(scriptJson);
+    console.log('Items length:', data.items?.length);
+    console.log('First item:', data.items?.[0]);
+  } catch(e) {
+    console.error('Parse error', e.message);
+  }
+} else {
+  console.log('No mk-chapters-data element found in HTML');
+}
