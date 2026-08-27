@@ -644,7 +644,7 @@ export async function getChapterPages(pool, chapterUrl) {
 }
 export async function refreshMangaPopularCache(pool) {
   try {
-    const list = await scrapeMangaList('https://dragontranslation.net/manga');
+    const list = await scrapeMangaList('https://dragontranslation.org/manga');
     let count = 0;
     for (let i = 0; i < list.length; i++) {
       const manga = list[i];
