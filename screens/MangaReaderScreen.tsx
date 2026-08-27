@@ -48,7 +48,7 @@ function ReaderImage({ uri }: { uri: string }) {
   }, [uri]);
 
   return (
-    <View style={styles.imageWrap}>
+    <View style={[styles.imageWrap, { aspectRatio: imgRatio }]}>
       {!loaded && !failed ? <SkeletonPage /> : null}
       {failed ? (
         <View style={styles.errorPage}>
@@ -58,8 +58,8 @@ function ReaderImage({ uri }: { uri: string }) {
       ) : (
         <Image
           source={{ uri }}
-          style={[styles.pageImage, { aspectRatio: imgRatio }]}
-          resizeMode="cover"
+          style={[styles.pageImage, { width: '100%', height: '100%' }]}
+          resizeMode="contain"
           onLoad={() => setLoaded(true)}
           onError={() => {
             setFailed(true);
@@ -157,12 +157,11 @@ export default function MangaReaderScreen() {
         onProfilePress={() => navigateByLabel('Perfil')}
       />
 
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
-            <Ionicons name="arrow-back" size={18} color="#fff" />
-            <Text style={styles.backText}>Volver</Text>
-          </TouchableOpacity>
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
+          <Ionicons name="arrow-back" size={18} color="#fff" />
+          <Text style={styles.backText}>Volver</Text>
+        </TouchableOpacity>
 
           <View style={styles.chapterIndicator}>
             <Text style={styles.chapterTitle} numberOfLines={1}>{mangaTitle}</Text>
@@ -180,7 +179,6 @@ export default function MangaReaderScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
 
       {loading ? (
         <View style={styles.loadingWrap}>
@@ -289,10 +287,11 @@ const styles = StyleSheet.create({
     maxWidth: 800, // Capped width on desktop/large screens
     overflow: 'hidden',
     backgroundColor: '#050505',
+    alignSelf: 'center',
   },
   pageImage: {
     width: '100%',
-    height: undefined, // Let aspectRatio handle the height
+    height: '100%',
     backgroundColor: '#050505',
   },
   errorPage: { minHeight: 260, alignItems: 'center', justifyContent: 'center', gap: 8 },
