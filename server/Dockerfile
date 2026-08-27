@@ -11,7 +11,10 @@ WORKDIR /app
 
 # Instalar dependencias para Chromium y fuentes de Windows para spoofing de Cloudflare
 # Habilitar contrib y non-free para mscorefonts
-RUN sed -i -e 's/main$/main contrib non-free/g' /etc/apt/sources.list.d/debian.sources || true && \
+RUN sed -i 's/Components: main/Components: main contrib non-free/g' /etc/apt/sources.list.d/debian.sources || true && \
+    sed -i 's/main$/main contrib non-free/g' /etc/apt/sources.list || true && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    debconf-utils && \
     echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
     apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
