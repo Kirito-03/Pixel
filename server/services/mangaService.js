@@ -2,7 +2,7 @@ import * as cheerio from 'cheerio';
 import { launch } from 'cloakbrowser';
 
 const BASE_URL = 'https://dragontranslation.org';
-const TIMEOUT = 30000;
+const TIMEOUT = 60000;
 
 let browserInstance = null;
 
@@ -629,10 +629,10 @@ export async function getChapterPages(pool, chapterUrl) {
     
     // 3. Guardar las páginas encontradas en la caché para futuras consultas
     if (pool && pages.length > 0) {
-      // Usamos JSON.stringify para array de strings en jsonb
+      // pages es TEXT[] en la DB, pasamos el array nativo de JS directamente
       await pool.query(
-        `UPDATE manga_chapters_cache SET pages = $1 WHERE chapter_id = $2`,
-        [JSON.stringify(pages), url]
+        `UPDATE manga_chapters_cache SET pages = $1::text[] WHERE chapter_id = $2`,
+        [pages, url]
       );
     }
     
