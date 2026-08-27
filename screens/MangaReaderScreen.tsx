@@ -27,6 +27,26 @@ function SkeletonPage() {
 function ReaderImage({ uri }: { uri: string }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [imgRatio, setImgRatio] = useState<number>(0.72); // Default fallback
+
+  useEffect(() => {
+    let active = true;
+    if (uri) {
+      Image.getSize(
+        uri,
+        (w, h) => {
+          if (active && w && h) setImgRatio(w / h);
+        },
+        () => {
+          if (active) setFailed(true);
+        }
+      );
+    }
+    return () => {
+      active = false;
+    };
+  }, [uri]);
+
   return (
     <View style={styles.imageWrap}>
       {!loaded && !failed ? <SkeletonPage /> : null}
@@ -38,8 +58,8 @@ function ReaderImage({ uri }: { uri: string }) {
       ) : (
         <Image
           source={{ uri }}
-          style={styles.pageImage}
-          resizeMode="contain"
+          style={[styles.pageImage, { aspectRatio: imgRatio }]}
+          resizeMode="cover"
           onLoad={() => setLoaded(true)}
           onError={() => {
             setFailed(true);
@@ -259,21 +279,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listContent: { paddingHorizontal: 10, paddingBottom: 30, gap: 10, alignItems: 'stretch' },
+  listContent: { 
+    paddingHorizontal: 0, 
+    paddingBottom: 30, 
+    alignItems: 'center' // Centers the children (images) on wide screens
+  },
   imageWrap: {
     width: '100%',
-    borderRadius: 10,
+    maxWidth: 800, // Capped width on desktop/large screens
     overflow: 'hidden',
-    backgroundColor: '#0F0F0F',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    minHeight: 260,
+    backgroundColor: '#050505',
   },
   pageImage: {
     width: '100%',
-    minHeight: 260,
-    aspectRatio: 0.72,
-    backgroundColor: '#0B0B0B',
+    height: undefined, // Let aspectRatio handle the height
+    backgroundColor: '#050505',
   },
   errorPage: { minHeight: 260, alignItems: 'center', justifyContent: 'center', gap: 8 },
   errorPageText: { color: 'rgba(255,255,255,0.62)', fontWeight: '700', fontSize: 12 },
