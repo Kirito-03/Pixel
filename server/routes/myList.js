@@ -15,6 +15,7 @@ router.get('/', async (req, res) => {
 
   try {
     const { rows } = await pool.query(
+      `
       SELECT
         m.content_id,
         m.content_type,
