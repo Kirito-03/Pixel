@@ -114,15 +114,6 @@ export default function MangaDetailScreen() {
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <SafeAreaView>
-          <View style={styles.topBar}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
-              <Ionicons name="arrow-back" size={20} color="#fff" />
-              <Text style={styles.backText}>Volver</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-
         {loading ? (
           <View style={styles.loading}>
             <ActivityIndicator size="large" color="#E50914" />
@@ -152,6 +143,15 @@ export default function MangaDetailScreen() {
                 style={StyleSheet.absoluteFillObject}
               />
             </View>
+            
+            <SafeAreaView edges={['top', 'left', 'right']}>
+              <View style={styles.topBar}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
+                  <Ionicons name="arrow-back" size={20} color="#fff" />
+                  <Text style={styles.backText}>Volver</Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
 
             <View style={[styles.heroContent, isSmallScreen ? styles.heroContentMobile : styles.heroContentWeb]}>
               <View style={[styles.posterContainer, isSmallScreen ? styles.posterMobile : styles.posterWeb]}>
