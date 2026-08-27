@@ -33,7 +33,7 @@ router.get('/chapter/:chapterId/pages', async (req, res) => {
   try {
     const chapterId = String(req.params.chapterId || '').trim();
     if (!chapterId) return res.status(400).json({ message: 'chapterId requerido' });
-    const result = await getChapterPages(chapterId);
+    const result = await getChapterPages(pool, chapterId);
     return res.json(result || { baseUrl: null, pages: [], chapterId });
   } catch (e) {
     return res.status(500).json({ message: 'Error obteniendo páginas del capítulo', error: e.message });

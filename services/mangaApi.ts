@@ -71,7 +71,7 @@ export const mangaApi = {
   },
 
   async chapterPages(chapterId: string) {
-    const { data } = await backendClient.get(`/api/manga/chapter/${chapterId}/pages`);
+    const { data } = await backendClient.get(`/api/manga/chapter/${encodeURIComponent(chapterId)}/pages`);
     return data as MangaChapterPages;
   },
 };

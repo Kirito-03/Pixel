@@ -604,12 +604,21 @@ export async function getMangaChapters(pool, id, { limit = 200, forceRefresh = f
     };
 }
 
-export async function getChapterPages(chapterUrl) {
+export async function getChapterPages(pool, chapterUrl) {
   const url = String(chapterUrl || '').trim();
   if (!url || !url.startsWith('http')) return null;
 
   try {
-    const html = await fetchHtmlWithCloak(url);
+    // 1. Revisar si las páginas ya están cacheadas en la DB
+    if (pool) {
+      const cacheQuery = await pool.query(`SELECT pages FROM manga_chapters_cache WHERE chapter_id = $1`, [url]);
+      if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].pages && cacheQuery.rows[0].pages.length > 0) {
+        return { baseUrl: '', pages: cacheQuery.rows[0].pages, chapterId: url, meta: { source: 'db', cache_hit: true } };
+      }
+    }
+
+    // 2. Si no están cacheadas, usamos el bot
+    const html = await fetchHtmlWithCloak(url, '.reading-content');
     const $ = cheerio.load(html);
     const pages = [];
     
@@ -618,7 +627,16 @@ export async function getChapterPages(chapterUrl) {
        if (src) pages.push(src.trim());
     });
     
-    return { baseUrl: '', pages, chapterId: url };
+    // 3. Guardar las páginas encontradas en la caché para futuras consultas
+    if (pool && pages.length > 0) {
+      // Usamos JSON.stringify para array de strings en jsonb
+      await pool.query(
+        `UPDATE manga_chapters_cache SET pages = $1 WHERE chapter_id = $2`,
+        [JSON.stringify(pages), url]
+      );
+    }
+    
+    return { baseUrl: '', pages, chapterId: url, meta: { source: 'dragon', cache_hit: false } };
   } catch (error) {
     console.error("Error scraping chapter pages:", error);
     return { baseUrl: '', pages: [], chapterId: url };
