@@ -56,6 +56,41 @@ class HentailaScraper {
         const html = await this.fetchHtml(`${BASE_URL}`); // Use the home page where latest hentai are usually listed
         return this.extractAnimes(html);
     }
+
+    async getVideoServers(slug, episodeNumber) {
+        // Hentaila URLs usually look like /media/{slug}/{episodeNumber}
+        const url = `${BASE_URL}/media/${slug}/${episodeNumber}`;
+        const html = await this.fetchHtml(url);
+        
+        // Find the embeds in the JSON string inside a script tag
+        const embedsMatch = html.match(/"embeds"\s*:\s*({.*?})/);
+        if (!embedsMatch) {
+            return [];
+        }
+
+        try {
+            // The matched string is valid JSON representing the embeds object
+            const embedsData = JSON.parse(embedsMatch[1]);
+            const servers = [];
+            
+            // "SUB" usually contains the array of servers
+            if (embedsData.SUB && Array.isArray(embedsData.SUB)) {
+                embedsData.SUB.forEach(s => {
+                    if (s.server && s.url) {
+                        servers.push({
+                            server: s.server,
+                            url: s.url
+                        });
+                    }
+                });
+            }
+
+            return servers;
+        } catch (error) {
+            console.error('[HentailaScraper] Error parsing servers JSON:', error.message);
+            return [];
+        }
+    }
 }
 
 export default new HentailaScraper();

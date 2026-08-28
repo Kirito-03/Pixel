@@ -6,7 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   Platform,
-  Modal
+  Modal,
+  Alert
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
@@ -26,6 +27,8 @@ export default function NSFWScreen() {
   const [items, setItems] = useState<NSFWAnime[]>([]);
   const [selectedItem, setSelectedItem] = useState<NSFWAnime | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [playingUrl, setPlayingUrl] = useState<string | null>(null);
+  const [fetchingVideo, setFetchingVideo] = useState(false);
   const isSmallScreen = Platform.OS !== 'web' || typeof window !== 'undefined' && window.innerWidth < 768;
 
   useEffect(() => {
@@ -39,9 +42,23 @@ export default function NSFWScreen() {
     setLoading(false);
   };
 
-  const handleItemPress = (item: NSFWAnime) => {
+  const handleItemPress = async (item: NSFWAnime) => {
+    if (fetchingVideo) return;
+    setFetchingVideo(true);
     setSelectedItem(item);
-    setShowPlayer(true);
+    
+    // El episodio suele ser el 1 (Hentaila normalmente tiene 1 episodio por entrada)
+    const servers = await nsfwApi.getServers(item.slug, 1);
+    
+    if (servers && servers.length > 0) {
+      setPlayingUrl(servers[0].url);
+      setShowPlayer(true);
+    } else {
+      Alert.alert("Error", "No se encontraron servidores de video para este anime.");
+      setSelectedItem(null);
+    }
+    
+    setFetchingVideo(false);
   };
 
   const closePlayer = () => {
@@ -58,9 +75,10 @@ export default function NSFWScreen() {
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
       <Header activeSection="Hentai" />
-      {loading ? (
+      {loading || fetchingVideo ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#E50914" />
+          {fetchingVideo && <Text style={{color: '#fff', marginTop: 10}}>Buscando servidores de video...</Text>}
         </View>
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: 100 }}>
@@ -91,7 +109,7 @@ export default function NSFWScreen() {
       )}
 
       {/* Episode Player Modal */}
-      {showPlayer && selectedItem && (
+      {showPlayer && selectedItem && playingUrl && (
         <Modal
           visible={showPlayer}
           animationType="slide"
@@ -99,21 +117,18 @@ export default function NSFWScreen() {
           onRequestClose={closePlayer}
         >
           <EpisodePlayer
-            animeId={selectedItem.id}
-            seasonId="hentai"
+            animeId={parseInt(selectedItem.id) || 99999}
+            seasonNumber={1}
             episode={{
               id: selectedItem.slug,
               title: selectedItem.title,
               number: 1,
               thumbnail_url: selectedItem.poster_path,
-              url: `https://hentaila.com/ver/${selectedItem.slug}`,
+              url: playingUrl,
               duration: 0
             }}
             animeTitle={selectedItem.title}
-            source="hentaila"
             onClose={closePlayer}
-            onNextEpisode={() => {}}
-            onPreviousEpisode={() => {}}
             hasNextEpisode={false}
             hasPreviousEpisode={false}
           />

@@ -18,5 +18,14 @@ export const nsfwApi = {
             console.error('Error fetching NSFW:', error);
             return [];
         }
+    },
+    getServers: async (slug: string, episode: number): Promise<{server: string, url: string}[]> => {
+        try {
+            const response = await backendClient.get(`/api/nsfw/servers/${slug}/${episode}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching NSFW servers:', error);
+            return [];
+        }
     }
 };
