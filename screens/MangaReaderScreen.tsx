@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -27,7 +27,8 @@ function SkeletonPage() {
 function ReaderImage({ uri }: { uri: string }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [imgRatio, setImgRatio] = useState<number>(0.72); // Default fallback
+  const [imgRatio, setImgRatio] = useState<number>(0.72);
+  const { width } = useWindowDimensions();
 
   useEffect(() => {
     let active = true;
@@ -47,8 +48,10 @@ function ReaderImage({ uri }: { uri: string }) {
     };
   }, [uri]);
 
+  const imageWidth = Platform.OS === 'web' ? '100%' : width;
+
   return (
-    <View style={[styles.imageWrap, { aspectRatio: imgRatio }]}>
+    <View style={[styles.imageWrap, { width: imageWidth, aspectRatio: imgRatio }]}>
       {!loaded && !failed ? <SkeletonPage /> : null}
       {failed ? (
         <View style={styles.errorPage}>
@@ -59,7 +62,8 @@ function ReaderImage({ uri }: { uri: string }) {
         <Image
           source={{ uri }}
           style={[styles.pageImage, { width: '100%', height: '100%' }]}
-          resizeMode="contain"
+          resizeMode={Platform.OS === 'android' ? 'cover' : 'contain'}
+          resizeMethod="resize"
           onLoad={() => setLoaded(true)}
           onError={() => {
             setFailed(true);

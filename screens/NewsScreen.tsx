@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
@@ -53,6 +53,8 @@ export default function NewsScreen() {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
+  const insets = useSafeAreaInsets();
+  const headerHeight = isWeb ? 90 : (56 + insets.top);
   const navigation = useNavigation<any>();
   const { navigateByLabel } = useTabNavigation();
   const [blackHeader, setBlackHeader] = useState(theme === 'dark');
@@ -151,22 +153,20 @@ export default function NewsScreen() {
         onSearchPress={() => navigateByLabel('Buscar')}
         onNavPress={navigateByLabel}
       />
-      <View style={{ height: Platform.OS === 'web' ? 90 : 0 }} />
+      <View style={{ height: headerHeight }} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* ── PAGE HEADER ── */}
-        <SafeAreaView>
-          <View style={styles.pageHeader}>
-            <Text style={[styles.superTitle, { color: colors.primary }]}>ÚLTIMAS NOVEDADES</Text>
-            <View style={styles.titleRow}>
-              <Text style={[styles.pageTitleWhite, { color: colors.text }]}>NOTI</Text>
-              <Text style={styles.pageTitleRed}>CIAS</Text>
-            </View>
-            <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>DEL MUNDO DEL ANIME Y MANGA</Text>
+        <View style={styles.pageHeader}>
+          <Text style={[styles.superTitle, { color: colors.primary }]}>ÚLTIMAS NOVEDADES</Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.pageTitleWhite, { color: colors.text }, isSmallScreen && { fontSize: 36 }]}>NOTI</Text>
+            <Text style={[styles.pageTitleRed, isSmallScreen && { fontSize: 36 }]}>CIAS</Text>
           </View>
-        </SafeAreaView>
+          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>DEL MUNDO DEL ANIME Y MANGA</Text>
+        </View>
 
         {/* ── HERO ── */}
         {hero ? (

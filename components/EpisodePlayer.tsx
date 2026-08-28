@@ -5,10 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  StatusBar,
   Platform,
   Animated,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -207,7 +208,7 @@ const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }} onTouchStart={resetControlsTimer}>
-      <StatusBar hidden />
+      <StatusBar hidden={true} translucent={true} />
       <VideoView
         player={player}
         style={{ flex: 1 }}
@@ -360,10 +361,21 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, []);
 
-  // ── StatusBar ────────────────────────────────────────────────
+  // ── Pantalla Completa (Inmersiva) ────────────────────────────
   useEffect(() => {
-    try { StatusBar.setHidden(true, 'fade'); } catch {}
-    return () => { try { StatusBar.setHidden(false, 'fade'); } catch {} };
+    if (Platform.OS === 'android') {
+      try {
+        NavigationBar.setVisibilityAsync("hidden");
+        NavigationBar.setBehaviorAsync("overlay-swipe");
+      } catch (e) {}
+    }
+    return () => {
+      if (Platform.OS === 'android') {
+        try {
+          NavigationBar.setVisibilityAsync("visible");
+        } catch (e) {}
+      }
+    };
   }, []);
 
   // ── Orientación: forzar landscape al entrar, restaurar al salir ──
@@ -517,7 +529,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     if (!isDirectVideo) {
       return (
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <StatusBar hidden />
+          <StatusBar hidden={true} translucent={true} />
           <WebView
             source={{ uri: videoUrl }}
             style={{ flex: 1 }}

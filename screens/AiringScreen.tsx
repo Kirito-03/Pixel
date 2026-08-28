@@ -9,8 +9,9 @@ import {
   Image,
   Dimensions,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import { catalogService, CatalogAnime } from '../services/catalogService';
@@ -26,6 +27,10 @@ import { useTheme } from '../contexts/ThemeContext';
 export default function AiringScreen({ navigation }: any) {
   const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isWeb = Platform.OS === 'web';
+  const isSmallScreen = width < 768;
+  const headerHeight = isWeb ? 90 : (56 + insets.top);
   const gap = 12;
   const desiredItemWidth = width < 768 ? (width * 0.3) : 160;
   const numColumns = Math.max(3, Math.floor((width - 40) / (desiredItemWidth + gap)));
@@ -225,12 +230,12 @@ export default function AiringScreen({ navigation }: any) {
       />
 
       {/* Espacio extra en la parte superior porque Header es absoluto */}
-      <View style={{ height: 90 }} />
+      <View style={{ height: headerHeight }} />
 
       <View style={styles.headerTitleContainer}>
         <View style={styles.titleRow}>
-          <Text style={[styles.pageTitleWhite, { color: colors.text }]}>EMI</Text>
-          <Text style={styles.pageTitleRed}>SIÓN</Text>
+          <Text style={[styles.pageTitleWhite, { color: colors.text }, isSmallScreen && { fontSize: 36 }]}>EMI</Text>
+          <Text style={[styles.pageTitleRed, isSmallScreen && { fontSize: 36 }]}>SIÓN</Text>
         </View>
         <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>CALENDARIO DE EMISIÓN SEMANAL</Text>
       </View>

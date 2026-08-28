@@ -12,6 +12,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../components/Header';
 import { MangaCard, MangaRankingItem, MangaFilterChips, MangaFilter, MangaItemUI } from '../components/MangaComponents';
 import { useTabNavigation } from '../hooks/useTabNavigation';
@@ -21,6 +22,8 @@ export default function MangaScreen() {
   const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
+  const insets = useSafeAreaInsets();
+  const headerHeight = Platform.OS === 'web' ? 90 : (56 + insets.top);
   const navigation = useNavigation<any>();
   const { navigateByLabel } = useTabNavigation();
 
@@ -107,7 +110,7 @@ export default function MangaScreen() {
         onSearchPress={() => navigateByLabel('Buscar')}
         onNavPress={navigateByLabel}
       />
-      <View style={{ height: Platform.OS === 'web' ? 90 : 0 }} />
+      <View style={{ height: headerHeight }} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -209,7 +212,7 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'web' ? 80 : 100, // Increased to clear Android status bar + header
+    paddingTop: 10,
     paddingBottom: 10,
     zIndex: 10,
   },
