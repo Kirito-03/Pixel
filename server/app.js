@@ -34,6 +34,7 @@ const { default: continueWatchingRoutes } = await import('./routes/continueWatch
 const { default: resumeTargetRoutes }     = await import('./routes/resumeTarget.js');
 const { default: newsRoutes }             = await import('./routes/news.js');
 const { default: mangaRoutes }            = await import('./routes/manga.js');
+const { default: nsfwRoutes }             = await import('./routes/nsfw.js');
 
 // ── Import routers nuevos ──────────────────────────────────────
 const { default: userAuthRoutes }   = await import('./routes/userAuth.js');
@@ -182,6 +183,7 @@ app.use('/api/catalog', catalogRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/manga', mangaRoutes);
+app.use('/api/nsfw', nsfwRoutes);
 app.use('/transcode', transcodeRoutes);
 app.use('/my-list', myListRoutes);
 app.use('/api/schedules', schedulesRoutes);

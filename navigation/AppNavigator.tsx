@@ -22,6 +22,7 @@ import NewsDetailScreen from '../screens/NewsDetailScreen';
 import MangaScreen from '../screens/MangaScreen';
 import MangaDetailScreen from '../screens/MangaDetailScreen';
 import MangaReaderScreen from '../screens/MangaReaderScreen';
+import NSFWScreen from '../screens/NSFWScreen';
 import AppearanceScreen from '../screens/AppearanceScreen';
 import AiringScreen from '../screens/AiringScreen';
 import LegalScreen from '../screens/LegalScreen';
@@ -134,7 +135,7 @@ function MainTabs({ route }: { route: any }) {
   const { isAdmin } = useAdmin();
   const insets = useSafeAreaInsets();
 
-  const { setCurrentProfile, currentProfile } = useProfile();
+  const { setCurrentProfile, currentProfile, adultContentEnabled } = useProfile();
 
   // Establecer el perfil seleccionado cuando se monta el componente
   React.useEffect(() => {
@@ -250,6 +251,21 @@ function MainTabs({ route }: { route: any }) {
           tabBarLabel: 'En Emisión',
         }}
       />
+      
+      {adultContentEnabled && (
+        <Tab.Screen
+          name="NSFW"
+          component={NSFWScreen}
+          options={{
+            title: 'Pixel - NSFW',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'flame' : 'flame-outline'} size={22} color={color} />
+            ),
+            tabBarLabel: '+18',
+          }}
+        />
+      )}
+      
       <Tab.Screen
         name="Manga"
         component={MangaNavigator}
