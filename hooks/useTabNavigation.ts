@@ -21,6 +21,7 @@ export function useTabNavigation() {
       'Mi Lista': { tab: 'MiLista' },
       'Buscar': { tab: 'Buscar' },
       'Perfil': { tab: 'Perfil' },
+      'NSFW': { tab: 'NSFW' },
     };
     
     const route = labelToRoute[label];

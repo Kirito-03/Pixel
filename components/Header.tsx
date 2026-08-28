@@ -25,7 +25,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
   const isWeb = Platform.OS === 'web';
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
-  const { currentProfile } = useProfile();
+  const { currentProfile, adultContentEnabled } = useProfile();
   const { colors, theme } = useTheme();
   const avatarUrl = currentProfile?.avatar_url || null;
   // activeNav es controlado por el prop activeSection — sin estado interno
@@ -79,6 +79,10 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
     { label: 'Manga', icon: 'book' },
     { label: 'Mi Lista', icon: 'bookmark' },
   ];
+
+  if (adultContentEnabled) {
+    navLinks.push({ label: 'NSFW', icon: 'flame' });
+  }
 
   const dynamicStyles = {
     container: {
