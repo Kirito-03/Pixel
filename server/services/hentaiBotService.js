@@ -25,26 +25,24 @@ export async function syncHentaiCatalog(pool) {
             
             try {
                 // Fetch the episode 1 page which contains the SvelteKit hydration payload
-                const res = await fetch(`https://hentaila.com/media/${item.slug}/1`);
-                if (res.ok) {
-                    const html = await res.text();
-                    // Buscar el payload específico que contiene la data de media
-                    const match = html.match(/\{type:"data",data:(\{media:\{.*?\}\}),uses:/);
-                    if (match) {
-                        try {
-                            const dataObj = eval('(' + match[1].replace(/void 0/g, 'null') + ')');
-                            if (dataObj && dataObj.media) {
-                                synopsis = dataObj.media.synopsis || null;
-                                if (dataObj.media.genres) {
-                                    genres = dataObj.media.genres.map(g => g.name);
-                                }
-                                if (dataObj.media.episodes && Array.isArray(dataObj.media.episodes)) {
-                                    episodesList = dataObj.media.episodes;
-                                }
+                const html = await hentailaScraper.fetchHtml(`https://hentaila.com/media/${item.slug}/1`);
+                
+                // Buscar el payload específico que contiene la data de media
+                const match = html.match(/\{type:"data",data:(\{media:\{.*?\}\}),uses:/);
+                if (match) {
+                    try {
+                        const dataObj = eval('(' + match[1].replace(/void 0/g, 'null') + ')');
+                        if (dataObj && dataObj.media) {
+                            synopsis = dataObj.media.synopsis || null;
+                            if (dataObj.media.genres) {
+                                genres = dataObj.media.genres.map(g => g.name);
                             }
-                        } catch (evalErr) {
-                            console.error(`[HentaiBot] Error evaluando SvelteKit payload para ${item.slug}:`, evalErr.message);
+                            if (dataObj.media.episodes && Array.isArray(dataObj.media.episodes)) {
+                                episodesList = dataObj.media.episodes;
+                            }
                         }
+                    } catch (evalErr) {
+                        console.error(`[HentaiBot] Error evaluando SvelteKit payload para ${item.slug}:`, evalErr.message);
                     }
                 }
             } catch (fetchErr) {
