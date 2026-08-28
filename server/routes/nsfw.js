@@ -7,13 +7,36 @@ const router = express.Router();
 // GET /api/nsfw/latest
 router.get('/latest', async (req, res) => {
     try {
-        const result = await pool.query(`
-            SELECT id::TEXT, slug, title, poster_url as poster_path, status, is_active
+        const { search, status } = req.query;
+        let query = `
+            SELECT id::TEXT, slug, title, poster_url as poster_path, status, synopsis, genres, is_active
             FROM hentai_content
             WHERE is_active = true
-            ORDER BY updated_at DESC
-            LIMIT 50
-        `);
+        `;
+        const queryParams = [];
+        let paramCount = 1;
+
+        if (status && status !== 'Todos') {
+            // Asumiremos que 'Nuevos caps' en la UI buscará los actualizados recientemente o estado 'En emisión'
+            // Dado que hentaila marca casi todo Finalizado, por ahora filtramos exacto por el estado.
+            if (status === 'Nuevos caps') {
+                // Ordenaremos por updated_at pero no filtramos por estado exacto si todos son Finalizado
+            } else {
+                query += ` AND status ILIKE $${paramCount}`;
+                queryParams.push(`%${status}%`);
+                paramCount++;
+            }
+        }
+
+        if (search) {
+            query += ` AND title ILIKE $${paramCount}`;
+            queryParams.push(`%${search}%`);
+            paramCount++;
+        }
+
+        query += ` ORDER BY updated_at DESC LIMIT 50`;
+
+        const result = await pool.query(query, queryParams);
         
         // Mapear al formato que espera el frontend (NSFWAnime)
         const latest = result.rows.map(r => ({
@@ -26,6 +49,40 @@ router.get('/latest', async (req, res) => {
     } catch (error) {
         console.error('Error in /nsfw/latest:', error);
         res.status(500).json({ error: 'Failed to fetch latest NSFW content from DB' });
+    }
+});
+
+// GET /api/nsfw/details/:slug
+router.get('/details/:slug', async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const result = await pool.query(`
+            SELECT id::TEXT, slug, title, poster_url as poster_path, status, synopsis, genres, is_active
+            FROM hentai_content
+            WHERE slug = $1 AND is_active = true
+            LIMIT 1
+        `, [slug]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Hentai not found' });
+        }
+
+        const hentai = result.rows[0];
+
+        // Fetch episodes
+        const episodesResult = await pool.query(`
+            SELECT episode_number as number
+            FROM hentai_episodes
+            WHERE hentai_id = $1 AND is_active = true
+            ORDER BY episode_number DESC
+        `, [hentai.id]);
+
+        hentai.episodes = episodesResult.rows;
+
+        res.json(hentai);
+    } catch (error) {
+        console.error('Error in /nsfw/details:', error);
+        res.status(500).json({ error: 'Failed to fetch NSFW details from DB' });
     }
 });
 

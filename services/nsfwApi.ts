@@ -7,16 +7,32 @@ export interface NSFWAnime {
     poster_path: string;
     type: string;
     is_nsfw: boolean;
+    synopsis?: string;
+    genres?: string[];
+    episodes?: { number: number }[];
 }
 
 export const nsfwApi = {
-    getLatest: async (): Promise<NSFWAnime[]> => {
+    getLatest: async (search?: string, status?: string): Promise<NSFWAnime[]> => {
         try {
-            const response = await backendClient.get('/api/nsfw/latest');
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (status) params.append('status', status);
+            
+            const response = await backendClient.get(`/api/nsfw/latest?${params.toString()}`);
             return response.data;
         } catch (error) {
             console.error('Error fetching NSFW:', error);
             return [];
+        }
+    },
+    getDetails: async (slug: string): Promise<NSFWAnime | null> => {
+        try {
+            const response = await backendClient.get(`/api/nsfw/details/${slug}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching NSFW details:', error);
+            return null;
         }
     },
     getServers: async (slug: string, episode: number): Promise<{server: string, url: string}[]> => {

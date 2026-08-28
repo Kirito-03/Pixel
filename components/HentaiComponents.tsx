@@ -39,7 +39,6 @@ const styles = StyleSheet.create({
   cardOuter: {
     flex: 1,
     minWidth: 140,
-    maxWidth: 200,
   },
   card: {
     width: '100%',

@@ -1,0 +1,445 @@
+root@srv1478919:/home/kirito/Pixel# docker exec -it pixel_backend node -e "import('./db.js').then(async db => { try { const { syncHentaiCatalog } = await import('./services/hentaiBotService.js'); await syncHentaiCatalog(db.default); console.log('✅ Bot ejecutado exitosamente'); } catch(e){ console.error(e) } finally { process.exit(); } })"
+[HentaiBot] Iniciando sincronización del catálogo de Hentaila...
+[HentailaScraper] Error fetching https://hentaila.com/media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1: Request failed with status code 404
+[HentaiBot] Error en la sincronización: AxiosError: Request failed with status code 404
+    at settle (file:///app/node_modules/axios/lib/core/settle.js:19:12)
+    at BrotliDecompress.handleStreamEnd (file:///app/node_modules/axios/lib/adapters/http.js:798:11)
+    at BrotliDecompress.emit (node:events:524:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+    at Axios.request (file:///app/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async HentailaScraper.fetchHtml (file:///app/services/hentailaScraper.js:9:30)
+    at async HentailaScraper.getVideoServers (file:///app/services/hentailaScraper.js:63:22)
+    at async syncHentaiCatalog (file:///app/services/hentaiBotService.js:38:29)
+    at async [eval]:1:122 {
+  isAxiosError: true,
+  code: 'ERR_BAD_REQUEST',
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false,
+      legacyInterceptorReqResOrdering: true
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 10000,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': undefined,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    method: 'get',
+    url: 'https://hentaila.com/media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> ClientRequest {
+    _events: [Object: null prototype] {
+      abort: [Function (anonymous)],
+      aborted: [Function (anonymous)],
+      connect: [Function (anonymous)],
+      error: [Function (anonymous)],
+      socket: [Function (anonymous)],
+      timeout: [Function (anonymous)],
+      finish: [Function: requestOnFinish]
+    },
+    _eventsCount: 7,
+    _maxListeners: undefined,
+    outputData: [],
+    outputSize: 0,
+    writable: true,
+    destroyed: true,
+    _last: true,
+    chunkedEncoding: false,
+    shouldKeepAlive: true,
+    maxRequestsOnConnectionReached: false,
+    _defaultKeepAlive: true,
+    useChunkedEncodingByDefault: false,
+    sendDate: false,
+    _removedConnection: false,
+    _removedContLen: false,
+    _removedTE: false,
+    strictContentLength: false,
+    _contentLength: 0,
+    _hasBody: true,
+    _trailer: '',
+    finished: true,
+    _headerSent: true,
+    _closed: true,
+    socket: TLSSocket {
+      _tlsOptions: [Object],
+      _secureEstablished: true,
+      _securePending: false,
+      _newSessionPending: false,
+      _controlReleased: true,
+      secureConnecting: false,
+      _SNICallback: null,
+      servername: 'hentaila.com',
+      alpnProtocol: false,
+      authorized: true,
+      authorizationError: null,
+      encrypted: true,
+      _events: [Object: null prototype],
+      _eventsCount: 9,
+      connecting: false,
+      _hadError: false,
+      _parent: null,
+      _host: 'hentaila.com',
+      _closeAfterHandlingError: false,
+      _readableState: [ReadableState],
+      _writableState: [WritableState],
+      allowHalfOpen: false,
+      _maxListeners: undefined,
+      _sockname: null,
+      _pendingData: null,
+      _pendingEncoding: '',
+      server: undefined,
+      _server: null,
+      ssl: [TLSWrap],
+      _requestCert: true,
+      _rejectUnauthorized: true,
+      timeout: 5000,
+      parser: null,
+      _httpMessage: null,
+      autoSelectFamilyAttemptedAddresses: [Array],
+      [Symbol(alpncallback)]: null,
+      [Symbol(res)]: [TLSWrap],
+      [Symbol(verified)]: true,
+      [Symbol(pendingSession)]: null,
+      [Symbol(async_id_symbol)]: -1,
+      [Symbol(kHandle)]: [TLSWrap],
+      [Symbol(lastWriteQueueSize)]: 0,
+      [Symbol(timeout)]: Timeout {
+        _idleTimeout: 5000,
+        _idlePrev: [TimersList],
+        _idleNext: [TimersList],
+        _idleStart: 1574,
+        _onTimeout: [Function: bound ],
+        _timerArgs: undefined,
+        _repeat: null,
+        _destroyed: false,
+        [Symbol(refed)]: false,
+        [Symbol(kHasPrimitive)]: false,
+        [Symbol(asyncId)]: 914,
+        [Symbol(triggerId)]: 912
+      },
+      [Symbol(kBuffer)]: null,
+      [Symbol(kBufferCb)]: null,
+      [Symbol(kBufferGen)]: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kSetNoDelay)]: false,
+      [Symbol(kSetKeepAlive)]: true,
+      [Symbol(kSetKeepAliveInitialDelay)]: 1,
+      [Symbol(kBytesRead)]: 0,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(connect-options)]: [Object]
+    },
+    _header: 'GET /media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1 HTTP/1.1\r\n' +
+      'Accept: application/json, text/plain, */*\r\n' +
+      'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n' +
+      'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+      'Host: hentaila.com\r\n' +
+      'Connection: keep-alive\r\n' +
+      '\r\n',
+    _keepAliveTimeout: 0,
+    _onPendingData: [Function: nop],
+    agent: Agent {
+      _events: [Object: null prototype],
+      _eventsCount: 2,
+      _maxListeners: undefined,
+      defaultPort: 443,
+      protocol: 'https:',
+      options: [Object: null prototype],
+      requests: [Object: null prototype] {},
+      sockets: [Object: null prototype] {},
+      freeSockets: [Object: null prototype],
+      keepAliveMsecs: 1000,
+      keepAlive: true,
+      maxSockets: Infinity,
+      maxFreeSockets: 256,
+      scheduling: 'lifo',
+      maxTotalSockets: Infinity,
+      totalSocketCount: 1,
+      maxCachedSessions: 100,
+      _sessionCache: [Object],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false
+    },
+    socketPath: undefined,
+    method: 'GET',
+    maxHeaderSize: undefined,
+    insecureHTTPParser: undefined,
+    joinDuplicateHeaders: undefined,
+    path: '/media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1',
+    _ended: true,
+    res: IncomingMessage {
+      _events: [Object],
+      _readableState: [ReadableState],
+      _maxListeners: undefined,
+      socket: null,
+      httpVersionMajor: 1,
+      httpVersionMinor: 1,
+      httpVersion: '1.1',
+      complete: true,
+      rawHeaders: [Array],
+      rawTrailers: [],
+      joinDuplicateHeaders: undefined,
+      aborted: false,
+      upgrade: false,
+      url: '',
+      method: null,
+      statusCode: 404,
+      statusMessage: 'Not Found',
+      client: [TLSSocket],
+      _consuming: true,
+      _dumped: false,
+      req: [Circular *1],
+      _eventsCount: 4,
+      responseUrl: 'https://hentaila.com/media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1',
+      redirects: [],
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false,
+      [Symbol(kHeaders)]: [Object],
+      [Symbol(kHeadersCount)]: 28,
+      [Symbol(kTrailers)]: null,
+      [Symbol(kTrailersCount)]: 0
+    },
+    aborted: false,
+    timeoutCb: null,
+    upgradeOrConnect: false,
+    parser: null,
+    maxHeadersCount: null,
+    reusedSocket: true,
+    host: 'hentaila.com',
+    protocol: 'https:',
+    _redirectable: Writable {
+      _events: [Object],
+      _writableState: [WritableState],
+      _maxListeners: undefined,
+      _options: [Object],
+      _ended: true,
+      _ending: true,
+      _redirectCount: 0,
+      _redirects: [],
+      _requestBodyLength: 0,
+      _requestBodyBuffers: [],
+      _eventsCount: 3,
+      _onNativeResponse: [Function (anonymous)],
+      _currentRequest: [Circular *1],
+      _currentUrl: 'https://hentaila.com/media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1',
+      _timeout: null,
+      [Symbol(shapeMode)]: true,
+      [Symbol(kCapture)]: false
+    },
+    [Symbol(shapeMode)]: false,
+    [Symbol(kCapture)]: false,
+    [Symbol(kBytesWritten)]: 0,
+    [Symbol(kNeedDrain)]: false,
+    [Symbol(corked)]: 0,
+    [Symbol(kOutHeaders)]: [Object: null prototype] {
+      accept: [Array],
+      'user-agent': [Array],
+      'accept-encoding': [Array],
+      host: [Array]
+    },
+    [Symbol(errored)]: null,
+    [Symbol(kHighWaterMark)]: 16384,
+    [Symbol(kRejectNonStandardBodyWrites)]: false,
+    [Symbol(kUniqueHeaders)]: null
+  },
+  response: {
+    status: 404,
+    statusText: 'Not Found',
+    headers: Object [AxiosHeaders] {
+      date: 'Fri, 28 Aug 2026 21:01:08 GMT',
+      'content-type': 'text/html',
+      'transfer-encoding': 'chunked',
+      connection: 'keep-alive',
+      server: 'cloudflare',
+      nel: '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}',
+      vary: 'accept-encoding',
+      link: '<../../../../_app/immutable/assets/common.C7oI0b2h.css>; rel="preload"; as="style"; nopush, <../../../../_app/immutable/entry/start.BZ-ecT5r.js>; rel="modulepreload"; nopush, <../../../../_app/immutable/chunks/_p91qVS-.js>; rel="modulepreload"; nopush, <../../../../_app/immutable/entry/app.DVk8aQ5y.js>; rel="modulepreload"; nopush, <../../../../_app/immutable/nodes/0.1FBrQcTZ.js>; rel="modulepreload"; nopush, <../../../../_app/immutable/nodes/1.DCQBrZ8m.js>; rel="modulepreload"; nopush',
+      'x-sveltekit-page': 'true',
+      'report-to': '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=STjwlJtP52gvett4sYvN7ufW2L%2F6Bho3slN3P5Q5v8Rq8ii%2BDCLpOnjsPwzq4QUC0kbYgHK3IlssR%2BQMvdFNGH5IlCkeO%2FQQnhLqNm7swPOxcFzoq%2FdPjw%2FbtNXhSyk%3D"}]}',
+      'cf-cache-status': 'DYNAMIC',
+      'cf-ray': 'a3263fdc0adc81ef-SIN',
+      'alt-svc': 'h3=":443"; ma=86400'
+    },
+    config: {
+      transitional: [Object],
+      adapter: [Array],
+      transformRequest: [Array],
+      transformResponse: [Array],
+      timeout: 10000,
+      xsrfCookieName: 'XSRF-TOKEN',
+      xsrfHeaderName: 'X-XSRF-TOKEN',
+      maxContentLength: -1,
+      maxBodyLength: -1,
+      env: [Object],
+      validateStatus: [Function: validateStatus],
+      headers: [Object [AxiosHeaders]],
+      method: 'get',
+      url: 'https://hentaila.com/media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1',
+      allowAbsoluteUrls: true,
+      data: undefined
+    },
+    request: <ref *1> ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: true,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: true,
+      socket: [TLSSocket],
+      _header: 'GET /media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1 HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'Host: hentaila.com\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      path: '/media/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/5/1',
+      _ended: true,
+      res: [IncomingMessage],
+      aborted: false,
+      timeoutCb: null,
+      upgradeOrConnect: false,
+      parser: null,
+      maxHeadersCount: null,
+      reusedSocket: true,
+      host: 'hentaila.com',
+      protocol: 'https:',
+      _redirectable: [Writable],
+      [Symbol(shapeMode)]: false,
+      [Symbol(kCapture)]: false,
+      [Symbol(kBytesWritten)]: 0,
+      [Symbol(kNeedDrain)]: false,
+      [Symbol(corked)]: 0,
+      [Symbol(kOutHeaders)]: [Object: null prototype],
+      [Symbol(errored)]: null,
+      [Symbol(kHighWaterMark)]: 16384,
+      [Symbol(kRejectNonStandardBodyWrites)]: false,
+      [Symbol(kUniqueHeaders)]: null
+    },
+    data: '<!doctype html>\r\n' +
+      '<html lang="es">\r\n' +
+      '\t<head>\r\n' +
+      '\t\t<meta charset="utf-8" />\r\n' +
+      '\t\t<link rel="icon" type="image/svg+xml" href="../../../../favicon.ico" />\r\n' +
+      '\t\t<meta name="viewport" content="width=device-width, initial-scale=1" />\r\n' +
+      '\t\t<meta name="darkreader-lock" />\r\n' +
+      '\t\t<link rel="preload" href="/fonts/satoshi-400.woff2" as="font" type="font/woff2" crossorigin />\r\n' +
+      '\t\t<link rel="preload" href="/fonts/satoshi-700.woff2" as="font" type="font/woff2" crossorigin />\r\n' +
+      '\t\t\n' +
+      '\t\t<link href="../../../../_app/immutable/assets/common.C7oI0b2h.css" rel="stylesheet"><!--xw9chl--><!--[!--><!--]--> <!----><script>(function setInitialMode({ defaultMode = "system", themeColors: themeColors2, darkClassNames: darkClassNames2 = ["dark"], lightClassNames: lightClassNames2 = [], defaultTheme = "", modeStorageKey: modeStorageKey2 = "mode-watcher-mode", themeStorageKey: themeStorageKey2 = "mode-watcher-theme" }) {\n' +
+      '  const rootEl = document.documentElement;\n' +
+      '  const mode = localStorage.getItem(modeStorageKey2) ?? defaultMode;\n' +
+      '  const theme = localStorage.getItem(themeStorageKey2) ?? defaultTheme;\n' +
+      '  const light = mode === "light" || mode === "system" && window.matchMedia("(prefers-color-scheme: light)").matches;\n' +
+      '  if (light) {\n' +
+      '    if (darkClassNames2.length)\n' +
+      '      rootEl.classList.remove(...darkClassNames2.filter(Boolean));\n' +
+      '    if (lightClassNames2.length)\n' +
+      '      rootEl.classList.add(...lightClassNames2.filter(Boolean));\n' +
+      '  } else {\n' +
+      '    if (lightClassNames2.length)\n' +
+      '      rootEl.classList.remove(...lightClassNames2.filter(Boolean));\n' +
+      '    if (darkClassNames2.length)\n' +
+      '      rootEl.classList.add(...darkClassNames2.filter(Boolean));\n' +
+      '  }\n' +
+      '  rootEl.style.colorScheme = light ? "light" : "dark";\n' +
+      '  if (themeColors2) {\n' +
+      `    const themeMetaEl = document.querySelector('meta[name="theme-color"]');\n` +
+      '    if (themeMetaEl) {\n' +
+      '      themeMetaEl.setAttribute("content", mode === "light" ? themeColors2.light : themeColors2.dark);\n' +
+      '    }\n' +
+      '  }\n' +
+      '  if (theme) {\n' +
+      '    rootEl.setAttribute("data-theme", theme);\n' +
+      '    localStorage.setItem(themeStorageKey2, theme);\n' +
+      '  }\n' +
+      '  localStorage.setItem(modeStorageKey2, mode);\n' +
+      '})({"defaultMode":"dark","darkClassNames":["dark"],"lightClassNames":[],"defaultTheme":"","modeStorageKey":"mode-watcher-mode","themeStorageKey":"mode-watcher-theme"});</script><!----><!---->\r\n' +
+      '\t</head>\r\n' +
+      '\t<body data-sveltekit-reload>\r\n' +
+      '\t\t<div class="flex min-h-full flex-col"><!--[--><!--[--><!----><!--[!--><!----><!--[!--><!--]--><!----> <div class="container grid items-start gap-6 lg:grid-cols-6 xl:grid-cols-12"><main class="grid items-start gap-12 last:col-span-12 last:pe-0 lg:col-span-4 lg:pe-6 xl:col-span-9"><section class="from-mute col-span-full grid items-start gap-6 bg-radial-[closest-side] py-24"><header class="flex flex-wrap items-center justify-between gap-4"><div class="grid w-full items-start gap-1 text-center"><div class="text-main text-5xl font-bold">404</div> <h1 class="text-lead text-2xl font-bold">Not Found</h1> <div class="mt-8"><a class="btn btn-sm btn-lead font-bold" href="/">Regresar al inicio</a></div></div></header></section></main></div><!----><!--]--><!----><!----><!--]--> <!--[!--><!--]--><!--]-->\n' +
+      '\t\t\t\n' +
+      '\t\t\t<script>\n' +
+      '\t\t\t\t{\n' +
+      '\t\t\t\t\t__sveltekit_bdsgrj = {\n' +
+      '\t\t\t\t\t\tbase: new URL("../../../..", location).pathname.slice(0, -1),\n' +
+      '\t\t\t\t\t\tenv: {"PUBLIC_DISCORD_CLIENT_ID":"1402378647154987189","PUBLIC_GOOGLE_ANALYTICS_ID":"G-T7KQ8V9457","PUBLIC_GOOGLE_CLIENT_ID":"554034498166-ck4hhf8jhn4f3ngduj3mpjhf2oua2df7.apps.googleusercontent.com","PUBLIC_NAME":"HentaiLA","PUBLIC_TURNSTILE_KEY":"0x4AAAAAABobdNxWiMbd0UrA","PUBLIC_CDN_URL":"https://cdn.hentaila.com","PUBLIC_URL":"https://hentaila.com"}\n' +
+      '\t\t\t\t\t};\n' +
+      '\n' +
+      '\t\t\t\t\tconst element = document.currentScript.parentElement;\n' +
+      '\n' +
+      '\t\t\t\t\tPromise.all([\n' +
+      '\t\t\t\t\t\timport("../../../../_app/immutable/entry/start.BZ-ecT5r.js"),\n' +
+      '\t\t\t\t\t\timport("../../../../_app/immutable/entry/app.DVk8aQ5y.js")\n' +
+      '\t\t\t\t\t]).then(([kit, app]) => {\n' +
+      '\t\t\t\t\t\tkit.start(app, element, {\n' +
+      '\t\t\t\t\t\t\tnode_ids: [0, 1],\n' +
+      '\t\t\t\t\t\t\tdata: [null],\n' +
+      '\t\t\t\t\t\t\tform: null,\n' +
+      '\t\t\t\t\t\t\terror: {message:"Not Found"},\n' +
+      '\t\t\t\t\t\t\tstatus: 404\n' +
+      '\t\t\t\t\t\t});\n' +
+      '\t\t\t\t\t});\n' +
+      '\t\t\t\t}\n' +
+      '\t\t\t</script>\n' +
+      '\t\t</div>\r\n' +
+      '\t</body>\r\n' +
+      '\r\n' +
+      '\t<script async src="https://www.googletagmanager.com/gtag/js?id=UA-155097471-1"></script>\r\n' +
+      '\t<script>\r\n' +
+      '\t\twindow.dataLayer = window.dataLayer || [];\r\n' +
+      '\t\tfunction gtag() {\r\n' +
+      '\t\t\tdataLayer.push(arguments);\r\n' +
+      '\t\t}\r\n' +
+      "\t\tgtag('js', new Date());\r\n" +
+      '\r\n' +
+      "\t\tgtag('config', 'UA-155097471-1');\r\n" +
+      '\t</script>\r\n' +
+      '</html>\r\n'
+  },
+  status: 404
+}
+✅ Bot ejecutado exitosamente
+root@srv1478919:/home/kirito/Pixel# 

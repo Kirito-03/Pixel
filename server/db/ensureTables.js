@@ -166,6 +166,8 @@ export async function ensurePixelNoSekaiTables() {
         title VARCHAR(255) NOT NULL,
         poster_url VARCHAR(500),
         status VARCHAR(50) DEFAULT 'Finalizado',
+        synopsis TEXT,
+        genres JSONB,
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -202,4 +204,6 @@ export async function ensurePixelNoSekaiTables() {
 
   // Columnas añadidas post-schema-inicial
   await pool.query(`ALTER TABLE anime_episodes ADD COLUMN IF NOT EXISTS stream_url VARCHAR(1000);`);
+  await pool.query(`ALTER TABLE hentai_content ADD COLUMN IF NOT EXISTS synopsis TEXT;`);
+  await pool.query(`ALTER TABLE hentai_content ADD COLUMN IF NOT EXISTS genres JSONB;`);
 }
