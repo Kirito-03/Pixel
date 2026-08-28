@@ -87,6 +87,12 @@ export function startBotSchedulers() {
         console.log('[Cron] La base de datos de animes está vacía. Iniciando sincronización de estrenos automáticamente...');
         await syncAiringAnimes();
       }
+
+      const resHentai = await pool.query('SELECT COUNT(*) FROM hentai_content');
+      if (parseInt(resHentai.rows[0].count, 10) === 0) {
+        console.log('[Cron] La base de datos de H Anime está vacía. Iniciando primera sincronización...');
+        await syncHentaiCatalog(pool);
+      }
     } catch (e) {
       console.error('[Cron] Error al verificar estado inicial de la BD:', e.message);
     }
