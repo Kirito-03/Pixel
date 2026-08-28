@@ -32,7 +32,14 @@ class HentailaScraper {
             if (title && link) {
                 let slug = link;
                 if (slug.startsWith(BASE_URL)) slug = slug.replace(BASE_URL, '');
-                slug = slug.replace('/hentai/', '').replace('/ver/', '').replace('/', '');
+                
+                // Extraer de /media/slug/1 o /hentai/slug
+                const match = slug.match(/\/(?:media|hentai|ver)\/([a-z0-9-]+)/);
+                if (match) {
+                    slug = match[1];
+                } else {
+                    slug = slug.replace('/hentai/', '').replace('/ver/', '').replace('/', '');
+                }
                 
                 if (poster && !poster.startsWith('http')) {
                     poster = poster.startsWith('/') ? BASE_URL + poster : BASE_URL + '/' + poster;

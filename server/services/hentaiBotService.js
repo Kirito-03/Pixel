@@ -35,17 +35,22 @@ export async function syncHentaiCatalog(pool) {
             // Por lo general, los hentais nuevos en Hentaila tienen 1 episodio inicial.
             // Trataremos de obtener el episodio 1. (Se podría mejorar iterando hasta que falle).
             const episodeNumber = 1; 
-            const servers = await hentailaScraper.getVideoServers(item.slug, episodeNumber);
+            
+            try {
+                const servers = await hentailaScraper.getVideoServers(item.slug, episodeNumber);
 
-            if (servers && servers.length > 0) {
-                await pool.query(`
-                    INSERT INTO hentai_episodes (hentai_id, episode_number, video_servers, is_active)
-                    VALUES ($1, $2, $3, true)
-                    ON CONFLICT (hentai_id, episode_number)
-                    DO UPDATE SET
-                        video_servers = EXCLUDED.video_servers,
-                        updated_at = CURRENT_TIMESTAMP;
-                `, [hentaiId, episodeNumber, JSON.stringify(servers)]);
+                if (servers && servers.length > 0) {
+                    await pool.query(`
+                        INSERT INTO hentai_episodes (hentai_id, episode_number, video_servers, is_active)
+                        VALUES ($1, $2, $3, true)
+                        ON CONFLICT (hentai_id, episode_number)
+                        DO UPDATE SET
+                            video_servers = EXCLUDED.video_servers,
+                            updated_at = CURRENT_TIMESTAMP;
+                    `, [hentaiId, episodeNumber, JSON.stringify(servers)]);
+                }
+            } catch (err) {
+                console.error(`[HentaiBot] Error obteniendo episodio ${episodeNumber} de ${item.slug}:`, err.message);
             }
 
             syncedCount++;
