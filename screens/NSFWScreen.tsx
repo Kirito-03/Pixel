@@ -7,16 +7,50 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
-  Alert
+  Alert,
+  TouchableOpacity,
+  Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../components/Header';
 import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
-import { MangaCard, MangaItemUI } from '../components/MangaComponents';
 import EpisodePlayer from '../components/EpisodePlayer';
 import { useTabNavigation } from '../hooks/useTabNavigation';
+
+const HentaiCard = ({ item, onPress }: { item: NSFWAnime, onPress: () => void }) => {
+  const [imageError, setImageError] = useState(false);
+  const isWeb = Platform.OS === 'web';
+  return (
+    <TouchableOpacity
+      activeOpacity={0.88}
+      onPress={onPress}
+      style={[styles.cardOuter, isWeb ? ({ cursor: 'pointer' } as any) : null]}
+    >
+      <View style={styles.card}>
+        <View style={styles.posterBox}>
+          {(!item.poster_path || imageError) ? (
+            <View style={{flex:1, backgroundColor:'#222', justifyContent:'center', alignItems:'center'}}>
+              <Text style={{color:'#666', fontWeight:'bold'}}>18+</Text>
+            </View>
+          ) : (
+            <Image
+              source={{ uri: item.poster_path }}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="cover"
+              onError={() => setImageError(true)}
+            />
+          )}
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>Finalizado</Text>
+          </View>
+        </View>
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 export default function NSFWScreen() {
   const { colors } = useTheme();
@@ -100,17 +134,9 @@ export default function NSFWScreen() {
               {chunks.map((row, rIdx) => (
                 <View key={`row-${rIdx}`} style={styles.gridRow}>
                   {row.map((item) => (
-                    <MangaCard
+                    <HentaiCard
                       key={item.id + item.slug}
-                      item={{
-                        id: item.id,
-                        title: item.title,
-                        image: item.poster_path,
-                        status: 'Finalizado',
-                        rating: 0,
-                        chapters: 1,
-                        updatedAt: new Date().toISOString()
-                      } as MangaItemUI}
+                      item={item}
                       onPress={() => handleItemPress(item)}
                     />
                   ))}
@@ -194,5 +220,42 @@ const styles = StyleSheet.create({
   gridRow: {
     flexDirection: 'row',
     gap: 12,
+  },
+  cardOuter: {
+    flex: 1,
+    minWidth: 140,
+    maxWidth: 200,
+  },
+  card: {
+    width: '100%',
+  },
+  posterBox: {
+    width: '100%',
+    aspectRatio: 0.7,
+    backgroundColor: '#222',
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  cardTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'left',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: '#E50914',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   }
 });
