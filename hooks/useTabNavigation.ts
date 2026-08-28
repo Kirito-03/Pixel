@@ -21,7 +21,7 @@ export function useTabNavigation() {
       'Mi Lista': { tab: 'MiLista' },
       'Buscar': { tab: 'Buscar' },
       'Perfil': { tab: 'Perfil' },
-      'NSFW': { tab: 'NSFW' },
+      'Hentai': { tab: 'Hentai' },
     };
     
     const route = labelToRoute[label];

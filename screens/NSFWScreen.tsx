@@ -50,14 +50,14 @@ export default function NSFWScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
-      <Header />
+      <Header activeSection="Hentai" />
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#E50914" />
         </View>
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: 100 }}>
-          <Text style={[styles.title, { color: '#E50914' }]}>HUB +18</Text>
+          <Text style={[styles.title, { color: '#E50914' }]}>H Anime</Text>
           
           <View style={styles.gridContainer}>
             {items.map((item) => (

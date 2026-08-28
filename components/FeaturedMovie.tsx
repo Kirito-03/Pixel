@@ -211,7 +211,9 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
             } : {})}
           >
             <Ionicons name="play" size={18} color={isWeb && playHover ? '#fff' : (theme === 'dark' ? '#000' : '#fff')} />
-            <Text style={[
+            <Text 
+              numberOfLines={1}
+              style={[
               styles.playButtonText,
               { color: theme === 'dark' ? '#000' : '#fff' },
               isWeb && playHover && { color: '#fff' },
@@ -239,7 +241,9 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
             } : {})}
           >
             <Ionicons name="information-circle-outline" size={18} color={theme === 'dark' ? '#fff' : '#000'} />
-            <Text style={[styles.infoButtonText, { color: theme === 'dark' ? '#fff' : '#000' }]}>Más información</Text>
+            <Text numberOfLines={1} style={[styles.infoButtonText, { color: theme === 'dark' ? '#fff' : '#000' }]}>
+              Más información
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

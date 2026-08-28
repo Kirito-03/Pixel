@@ -254,14 +254,14 @@ function MainTabs({ route }: { route: any }) {
       
       {adultContentEnabled && (
         <Tab.Screen
-          name="NSFW"
+          name="Hentai"
           component={NSFWScreen}
           options={{
-            title: 'Pixel - NSFW',
+            title: 'Pixel - H Anime',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? 'flame' : 'flame-outline'} size={22} color={color} />
             ),
-            tabBarLabel: '+18',
+            tabBarLabel: 'Hentai',
           }}
         />
       )}

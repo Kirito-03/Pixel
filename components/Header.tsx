@@ -81,7 +81,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
   ];
 
   if (adultContentEnabled) {
-    navLinks.push({ label: 'NSFW', icon: 'flame' });
+    navLinks.push({ label: 'Hentai', icon: 'flame' });
   }
 
   const dynamicStyles = {
