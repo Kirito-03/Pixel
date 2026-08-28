@@ -16,12 +16,13 @@ import Header from '../components/Header';
 import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
 import { MangaCard, MangaItemUI } from '../components/MangaComponents';
 import EpisodePlayer from '../components/EpisodePlayer';
+import { useTabNavigation } from '../hooks/useTabNavigation';
 
 export default function NSFWScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const headerHeight = Platform.OS === 'web' ? 90 : (56 + insets.top);
-  const navigation = useNavigation<any>();
+  const { navigateByLabel } = useTabNavigation();
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<NSFWAnime[]>([]);
@@ -74,7 +75,12 @@ export default function NSFWScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
-      <Header activeSection="Hentai" />
+      <Header 
+        activeSection="Hentai"
+        onNavPress={navigateByLabel}
+        onSearchPress={() => navigateByLabel('Buscar')}
+        onProfilePress={() => navigateByLabel('Perfil')}
+      />
       {loading || fetchingVideo ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#E50914" />
@@ -84,27 +90,34 @@ export default function NSFWScreen() {
         <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: headerHeight + 20, paddingBottom: 100 }}>
           <Text style={[styles.title, { color: '#E50914' }]}>H Anime</Text>
           
-          <View style={styles.gridContainer}>
-            {chunks.map((row, rIdx) => (
-              <View key={`row-${rIdx}`} style={styles.gridRow}>
-                {row.map((item) => (
-                  <MangaCard
-                    key={item.id + item.slug}
-                    item={{
-                      id: item.id,
-                      title: item.title,
-                      image: item.poster_path,
-                      status: 'Finalizado',
-                      rating: 0,
-                      chapters: 1,
-                      updatedAt: new Date().toISOString()
-                    } as MangaItemUI}
-                    onPress={() => handleItemPress(item)}
-                  />
-                ))}
-              </View>
-            ))}
-          </View>
+          {items.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>El catálogo está vacío.</Text>
+              <Text style={styles.emptySubtext}>El bot sincronizará automáticamente los títulos pronto.</Text>
+            </View>
+          ) : (
+            <View style={styles.gridContainer}>
+              {chunks.map((row, rIdx) => (
+                <View key={`row-${rIdx}`} style={styles.gridRow}>
+                  {row.map((item) => (
+                    <MangaCard
+                      key={item.id + item.slug}
+                      item={{
+                        id: item.id,
+                        title: item.title,
+                        image: item.poster_path,
+                        status: 'Finalizado',
+                        rating: 0,
+                        chapters: 1,
+                        updatedAt: new Date().toISOString()
+                      } as MangaItemUI}
+                      onPress={() => handleItemPress(item)}
+                    />
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -156,6 +169,22 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     marginBottom: 20,
     textTransform: 'uppercase'
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 40
+  },
+  emptyText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold'
+  },
+  emptySubtext: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 8
   },
   gridContainer: {
     flex: 1,
