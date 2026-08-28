@@ -17,7 +17,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
-import HentaiCard from '../components/HentaiCard';
+import { HentaiCard } from '../components/HentaiComponents';
 import HentaiSeriesModal from '../components/HentaiSeriesModal';
 import HentaiVideoPlayer from '../components/HentaiVideoPlayer';
 import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
@@ -149,7 +149,7 @@ export default function NSFWScreen() {
         ) : (
           <View style={styles.gridContainer}>
             {items.map(item => (
-              <View key={item.id + item.slug} style={[styles.cardWrapper, { width: cardWidth }]}>
+              <View key={item.id + item.slug} style={[styles.cardWrapper, { width: cardWidth as any }]}>
                 <HentaiCard
                   item={item}
                   onPress={() => handleCardPress(item)}
