@@ -13,7 +13,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../components/Header';
 import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
-import { MangaItemUI } from '../components/MangaComponents';
+import { MangaCard, MangaItemUI } from '../components/MangaComponents';
 import EpisodePlayer from '../components/EpisodePlayer';
 
 export default function NSFWScreen() {
@@ -26,6 +26,7 @@ export default function NSFWScreen() {
   const [items, setItems] = useState<NSFWAnime[]>([]);
   const [selectedItem, setSelectedItem] = useState<NSFWAnime | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
+  const isSmallScreen = Platform.OS !== 'web' || typeof window !== 'undefined' && window.innerWidth < 768;
 
   useEffect(() => {
     loadContent();
@@ -48,6 +49,12 @@ export default function NSFWScreen() {
     setSelectedItem(null);
   };
 
+  const columns = isSmallScreen ? 2 : 8;
+  const chunks: NSFWAnime[][] = [];
+  for (let i = 0; i < items.length; i += columns) {
+    chunks.push(items.slice(i, i + columns));
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
       <Header activeSection="Hentai" />
@@ -60,18 +67,24 @@ export default function NSFWScreen() {
           <Text style={[styles.title, { color: '#E50914' }]}>H Anime</Text>
           
           <View style={styles.gridContainer}>
-            {items.map((item) => (
-              <MangaItemUI
-                key={item.id + item.slug}
-                manga={{
-                  id: item.id,
-                  title: item.title,
-                  poster_path: item.poster_path,
-                  type: 'hentai'
-                } as any}
-                onPress={() => handleItemPress(item)}
-                isSmallScreen={true}
-              />
+            {chunks.map((row, rIdx) => (
+              <View key={`row-${rIdx}`} style={styles.gridRow}>
+                {row.map((item) => (
+                  <MangaCard
+                    key={item.id + item.slug}
+                    item={{
+                      id: item.id,
+                      title: item.title,
+                      image: item.poster_path,
+                      status: 'Finalizado',
+                      rating: 0,
+                      chapters: 1,
+                      updatedAt: new Date().toISOString()
+                    } as MangaItemUI}
+                    onPress={() => handleItemPress(item)}
+                  />
+                ))}
+              </View>
             ))}
           </View>
         </ScrollView>
@@ -130,9 +143,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase'
   },
   gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flex: 1,
     paddingHorizontal: 8,
-    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 12,
   }
 });
