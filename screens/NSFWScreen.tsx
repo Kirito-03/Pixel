@@ -6,10 +6,12 @@ import {
   StyleSheet,
   ActivityIndicator,
   Platform,
+
   Modal,
   Alert,
   TextInput,
-  TouchableOpacity
+  TouchableOpacity,
+  useWindowDimensions
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -87,6 +89,13 @@ export default function NSFWScreen() {
     setPlayingUrl(null);
   };
 
+  const { width } = useWindowDimensions();
+  // Ancho efectivo = window width - paddingHorizontal total (24)
+  // Tarjetas de aproximadamente 160px de ancho base
+  const availableWidth = width - 24;
+  const numColumns = Math.max(2, Math.floor(availableWidth / 160));
+  const cardWidth = availableWidth / numColumns;
+
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
       <Header 
@@ -141,7 +150,7 @@ export default function NSFWScreen() {
         ) : (
           <View style={styles.gridContainer}>
             {items.map(item => (
-              <View key={item.id + item.slug} style={styles.cardWrapper}>
+              <View key={item.id + item.slug} style={[styles.cardWrapper, { width: cardWidth }]}>
                 <HentaiCard
                   item={item}
                   onPress={() => handleCardPress(item)}
@@ -281,11 +290,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 12,
-    justifyContent: 'flex-start',
   },
   cardWrapper: {
     padding: 6,
-    width: Platform.OS === 'web' ? '12.5%' : '50%',
-    minWidth: 140,
   }
 });
