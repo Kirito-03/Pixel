@@ -196,7 +196,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           <TouchableOpacity
             style={[
               styles.playButton,
-              !isSmallScreen && { flex: 0, paddingHorizontal: 30, width: 220 },
+              !isSmallScreen && { flex: 0, paddingHorizontal: 32 },
               { backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000' },
               isWeb && playHover && {
                 backgroundColor: theme === 'dark' ? '#E50914' : '#E50914',
@@ -223,7 +223,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           <TouchableOpacity
             style={[
               styles.infoButton,
-              !isSmallScreen && { flex: 0, paddingHorizontal: 30, width: 220 },
+              !isSmallScreen && { flex: 0, paddingHorizontal: 32 },
               { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' },
               isWeb && infoHover && {
                 backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
