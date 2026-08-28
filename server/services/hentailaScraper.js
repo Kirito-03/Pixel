@@ -65,36 +65,30 @@ class HentailaScraper {
     }
 
     async getVideoServers(slug, episodeNumber) {
-        // Hentaila URLs usually look like /media/{slug}/{episodeNumber}
-        const url = `${BASE_URL}/media/${slug}/${episodeNumber}`;
-        const html = await this.fetchHtml(url);
-        
-        // Find the embeds in the JSON string inside a script tag
-        const embedsMatch = html.match(/"embeds"\s*:\s*({.*?})/);
-        if (!embedsMatch) {
-            return [];
-        }
-
         try {
-            // The matched string is valid JSON representing the embeds object
-            const embedsData = JSON.parse(embedsMatch[1]);
-            const servers = [];
+            // Hentaila URLs usually look like /media/{slug}/{episodeNumber}
+            const url = `${BASE_URL}/media/${slug}/${episodeNumber}`;
+            const html = await this.fetchHtml(url);
             
-            // "SUB" usually contains the array of servers
-            if (embedsData.SUB && Array.isArray(embedsData.SUB)) {
-                embedsData.SUB.forEach(s => {
-                    if (s.server && s.url) {
-                        servers.push({
-                            server: s.server,
-                            url: s.url
-                        });
-                    }
-                });
-            }
-
+            // Extract from SvelteKit payload
+            const match = html.match(/\{type:"data",data:(\{media:\{.*?\}\}),uses:/);
+            if (!match) return [];
+            
+            const dataObj = eval('(' + match[1].replace(/void 0/g, 'null') + ')');
+            if (!dataObj || !dataObj.embeds || !dataObj.embeds.SUB) return [];
+            
+            const servers = [];
+            dataObj.embeds.SUB.forEach(s => {
+                if (s.server && s.url) {
+                    servers.push({
+                        server: s.server,
+                        url: s.url
+                    });
+                }
+            });
             return servers;
         } catch (error) {
-            console.error('[HentailaScraper] Error parsing servers JSON:', error.message);
+            console.error(`[HentailaScraper] Error en getVideoServers para ${slug} ep ${episodeNumber}:`, error.message);
             return [];
         }
     }

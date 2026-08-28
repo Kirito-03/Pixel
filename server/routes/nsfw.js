@@ -1,5 +1,6 @@
 import express from 'express';
 import hentailaScraper from '../services/hentailaScraper.js';
+import { syncHentaiSingle } from '../services/hentaiBotService.js';
 import pool from '../db.js';
 
 const router = express.Router();
@@ -67,15 +68,41 @@ router.get('/details/:slug', async (req, res) => {
             return res.status(404).json({ error: 'Hentai not found' });
         }
 
-        const hentai = result.rows[0];
+        let hentai = result.rows[0];
 
         // Fetch episodes
-        const episodesResult = await pool.query(`
+        let episodesResult = await pool.query(`
             SELECT episode_number as number
             FROM hentai_episodes
             WHERE hentai_id = $1 AND is_active = true
             ORDER BY episode_number DESC
         `, [hentai.id]);
+
+        // Si no hay episodios, intentamos buscarlos en vivo (On-Demand)
+        if (episodesResult.rows.length === 0) {
+            console.log(`[API] 0 episodios para ${slug}, disparando búsqueda On-Demand...`);
+            const synced = await syncHentaiSingle(pool, slug);
+            if (synced) {
+                // Re-consultar la base de datos tras la sincronización
+                const refreshedResult = await pool.query(`
+                    SELECT id::TEXT, slug, title, poster_url as poster_path, status, synopsis, genres, is_active
+                    FROM hentai_content
+                    WHERE slug = $1 AND is_active = true
+                    LIMIT 1
+                `, [slug]);
+                
+                if (refreshedResult.rows.length > 0) {
+                    hentai = refreshedResult.rows[0];
+                }
+
+                episodesResult = await pool.query(`
+                    SELECT episode_number as number
+                    FROM hentai_episodes
+                    WHERE hentai_id = $1 AND is_active = true
+                    ORDER BY episode_number DESC
+                `, [hentai.id]);
+            }
+        }
 
         hentai.episodes = episodesResult.rows;
 

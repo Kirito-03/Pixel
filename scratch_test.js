@@ -1,17 +1,14 @@
 import scraper from './server/services/hentailaScraper.js';
 
 (async () => {
-  const animes = await scraper.getLatestHentai();
-  let matches = 0;
-  for(let i=0; i<Math.min(5, animes.length); i++) {
-    const html = await fetch('https://hentaila.com/media/'+animes[i].slug+'/1').then(r=>r.text());
-    const match = html.match(/\{type:"data",data:(\{media:\{.*?\}\}),uses:/);
-    if(match) {
-        matches++;
-        console.log('Match for', animes[i].slug);
-    } else {
-        console.log('No match for', animes[i].slug);
-    }
+  const html = await fetch('https://hentaila.com/media/onaji-semi-no-someya-san-ga-sexy-joyuu-datta-hanashi/1').then(r=>r.text());
+  const match = html.match(/\{type:"data",data:(\{media:\{.*?\}\}),uses:/);
+  if(match) {
+      const dataObj = eval('(' + match[1].replace(/void 0/g, 'null') + ')');
+      console.log('Media:', JSON.stringify(Object.keys(dataObj.media), null, 2));
+      console.log('Media id:', dataObj.media.id);
+      console.log('Poster:', dataObj.media.poster);
+      console.log('Cover:', dataObj.media.cover);
+      console.log('Image:', dataObj.media.image);
   }
-  console.log('Matches:', matches, '/ 5');
 })();

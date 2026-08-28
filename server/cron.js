@@ -60,9 +60,9 @@ export function startBotSchedulers() {
     }
   });
 
-  // Tarea 6: Hentai Bot Sincronización (Cada 6 horas)
-  // '0 */6 * * *' -> minuto 0, cada 6 horas
-  cron.schedule('0 */6 * * *', async () => {
+  // Tarea 6: Hentai Bot Sincronización (Cada 30 minutos)
+  // '*/30 * * * *' -> cada 30 minutos
+  cron.schedule('*/30 * * * *', async () => {
     console.log('[Cron] Ejecutando Hentai Bot...');
     try {
       await syncHentaiCatalog(pool);
@@ -77,7 +77,7 @@ export function startBotSchedulers() {
   console.log(' - Sync Catalog Incremental: Cada 10 minutos');
   console.log(' - Fix Missing Images: Cada 12 horas');
   console.log(' - Manga Bot Incremental: Cada 1 hora');
-  console.log(' - Hentai Bot: Cada 6 horas');
+  console.log(' - Hentai Bot: Cada 30 minutos');
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {
