@@ -17,11 +17,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
-import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
-import EpisodePlayer from '../components/EpisodePlayer';
-import { useTabNavigation } from '../hooks/useTabNavigation';
-import { HentaiCard } from '../components/HentaiComponents';
+import HentaiCard from '../components/HentaiCard';
 import HentaiSeriesModal from '../components/HentaiSeriesModal';
+import HentaiVideoPlayer from '../components/HentaiVideoPlayer';
+import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
+import { useTabNavigation } from '../hooks/useTabNavigation';
 
 const FILTERS = ['Todos', 'Nuevos caps', 'Finalizado'];
 
@@ -44,7 +44,7 @@ export default function NSFWScreen() {
   
   // Player state
   const [showPlayer, setShowPlayer] = useState(false);
-  const [playingUrl, setPlayingUrl] = useState<string | null>(null);
+  const [playingServers, setPlayingServers] = useState<any[]>([]);
   const [playingEpisode, setPlayingEpisode] = useState<number>(1);
   const [fetchingVideo, setFetchingVideo] = useState(false);
 
@@ -74,7 +74,7 @@ export default function NSFWScreen() {
     
     const servers = await nsfwApi.getServers(slug, episodeNumber);
     if (servers && servers.length > 0) {
-      setPlayingUrl(servers[0].url);
+      setPlayingServers(servers);
       setPlayingEpisode(episodeNumber);
       setShowPlayer(true);
     } else {
@@ -86,15 +86,14 @@ export default function NSFWScreen() {
 
   const closePlayer = () => {
     setShowPlayer(false);
-    setPlayingUrl(null);
+    setPlayingServers([]);
   };
 
   const { width } = useWindowDimensions();
   // Ancho efectivo = window width - paddingHorizontal total (24)
-  // Tarjetas de aproximadamente 160px de ancho base
   const availableWidth = width - 24;
   const numColumns = Math.max(2, Math.floor(availableWidth / 160));
-  const cardWidth = availableWidth / numColumns;
+  const cardWidth = `${100 / numColumns}%`; // Usamos porcentaje estricto para evitar espacios en blanco por redondeo de pixeles
 
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
@@ -170,28 +169,18 @@ export default function NSFWScreen() {
       />
 
       {/* Episode Player Modal */}
-      {showPlayer && playingUrl && selectedAnime && (
+      {showPlayer && playingServers.length > 0 && selectedAnime && (
         <Modal
           visible={showPlayer}
           animationType="slide"
           presentationStyle="fullScreen"
           onRequestClose={closePlayer}
         >
-          <EpisodePlayer
-            animeId={parseInt(selectedAnime.id) || 99999}
-            seasonNumber={1}
-            episode={{
-              id: selectedAnime.slug,
-              title: selectedAnime.title,
-              number: playingEpisode,
-              thumbnail_url: selectedAnime.poster_path,
-              url: playingUrl,
-              duration: 0
-            }}
+          <HentaiVideoPlayer
             animeTitle={selectedAnime.title}
+            episodeNumber={playingEpisode}
+            servers={playingServers}
             onClose={closePlayer}
-            hasNextEpisode={false}
-            hasPreviousEpisode={false}
           />
         </Modal>
       )}
