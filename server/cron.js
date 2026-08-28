@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
 import { runIncrementalMangaScraping } from './services/mangaBotService.js';
+import { syncHentaiCatalog } from './services/hentaiBotService.js';
 import pool from './db.js';
 
 export function startBotSchedulers() {
@@ -59,12 +60,24 @@ export function startBotSchedulers() {
     }
   });
 
+  // Tarea 6: Hentai Bot Sincronización (Cada 6 horas)
+  // '0 */6 * * *' -> minuto 0, cada 6 horas
+  cron.schedule('0 */6 * * *', async () => {
+    console.log('[Cron] Ejecutando Hentai Bot...');
+    try {
+      await syncHentaiCatalog(pool);
+    } catch (e) {
+      console.error('[Cron] Error en Hentai Bot:', e.message);
+    }
+  });
+
   console.log('[Cron] Tareas del bot configuradas:');
   console.log(' - Update Ongoing: Cada 4 horas');
   console.log(' - Sync Airing: Diario a las 02:00 AM');
   console.log(' - Sync Catalog Incremental: Cada 10 minutos');
   console.log(' - Fix Missing Images: Cada 12 horas');
   console.log(' - Manga Bot Incremental: Cada 1 hora');
+  console.log(' - Hentai Bot: Cada 6 horas');
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {

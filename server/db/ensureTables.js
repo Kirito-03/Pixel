@@ -159,7 +159,44 @@ export async function ensurePixelNoSekaiTables() {
       started_at TIMESTAMP,
       finished_at TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS hentai_content (
+        id SERIAL PRIMARY KEY,
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        poster_url VARCHAR(500),
+        status VARCHAR(50) DEFAULT 'Finalizado',
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS hentai_episodes (
+        id SERIAL PRIMARY KEY,
+        hentai_id INTEGER NOT NULL REFERENCES hentai_content(id) ON DELETE CASCADE,
+        episode_number INTEGER NOT NULL,
+        video_servers JSONB,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(hentai_id, episode_number)
+    );
   `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hentai_content_updated_at') THEN
+        CREATE TRIGGER update_hentai_content_updated_at BEFORE UPDATE ON hentai_content
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_hentai_episodes_updated_at') THEN
+        CREATE TRIGGER update_hentai_episodes_updated_at BEFORE UPDATE ON hentai_episodes
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      END IF;
+    END $$;
+  `);
+
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_transcode_jobs_episode_id ON transcode_jobs(episode_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_transcode_jobs_status ON transcode_jobs(status, updated_at DESC);`);
 
