@@ -325,7 +325,7 @@ export default function NSFWScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={{
-          paddingTop: hasHero ? 0 : headerHeight + 20,
+          paddingTop: hasHero ? (headerHeight + (isSmallScreen ? 8 : 14)) : headerHeight + 20,
           paddingBottom: Math.max(40, insets.bottom + 24),
           paddingHorizontal: 0,
         }}

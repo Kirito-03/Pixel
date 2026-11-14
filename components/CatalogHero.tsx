@@ -39,6 +39,7 @@ export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DES
   const go = (direction: number) => { setPaused(true); setIndex(current => (current + direction + items.length) % items.length); };
   return <Pressable accessibilityRole="none" onHoverIn={() => setPaused(true)} onHoverOut={() => setPaused(false)} style={[styles.hero, { height: compact ? 460 : Math.max(480, Math.min(height * 0.74, 660)) }]}>
     <AnimeArtwork banner={item.banner} poster={item.poster} />
+    <LinearGradient pointerEvents="none" colors={['rgba(8,8,8,0.75)', 'rgba(8,8,8,0.2)', 'transparent']} locations={[0, 0.22, 0.5]} style={StyleSheet.absoluteFill} />
     <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
     <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.12)', '#080808']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
     <View style={[styles.copy, { left: gutter, right: compact ? 20 : undefined, bottom: compact ? 84 : 94, maxWidth: compact ? undefined : 650 }]}>
