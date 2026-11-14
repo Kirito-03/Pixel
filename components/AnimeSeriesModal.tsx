@@ -74,12 +74,12 @@ export default function AnimeSeriesModal({
   const [selectedSeason, setSelectedSeason] = useState<AnimeSeason | null>(null);
   const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
-  const [isTogglingMyList, setIsTogglingMyList] = useState(false);
+  const [localTogglingMyList, setIsTogglingMyList] = useState(false);
   const [isTogglingDownloads, setIsTogglingDownloads] = useState(false);
   const [currentInDownloads, setCurrentInDownloads] = useState(false);
 
   const { currentProfile } = useProfile();
-  const { isInMyList, toggleMyList } = useMyList();
+  const { isInMyList, toggleMyList, isUpdatingMyList, loading: listLoading } = useMyList();
 
   const { width, height } = useWindowDimensions();
   const isSmallScreen = width < 768;
@@ -100,6 +100,7 @@ export default function AnimeSeriesModal({
           : currentContent.type)
     : 'movie';
   const currentInMyList = currentContent ? isInMyList(currentContent.id, normalizedTypeForCurrentContent) : false;
+  const isTogglingMyList = localTogglingMyList || listLoading || (currentContent ? isUpdatingMyList(currentContent.id, normalizedTypeForCurrentContent) : false);
 
   useEffect(() => {
     if (content) {
@@ -1000,13 +1001,13 @@ export default function AnimeSeriesModal({
                         style={[heroStyles.btnSecondary, isTogglingMyList && { opacity: 0.6 }]}
                         accessibilityRole="button" accessibilityLabel={currentInMyList ? "Quitar de Mi Lista" : "Añadir a Mi Lista"}
                         onPress={handleToggleList}
-                        disabled={isTogglingMyList}
+                        accessibilityState={{ busy: isTogglingMyList, disabled: isTogglingMyList }} disabled={isTogglingMyList}
                       >
                         {isTogglingMyList
                           ? <ActivityIndicator size="small" color="#fff" />
                           : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color="#fff" />}
                         <Text style={heroStyles.btnSecondaryText}>
-                          {currentInMyList ? 'En mi lista' : 'Mi lista'}
+                          {isTogglingMyList ? 'Guardando…' : currentInMyList ? 'En mi lista' : 'Mi lista'}
                         </Text>
                       </TouchableOpacity>
 

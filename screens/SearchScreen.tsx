@@ -204,7 +204,7 @@ export default function SearchScreen() {
   };
 
   // En web usamos outlineStyle none. En native lo ignoramos
-  const inputPlatformStyles = Platform.OS === 'web' ? { outlineStyle: 'none' } : {};
+  const inputPlatformStyles = Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } : {};
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';

@@ -18,8 +18,9 @@ const EMPTY = new Set<string>();
 
 export function MyListProvider({ children }: { children: ReactNode }) {
   const { currentProfile, adultContentEnabled } = useProfile();
+  const { user, isLoading: authLoading } = useAuth();
   const profileId = currentProfile?.id ?? null;
-  const scope = `${profileId}:${adultContentEnabled}`;
+  const scope = `${user?.uid}:${profileId}:${adultContentEnabled}`;
   const currentScope = useRef(scope);
   currentScope.current = scope;
   const [state, setState] = useState({ scope, items: EMPTY });
@@ -34,7 +35,7 @@ export function MyListProvider({ children }: { children: ReactNode }) {
 
   const refreshMyList = async () => {
     const request = ++reads.current;
-    if (!profileId) { setState({ scope, items: EMPTY }); setLoading(false); return; }
+    if (!profileId || !user?.uid || authLoading) { setState({ scope, items: EMPTY }); setLoading(false); return; }
     const started = revision.current;
     setLoading(true);
     try {
@@ -45,12 +46,12 @@ export function MyListProvider({ children }: { children: ReactNode }) {
       if (currentScope.current === scope && request === reads.current) setLoading(false);
     }
   };
-  useEffect(() => { refreshMyList().catch(() => {}); }, [scope]);
+  useEffect(() => { refreshMyList().catch(() => {}); }, [scope, authLoading]);
 
   const isInMyList = (id: string | number, type: MyListContentType = 'movie') => myListItems.has(`${type}:${id}`);
   const isUpdatingMyList = (id: string | number, type: MyListContentType = 'movie') => pending.has(`${scope}:${type}:${id}`);
   const mutate = (id: string | number, type: MyListContentType, action: 'add' | 'remove' | 'toggle'): Promise<void> => {
-    if (!profileId) return Promise.reject(new Error('Selecciona un perfil antes de guardar títulos'));
+    if (!profileId || !user?.uid || authLoading) return Promise.reject(new Error('Selecciona un perfil antes de guardar títulos'));
     if (type === 'h_anime' && !adultContentEnabled) return Promise.reject(new Error('Esta sección está deshabilitada en tu perfil'));
     const key = `${type}:${id}`;
     const operationKey = `${scope}:${key}`;

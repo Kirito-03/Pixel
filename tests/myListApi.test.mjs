@@ -23,6 +23,7 @@ function createFirestoreError(code, message = `Firestore error: ${code}`) {
  */
 function loadMyListApiWithMocks({
   currentUser = { uid: 'user-123' },
+  authStateReadyImpl = null,
   existingProfiles = new Set(['profiles/user-123/profiles/1756000000000']),
   initialDocs = new Map(),
   backendGetImpl = async () => ({ data: null }),
@@ -41,6 +42,7 @@ function loadMyListApiWithMocks({
   };
 
   const mockAuth = { currentUser };
+  if (authStateReadyImpl) mockAuth.authStateReady = () => authStateReadyImpl(mockAuth);
   const mockDb = { __mockDb: true };
 
   const firestoreMock = {
@@ -471,4 +473,33 @@ test('errores no ocultan denegacion (permission-denied ni otros errores de Fires
       return true;
     }
   );
+});
+
+test('H favorites have a separate safe key and are hidden without adult opt-in', async () => {
+  const { myListApi, store, ops } = loadMyListApiWithMocks({ backendGetImpl: async () => ({ data: { title: 'Serie de prueba', poster_path: 'https://example.test/poster.jpg', episodes: [] } }) });
+  await myListApi.add(VALID_PROFILE_ID, 'serie-demo', 'h_anime');
+  const key = `profiles/user-123/profiles/${VALID_PROFILE_ID}/mylist/h_anime_serie-demo`;
+  assert.equal(store.get(key).content_id, 'serie-demo');
+  assert.equal(store.get(key).content_type, 'h_anime');
+  assert.deepEqual(await myListApi.getMyList(VALID_PROFILE_ID), []);
+  assert.equal(ops.backendGetCalls.length, 0, 'Disabled section must not fetch adult metadata');
+  const entries = await myListApi.getMyList(VALID_PROFILE_ID, { includeAdult: true });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].anime_title, 'Serie de prueba');
+  assert.equal(ops.backendGetCalls[0].url, '/api/nsfw/details/serie-demo');
+  await myListApi.remove(VALID_PROFILE_ID, 'serie-demo', 'h_anime');
+  assert.equal(store.has(key), false);
+  for (const id of ['../bad','a/b','__reserved__','', 'x'.repeat(129)]) {
+    await assert.rejects(() => myListApi.add(VALID_PROFILE_ID, id, 'h_anime'), /contentId inválido/);
+  }
+});
+
+test('first list request waits for persisted Firebase authentication', async () => {
+  let ready = false;
+  const { myListApi, ops } = loadMyListApiWithMocks({ currentUser: null, authStateReadyImpl: async auth => {
+    await Promise.resolve(); auth.currentUser = { uid: 'user-123' }; ready = true;
+  } });
+  await myListApi.getMyList(VALID_PROFILE_ID);
+  assert.equal(ready, true);
+  assert.equal(ops.getDocCalls[0], `profiles/user-123/profiles/${VALID_PROFILE_ID}`);
 });

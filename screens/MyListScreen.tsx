@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,13 @@ import { useMyList } from '../contexts/MyListContext';
 import MovieModal from '../components/MovieModal';
 import AnimeSeriesModalWrapper from '../components/AnimeSeriesModalWrapper';
 import Header from '../components/Header';
-import { ContinueWatchingCard, WatchListItem } from '../components/MyListComponents';
+import { ContinueWatchingCard, WatchListItem, SavedListItem } from '../components/MyListComponents';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { colors as staticColors } from '../theme';
 import { ContentItem } from '../types';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useTheme } from '../contexts/ThemeContext';
-import { myListApi, MyListEntry } from '../services/myListApi';
+import { myListApi, MyListEntry, MyListContentType } from '../services/myListApi';
 import { continueWatchingApi, ContinueWatchingEntry } from '../services/continueWatchingApi';
 import { progressApi } from '../services/progressApi';
 import { getResumeTarget } from '../services/resumeTarget';
@@ -44,8 +44,9 @@ export default function MyListScreen() {
   const { navigateByLabel } = useTabNavigation();
   const navigation = useNavigation<any>();
 
-  const [items, setItems] = useState<ContentItem[]>([]);
+  const [items, setItems] = useState<SavedListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [startFromEpisodeId, setStartFromEpisodeId] = useState<number | null>(null);
@@ -55,30 +56,42 @@ export default function MyListScreen() {
   const [continueRows, setContinueRows] = useState<ContinueWatchingEntry[]>([]);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmPayload, setConfirmPayload] = useState<{
-    animeId: number;
+    animeId: string | number;
+    contentType?: MyListContentType;
     title: string;
     source: 'continue' | 'mylist';
     episodeId?: number | null;
   } | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
+  const listRequest = useRef(0);
+  const currentScope = `${user?.uid}:${currentProfile?.id}:${adultContentEnabled}`;
+  const scopeRef = useRef(currentScope);
+  scopeRef.current = currentScope;
+
   useFocusEffect(
     useCallback(() => {
       if (currentProfile && user?.uid) loadMyList();
-    }, [currentProfile, user?.uid])
+    }, [currentProfile, user?.uid, adultContentEnabled])
   );
 
   const loadMyList = async () => {
     if (!currentProfile) return;
+    const request = ++listRequest.current;
+    const scope = currentScope;
     setLoading(true);
     try {
       await refreshMyList();
 
-      const cw = await continueWatchingApi.get(currentProfile.id);
-      console.log('[MyListScreen][continue-watching]', { profileId: currentProfile.id, rows: cw });
-      setContinueRows(cw);
+      // Playback progress is optional: its endpoint must not hide saved favorites when unavailable.
+      continueWatchingApi.get(currentProfile.id).then(rows => {
+        if (request === listRequest.current && scope === scopeRef.current) setContinueRows(rows);
+      }).catch(() => {
+        if (request === listRequest.current && scope === scopeRef.current) setContinueRows([]);
+      });
 
-      const entries = await myListApi.getMyList(currentProfile.id);
+      const entries = await myListApi.getMyList(currentProfile.id, { includeAdult: adultContentEnabled });
+      if (request !== listRequest.current || scope !== scopeRef.current) return;
       const metaMap = new Map<number, MyListEntry>();
       for (const e of entries) {
         if (e.content_type === 'anime') metaMap.set(Number(e.content_id), e);
@@ -88,18 +101,19 @@ export default function MyListScreen() {
 
       const detailPromises = entries.map(async (entry) => {
         try {
-          if (entry.content_type === 'manga') {
+          if (entry.content_type === 'manga' || entry.content_type === 'h_anime') {
             return {
               id: entry.content_id,
-              type: 'manga',
-              title: entry.anime_title || `Manga #${entry.content_id}`,
+              type: entry.content_type,
+              isAdult: entry.content_type === 'h_anime',
+              title: entry.anime_title || `${entry.content_type === 'h_anime' ? 'H Anime' : 'Manga'} #${entry.content_id}`,
               overview: '',
               poster_path: normalizeImagePath(entry.poster_url),
               backdrop_path: normalizeImagePath(entry.banner_url),
               release_date: '',
               vote_average: 0,
               source: 'anilist',
-            } as ContentItem;
+            } as SavedListItem;
           }
           return {
             id: Number(entry.content_id),
@@ -118,22 +132,23 @@ export default function MyListScreen() {
       const details = await Promise.allSettled(detailPromises);
       let validItems = details
         .map(r => (r.status === 'fulfilled' ? r.value : null))
-        .filter((c): c is ContentItem => !!c);
+        .filter((c): c is SavedListItem => !!c);
 
       if (!adultContentEnabled) {
-        validItems = validItems.filter(i => !(i.type === 'anime' && i.isAdult));
+        validItems = validItems.filter(i => !(i.type === 'h_anime' || i.isAdult));
       }
-      setItems(validItems);
+      if (request === listRequest.current && scope === scopeRef.current) { setItems(validItems); setLoadedScope(scope); }
     } catch (error) {
+      if (request !== listRequest.current || scope !== scopeRef.current) return;
       console.error('[MyListScreen] Error loading My List:', error);
       setItems([]);
       setContinueRows([]);
     } finally {
-      setLoading(false);
+      if (request === listRequest.current && scope === scopeRef.current) setLoading(false);
     }
   };
 
-  const openConfirmRemove = (payload: { animeId: number; title: string; source: 'continue' | 'mylist'; episodeId?: number | null }) => {
+  const openConfirmRemove = (payload: { animeId: string | number; contentType?: MyListContentType; title: string; source: 'continue' | 'mylist'; episodeId?: number | null }) => {
     console.log('[MyListScreen][remove][open]', payload);
     setConfirmPayload(payload);
     setConfirmError(null);
@@ -149,15 +164,16 @@ export default function MyListScreen() {
   const confirmRemove = async () => {
     if (!currentProfile || !confirmPayload) return;
     const animeId = Number(confirmPayload.animeId);
-    if (!animeId) return;
-
-    const key = `anime:${animeId}`;
+    const contentId = confirmPayload.animeId;
+    const contentType = confirmPayload.contentType || 'anime';
+    if (confirmPayload.source === 'continue' && !animeId) return;
+    const key = `${contentType}:${contentId}`;
     setRemovingKey(key);
     try {
       console.log('[MyListScreen][remove][confirm]', { source: confirmPayload.source, animeId, profileId: currentProfile.id });
       if (confirmPayload.source === 'mylist') {
-        await removeFromMyList(animeId, 'anime');
-        setItems((prev) => prev.filter((i) => !(i.type === 'anime' && i.id === animeId)));
+        await removeFromMyList(contentId, contentType);
+        setItems((prev) => prev.filter((i) => !(i.type === contentType && String(i.id) === String(contentId))));
         setMetaByAnimeId((prev) => {
           const next = new Map(prev);
           next.delete(animeId);
@@ -208,7 +224,7 @@ export default function MyListScreen() {
   };
 
   // ── Continuar viendo desde endpoint dedicado
-  const continueItems = continueRows
+  const continueItems = (loadedScope === currentScope ? continueRows : [])
     .filter((row) => row.current_time > 0)
     .filter((row) => row.duration <= 0 || row.current_time < row.duration * 0.95)
     .slice(0, 6)
@@ -226,7 +242,7 @@ export default function MyListScreen() {
       };
       return { row, item };
     });
-  const allItems = items;
+  const allItems = loadedScope === currentScope ? items.filter(item => adultContentEnabled || (item.type !== 'h_anime' && !item.isAdult)) : [];
 
   if (loading) {
     return (
@@ -312,7 +328,7 @@ export default function MyListScreen() {
           </View>
         )}
 
-        {items.length === 0 ? (
+        {allItems.length === 0 ? (
           /* ── EMPTY STATE ── */
           <View style={styles.emptyState}>
             <Ionicons name="bookmark-outline" size={64} color={theme === 'dark' ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.15)"} />
@@ -350,11 +366,13 @@ export default function MyListScreen() {
                     onPress={() => {
                       if (item.type === 'manga') {
                         navigation.navigate('MangaDetail', { id: item.id });
+                      } else if (item.type === 'h_anime') {
+                        navigation.navigate('Hentai', { slug: String(item.id) });
                       } else {
-                        openModal(item);
+                        openModal(item as ContentItem);
                       }
                     }}
-                    onRemove={() => openConfirmRemove({ animeId: item.id as any, title: item.title, source: 'mylist' })}
+                    onRemove={() => openConfirmRemove({ animeId: item.id, contentType: item.type, title: item.title, source: 'mylist' })}
                   />
                 </View>
                   );

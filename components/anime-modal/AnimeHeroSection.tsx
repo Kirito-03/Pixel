@@ -225,13 +225,13 @@ export default function AnimeHeroSection({ hook }: AnimeHeroSectionProps) {
               <TouchableOpacity
                 style={[heroStyles.btnSecondary, isTogglingMyList && { opacity: 0.6 }]}
                 onPress={handleToggleList}
-                disabled={isTogglingMyList}
+                accessibilityState={{ busy: isTogglingMyList, disabled: isTogglingMyList }} disabled={isTogglingMyList}
               >
                 {isTogglingMyList
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color="#fff" />}
                 <Text style={heroStyles.btnSecondaryText}>
-                  {currentInMyList ? 'En mi lista' : 'Mi lista'}
+                  {isTogglingMyList ? 'Guardando…' : currentInMyList ? 'En mi lista' : 'Mi lista'}
                 </Text>
               </TouchableOpacity>
 

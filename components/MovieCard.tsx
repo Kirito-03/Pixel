@@ -7,6 +7,7 @@ import {
   View,
   Text,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Movie, TVShow, ContentItem } from '../types';
@@ -32,11 +33,12 @@ interface Props {
 
 export default function MovieCard({ movie, onPress, isFirst = false, isLast = false, onHoverChange, cardWidth }: Props) {
   const { colors, theme } = useTheme();
-  const { isInMyList, toggleMyList } = useMyList();
+  const { isInMyList, toggleMyList, isUpdatingMyList, loading: listLoading } = useMyList();
   const { currentProfile } = useProfile();
-  const [saving, setSaving] = useState(false);
+  const [localSaving, setSaving] = useState(false);
   const listType = ('source' in movie && movie.source === 'anilist') ? 'anime' : ('type' in movie ? movie.type : 'movie') as 'movie' | 'tv' | 'anime';
   const saved = isInMyList(movie.id, listType);
+  const saving = localSaving || listLoading || isUpdatingMyList(movie.id, listType);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewClosed, setPreviewClosed] = useState(false);
   const { width } = useWindowDimensions();
@@ -301,8 +303,8 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver capítulos de ${getTitle()}`} style={[styles.actionBtnPlay, { backgroundColor: theme === 'dark' ? '#fff' : '#000' }]} onPress={() => { closeHover(); onPress(); }}>
                   <Ionicons name="play" size={20} color={theme === 'dark' ? '#000' : '#fff'} style={{ marginLeft: 3 }} />
                 </TouchableOpacity>
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel={saved ? "Quitar de Mi Lista" : "Añadir a Mi Lista"} disabled={saving} onPress={saveToList} style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
-                  <Ionicons name={saved ? "checkmark" : "add"} size={22} color={colors.text} />
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={saved ? "Quitar de Mi Lista" : "Añadir a Mi Lista"} accessibilityState={{ busy: saving, disabled: saving }} disabled={saving} onPress={saveToList} style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
+                  {saving ? <ActivityIndicator size="small" color={colors.text} /> : <Ionicons name={saved ? "checkmark" : "add"} size={22} color={colors.text} />}
                 </TouchableOpacity>
               </View>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver detalles de ${getTitle()}`} style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]} onPress={() => { closeHover(); onPress(); }}>

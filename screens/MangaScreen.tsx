@@ -126,7 +126,7 @@ export default function MangaScreen() {
             <View style={styles.searchRedLine} />
             <Ionicons name="search" size={20} color={colors.textMuted || "#444"} style={{marginLeft: 16, marginRight: 12}} />
             <TextInput
-              style={[styles.searchInput, { color: colors.text }, Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}]}
+              style={[styles.searchInput, { color: colors.text }, Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any : {}]}
               placeholder="Buscar manga..."
               placeholderTextColor={colors.textMuted || "#444"}
               value={search}

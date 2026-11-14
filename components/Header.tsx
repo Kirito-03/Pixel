@@ -25,6 +25,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
   const isWeb = Platform.OS === 'web';
   const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const { currentProfile, adultContentEnabled } = useProfile();
   const { colors, theme } = useTheme();
   const avatarUrl = currentProfile?.avatar_url || null;
@@ -215,7 +216,9 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
             {Platform.OS === 'web' && (
               <Animated.View style={{ transform: [{ scale: searchIconScale }] }}>
                 <TouchableOpacity
-                  style={dynamicStyles.searchButton}
+                  accessibilityRole="button" accessibilityLabel="Buscar anime y manga"
+                  onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)}
+                  style={[dynamicStyles.searchButton, isWeb && ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', ...(searchFocused ? { backgroundColor: 'rgba(229,9,20,0.2)' } : {}) } as any)]}
                   onPress={() => {
                     animateIcon(searchIconScale);
                     onSearchPress?.();

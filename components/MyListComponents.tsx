@@ -203,8 +203,10 @@ const cwStyles = StyleSheet.create({
 // ─────────────────────────────────────────────
 // WATCH LIST ITEM (fila horizontal)
 // ─────────────────────────────────────────────
+export type SavedListItem = Omit<ContentItem, 'id' | 'type'> & { id: string | number; type: 'anime' | 'manga' | 'h_anime' | 'movie' | 'tv' };
+
 interface WatchListItemProps {
-  item: ContentItem;
+  item: SavedListItem;
   currentEpisode?: number;
   totalEpisodes?: number;
   progress?: number; // 0–1

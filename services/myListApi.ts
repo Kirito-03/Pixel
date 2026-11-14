@@ -12,7 +12,7 @@ import {
 import { auth, db } from './firebase';
 import { backendClient } from './backendClient';
 
-export type MyListContentType = 'movie' | 'tv' | 'anime' | 'manga';
+export type MyListContentType = 'movie' | 'tv' | 'anime' | 'manga' | 'h_anime';
 
 export interface MyListEntry {
   content_id: string | number;
@@ -31,7 +31,7 @@ export interface MyListEntry {
   last_watched_at: string | null;
 }
 
-const ALLOWED_CONTENT_TYPES = new Set<MyListContentType>(['movie', 'tv', 'anime', 'manga']);
+const ALLOWED_CONTENT_TYPES = new Set<MyListContentType>(['movie', 'tv', 'anime', 'manga', 'h_anime']);
 const SAFE_MANGA_ID_REGEX = /^[a-zA-Z0-9._-]+$/;
 const RESERVED_FIRESTORE_ID_REGEX = /^__.*__$/;
 const MAX_MANGA_ID_LENGTH = 128;
@@ -40,7 +40,7 @@ const MAX_METADATA_CONCURRENCY = 5;
 function validateContentType(contentType: unknown): MyListContentType {
   if (typeof contentType !== 'string' || !ALLOWED_CONTENT_TYPES.has(contentType as MyListContentType)) {
     throw new Error(
-      `Tipo de contenido inválido: "${String(contentType)}". Valores permitidos: movie, tv, anime, manga.`
+      `Tipo de contenido inválido: "${String(contentType)}". Valores permitidos: movie, tv, anime, manga, h_anime.`
     );
   }
   return contentType as MyListContentType;
@@ -55,7 +55,7 @@ function validateProfileId(profileId: unknown): string {
 }
 
 function validateContentId(contentId: unknown, contentType: MyListContentType): string | number {
-  if (contentType === 'manga') {
+  if (contentType === 'manga' || contentType === 'h_anime') {
     const raw = typeof contentId === 'number' ? String(contentId) : String(contentId ?? '');
     const trimmed = raw.trim();
     if (
@@ -66,7 +66,7 @@ function validateContentId(contentId: unknown, contentType: MyListContentType): 
       RESERVED_FIRESTORE_ID_REGEX.test(trimmed)
     ) {
       throw new Error(
-        'contentId inválido para manga: debe ser un identificador seguro no vacío (alfanumérico, ".", "_" o "-").'
+        `contentId inválido para ${contentType}: debe ser un identificador seguro no vacío (alfanumérico, ".", "_" o "-").`
       );
     }
     return trimmed;
@@ -155,6 +155,8 @@ async function requireAuthenticatedProfile(profileId: unknown): Promise<{
   uid: string;
   normalizedProfileId: string;
 }> {
+  // Wait for persisted Firebase auth before the first list read after a page reload.
+  if (typeof auth?.authStateReady === 'function') await auth.authStateReady();
   const uid = auth?.currentUser?.uid;
   if (typeof uid !== 'string' || !uid.trim()) {
     throw new Error('Usuario no autenticado en Firebase. Inicia sesión para gestionar Mi Lista.');
@@ -233,6 +235,15 @@ async function enrichEntryMetadata(entry: MyListEntry): Promise<MyListEntry> {
     }
   }
 
+  if (entry.content_type === 'h_anime') {
+    try {
+      const { data } = await backendClient.get(`/api/nsfw/details/${encodeURIComponent(String(entry.content_id))}`, { withCredentials: false });
+      if (!data || typeof data !== 'object') return entry;
+      return { ...entry, anime_title: data.title ?? entry.anime_title, poster_url: data.poster_path ?? entry.poster_url,
+        banner_url: data.banner_path || data.banner_url || entry.banner_url, total_episodes: Array.isArray(data.episodes) ? data.episodes.length : null };
+    } catch { return entry; }
+  }
+
   if (entry.content_type === 'manga') {
     try {
       // GET público directo vía backendClient para evitar dependencia circular con mangaApi.
@@ -263,7 +274,7 @@ async function enrichEntryMetadata(entry: MyListEntry): Promise<MyListEntry> {
 }
 
 export const myListApi = {
-  async getMyList(profileId: number): Promise<MyListEntry[]> {
+  async getMyList(profileId: number, options: { includeAdult?: boolean } = {}): Promise<MyListEntry[]> {
     const { uid, normalizedProfileId } = await requireAuthenticatedProfile(profileId);
     const listRef = collection(db, 'profiles', uid, 'profiles', normalizedProfileId, 'mylist');
     const q = query(listRef, orderBy('added_at', 'desc'));
@@ -273,7 +284,7 @@ export const myListApi = {
       const snap = await getDocs(q);
       for (const docSnap of snap.docs) {
         const parsed = parseRawEntry(docSnap.data() as Record<string, unknown> | undefined);
-        if (parsed) baseEntries.push(parsed);
+        if (parsed && (parsed.content_type !== 'h_anime' || options.includeAdult)) baseEntries.push(parsed);
       }
     } catch (error) {
       throw formatFirestoreStageError(
@@ -296,7 +307,7 @@ export const myListApi = {
     const validType = validateContentType(contentType);
     const validId = validateContentId(contentId, validType);
     const docId = buildSafeDocId(validType, validId);
-    const normalizedContentId = validType === 'manga' ? String(validId) : Number(validId);
+    const normalizedContentId = (validType === 'manga' || validType === 'h_anime') ? String(validId) : Number(validId);
 
     const itemRef = doc(db, 'profiles', uid, 'profiles', normalizedProfileId, 'mylist', docId);
     try {

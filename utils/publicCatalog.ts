@@ -6,6 +6,6 @@ export function isPublicCatalogItem(item: any): boolean {
   const labels = [item.type, item.content_type, item.source, item.content_rating,
     ...(Array.isArray(item.genres) ? item.genres : []),
     ...(Array.isArray(item.tags) ? item.tags : [])];
-  const blocked = new Set(['hentai', 'nsfw', 'adult', '18+', 'r18', 'r-18', 'erotica', 'pornographic']);
+  const blocked = new Set(['hentai', 'h_anime', 'nsfw', 'adult', '18+', 'r18', 'r-18', 'erotica', 'pornographic']);
   return !labels.some(value => blocked.has(String(typeof value === 'object' ? value?.name : value || '').trim().toLowerCase()));
 }

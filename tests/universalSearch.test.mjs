@@ -19,7 +19,7 @@ const { createUniversalSearch } = load('../services/universalSearch.ts', {
 });
 
 test('adult flags and labels are excluded independently of profile preferences', () => {
-  for (const entry of [{ isAdult: true }, { is_adult: 'TRUE' }, { is_nsfw: 1 }, { type: 'hentai' }, { genres: ['Action', ' HENTAI '] }, { tags: [{ name: 'NSFW' }] }, { content_rating: 'pornographic' }, { content_rating: 'erotica' }]) {
+  for (const entry of [{ isAdult: true }, { is_adult: 'TRUE' }, { is_nsfw: 1 }, { type: 'hentai' }, { content_type: 'h_anime' }, { genres: ['Action', ' HENTAI '] }, { tags: [{ name: 'NSFW' }] }, { content_rating: 'pornographic' }, { content_rating: 'erotica' }]) {
     assert.equal(policy.isPublicCatalogItem(entry), false);
   }
   assert.equal(policy.isPublicCatalogItem({ genres: ['Action', 'Romance'], isAdult: false }), true);

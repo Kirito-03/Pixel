@@ -25,13 +25,14 @@ export default function MangaDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { navigateByLabel } = useTabNavigation();
-  const { isInMyList, toggleMyList } = useMyList();
+  const { isInMyList, toggleMyList, isUpdatingMyList, loading: listLoading } = useMyList();
   const id = String(route?.params?.id || '').trim();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
 
   const [loading, setLoading] = useState(true);
-  const [savingList, setSavingList] = useState(false);
+  const [localSavingList, setSavingList] = useState(false);
+  const savingList = localSavingList || listLoading || isUpdatingMyList(id, 'manga');
   const [listError, setListError] = useState('');
   const [manga, setManga] = useState<Manga | null>(null);
   const [chapters, setChapters] = useState<MangaChapter[]>([]);
@@ -222,8 +223,9 @@ export default function MangaDetailScreen() {
 
                   <TouchableOpacity
                     style={styles.secondaryBtn}
-                    accessibilityRole="button" accessibilityLabel={isInMyList(id, 'manga') ? 'Quitar manga de Mi Lista' : 'Añadir manga a Mi Lista'} disabled={savingList}
+                    accessibilityRole="button" accessibilityLabel={isInMyList(id, 'manga') ? 'Quitar manga de Mi Lista' : 'Añadir manga a Mi Lista'} accessibilityState={{ busy: savingList, disabled: savingList }} disabled={savingList}
                     onPress={async () => {
+                      if (savingList) return;
                       setListError('');
                       setSavingList(true);
                       try { await toggleMyList(id, 'manga'); }
@@ -234,7 +236,7 @@ export default function MangaDetailScreen() {
                       finally { setSavingList(false); }
                     }}
                   >
-                    <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color="#fff" />
+                    {savingList ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color="#fff" />}
                     <Text style={styles.secondaryText}>{savingList ? 'Guardando…' : isInMyList(id, 'manga') ? 'En mi lista' : 'Mi lista'}</Text>
                   </TouchableOpacity>
 

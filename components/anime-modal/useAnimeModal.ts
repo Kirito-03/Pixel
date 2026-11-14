@@ -44,12 +44,12 @@ export function useAnimeModal({
   const [selectedSeason, setSelectedSeason] = useState<AnimeSeason | null>(null);
   const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
-  const [isTogglingMyList, setIsTogglingMyList] = useState(false);
+  const [localTogglingMyList, setIsTogglingMyList] = useState(false);
   const [isTogglingDownloads, setIsTogglingDownloads] = useState(false);
   const [currentInDownloads, setCurrentInDownloads] = useState(false);
 
   const { currentProfile } = useProfile();
-  const { isInMyList, toggleMyList } = useMyList();
+  const { isInMyList, toggleMyList, isUpdatingMyList, loading: listLoading } = useMyList();
   
   const { width, height } = useWindowDimensions();
   const isSmallScreen = width < 768;
@@ -70,6 +70,7 @@ export function useAnimeModal({
           : currentContent.type)
     : 'movie';
   const currentInMyList = currentContent ? isInMyList(currentContent.id, normalizedTypeForCurrentContent) : false;
+  const isTogglingMyList = localTogglingMyList || listLoading || (currentContent ? isUpdatingMyList(currentContent.id, normalizedTypeForCurrentContent) : false);
 
   useEffect(() => {
     if (content) {

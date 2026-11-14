@@ -23,3 +23,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-13-buscador-universal-y-filas]]: búsqueda anime/manga y catálogo adulto separado con filas.
 
 - [[2026-11-13-hero-categorias-busqueda]]: hero panorámico, categorías y buscador propio de la sección H.
+
+- [[2026-11-13-mi-lista-feedback]]: foco del buscador, carga/check al guardar y favoritos H separados por perfil.

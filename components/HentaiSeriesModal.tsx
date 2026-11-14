@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
 import { useProfile } from '../contexts/ProfileContext';
+import MyListButton from './MyListButton';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface HentaiSeriesModalProps {
@@ -202,8 +203,8 @@ export default function HentaiSeriesModal({
                   </View>
                 )}
 
-                {firstEpisode && (
-                  <View style={styles.actionRow}>
+                <View style={styles.actionRow}>
+                  {firstEpisode && (
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel={`Reproducir episodio ${firstEpisode.number}`}
@@ -219,8 +220,9 @@ export default function HentaiSeriesModal({
                         Reproducir Ep. {firstEpisode.number}
                       </Text>
                     </TouchableOpacity>
-                  </View>
-                )}
+                  )}
+                  <MyListButton id={displayData.slug} type="h_anime" />
+                </View>
 
                 <Text style={[styles.synopsisHeader, { color: colors.text }]}>Sinopsis</Text>
                 {loading ? (

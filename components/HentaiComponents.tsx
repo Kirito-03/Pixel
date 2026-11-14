@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NSFWAnime } from '../services/nsfwApi';
+import MyListButton from './MyListButton';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface HentaiCardProps {
@@ -54,6 +55,7 @@ export const HentaiCard = ({ item, onPress, cardWidth }: HentaiCardProps) => {
               onError={() => setImageError(true)}
             />
           )}
+          <View style={{ position: 'absolute', top: 6, right: 6 }}><MyListButton id={item.slug} type="h_anime" compact /></View>
           <View style={[styles.badge, { backgroundColor: colors.primary }]}>
             <Text style={styles.badgeText}>18+</Text>
           </View>

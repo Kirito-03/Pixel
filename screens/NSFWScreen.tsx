@@ -17,6 +17,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import CatalogHero from '../components/CatalogHero';
 import { catalogCategories, filterCatalog } from '../utils/catalogFilters';
 import HentaiShelf from '../components/HentaiShelf';
@@ -30,6 +31,8 @@ const SHELF_CHUNK_SIZE = 12;
 
 export default function NSFWScreen() {
   const { colors } = useTheme();
+  const route = useRoute<any>();
+  const navigation = useNavigation<any>();
   const { adultContentEnabled, currentProfile } = useProfile();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -192,6 +195,15 @@ export default function NSFWScreen() {
     return result;
   }, [items]);
 
+  useEffect(() => {
+    if (!adultContentEnabled || loading || typeof route.params?.slug !== 'string') return;
+    const selected = uniqueItems.find(item => item.slug === route.params.slug);
+    if (!selected) return;
+    setSelectedAnime(selected);
+    setShowSeriesModal(true);
+    navigation.setParams({ slug: undefined });
+  }, [route.params?.slug, uniqueItems, adultContentEnabled, loading, navigation]);
+
   const categories = useMemo(() => catalogCategories(uniqueItems), [uniqueItems]);
   const filteredItems = useMemo(() => filterCatalog(uniqueItems, query, category), [uniqueItems, query, category]);
   const heroItems = useMemo(() => uniqueItems.slice(0, 5).map(item => ({
@@ -289,7 +301,7 @@ export default function NSFWScreen() {
                 <View style={[styles.localTools, { width: isSmallScreen ? '100%' : 520 }]}>
                   <View style={[styles.searchBox, { backgroundColor: colors.card }]}>
                     <Ionicons name="search" size={18} color={colors.textMuted} />
-                    <TextInput accessibilityLabel="Buscar en esta sección" placeholder="Buscar en esta sección…" placeholderTextColor={colors.textMuted} value={query} onChangeText={setQuery} style={[styles.searchInput, { color: colors.text }]} returnKeyType="search" />
+                    <TextInput accessibilityLabel="Buscar en esta sección" placeholder="Buscar en esta sección…" placeholderTextColor={colors.textMuted} value={query} onChangeText={setQuery} style={[styles.searchInput, { color: colors.text }, isWeb && ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any)]} returnKeyType="search" />
                     {query ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar búsqueda de esta sección" onPress={() => setQuery('')} style={styles.clearSearch}><Ionicons name="close" size={20} color={colors.text} /></TouchableOpacity> : null}
                   </View>
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Filtrar por categoría" accessibilityState={{ expanded: categoriesOpen }} onPress={() => setCategoriesOpen(open => !open)} style={[styles.categoryToggle, { backgroundColor: category ? colors.primary : colors.card }]}>
