@@ -1,12 +1,85 @@
 import hentailaScraper from './hentailaScraper.js';
 
+let currentHentaiCatalogPage = 1;
+let isSyncingHentaiCatalog = false;
+
+async function upsertEpisodesForHentai(pool, hentaiId, slug, episodesList) {
+    const episodes = Array.isArray(episodesList) && episodesList.length > 0
+        ? episodesList
+        : [{ number: 1 }];
+
+    let scrapedCount = 0;
+    for (const ep of episodes) {
+        const epNum = Number(ep?.number) || 1;
+        try {
+            const servers = await hentailaScraper.getVideoServers(slug, epNum);
+            if (servers && servers.length > 0) {
+                await pool.query(`
+                    INSERT INTO hentai_episodes (hentai_id, episode_number, video_servers, is_active)
+                    VALUES ($1, $2, $3, true)
+                    ON CONFLICT (hentai_id, episode_number)
+                    DO UPDATE SET
+                        video_servers = EXCLUDED.video_servers,
+                        updated_at = CURRENT_TIMESTAMP;
+                `, [hentaiId, epNum, JSON.stringify(servers)]);
+                scrapedCount++;
+            }
+        } catch (err) {
+            console.error(`[HentaiBot] Error obteniendo episodio ${epNum} de ${slug}:`, err.message);
+        }
+    }
+    return scrapedCount;
+}
+
+async function syncHentaiItem(pool, item) {
+    let synopsis = item.synopsis || null;
+    let genres = item.genres || null;
+    let status = item.status || 'Finalizado';
+    let episodesList = [];
+
+    try {
+        const details = await hentailaScraper.getMediaDetails(item.slug);
+        if (details) {
+            synopsis = details.synopsis || synopsis;
+            genres = details.genres || genres;
+            status = details.status || status;
+            episodesList = details.episodes || [];
+        }
+    } catch (fetchErr) {
+        console.error(`[HentaiBot] Error obteniendo detalles para ${item.slug}:`, fetchErr.message);
+    }
+
+    const resContent = await pool.query(`
+        INSERT INTO hentai_content (slug, title, poster_url, status, synopsis, genres, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6, true)
+        ON CONFLICT (slug)
+        DO UPDATE SET
+            title = EXCLUDED.title,
+            poster_url = EXCLUDED.poster_url,
+            status = EXCLUDED.status,
+            synopsis = COALESCE(EXCLUDED.synopsis, hentai_content.synopsis),
+            genres = COALESCE(EXCLUDED.genres, hentai_content.genres),
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING id;
+    `, [item.slug, item.title, item.poster_path, status, synopsis, genres ? JSON.stringify(genres) : null]);
+
+    const hentaiId = resContent.rows[0].id;
+    const episodesSynced = await upsertEpisodesForHentai(pool, hentaiId, item.slug, episodesList);
+    return { hentaiId, episodesSynced };
+}
+
 /**
- * Sincroniza el catálogo de Hentaila y obtiene todos los enlaces de episodios
- * y los guarda en la base de datos PostgreSQL local para no depender del scraper
- * en tiempo real durante la navegación de los usuarios.
+ * Sincroniza el catálogo de Hentaila (/hub) y obtiene todos los enlaces de episodios
+ * guardándolos en PostgreSQL para no depender del scraper en tiempo real.
  */
 export async function syncHentaiCatalog(pool) {
-    console.log('[HentaiBot] Iniciando sincronización del catálogo de Hentaila...');
+    if (isSyncingHentaiCatalog) {
+        console.log('[HentaiBot] Sincronización ya en curso, omitiendo ejecución simultánea.');
+        return { ok: true, count: 0, skipped: true };
+    }
+    isSyncingHentaiCatalog = true;
+    console.log('[HentaiBot] Iniciando sincronización del catálogo de Hentaila (/hub)...');
+
     try {
         const latestAnimes = await hentailaScraper.getLatestHentai();
         if (!latestAnimes || latestAnimes.length === 0) {
@@ -15,90 +88,58 @@ export async function syncHentaiCatalog(pool) {
         }
 
         let syncedCount = 0;
-
+        let episodesCount = 0;
         for (const item of latestAnimes) {
-            // Obtener más detalles y la lista completa de capítulos extrayendo el payload de SvelteKit
-            // desde la página del primer episodio.
-            let synopsis = null;
-            let genres = null;
-            let episodesList = [];
-            
-            try {
-                // Fetch the episode 1 page which contains the SvelteKit hydration payload
-                const html = await hentailaScraper.fetchHtml(`https://hentaila.com/media/${item.slug}/1`);
-                
-                // Buscar el payload específico que contiene la data de media
-                const match = html.match(/\{type:"data",data:(\{media:\{.*?\}\}),uses:/);
-                if (match) {
-                    try {
-                        const dataObj = eval('(' + match[1].replace(/void 0/g, 'null') + ')');
-                        if (dataObj && dataObj.media) {
-                            synopsis = dataObj.media.synopsis || null;
-                            if (dataObj.media.genres) {
-                                genres = dataObj.media.genres.map(g => g.name);
-                            }
-                            if (dataObj.media.episodes && Array.isArray(dataObj.media.episodes)) {
-                                episodesList = dataObj.media.episodes;
-                            }
-                        }
-                    } catch (evalErr) {
-                        console.error(`[HentaiBot] Error evaluando SvelteKit payload para ${item.slug}:`, evalErr.message);
-                    }
-                }
-            } catch (fetchErr) {
-                console.error(`[HentaiBot] Error obteniendo detalles para ${item.slug}:`, fetchErr.message);
-            }
-
-            // 1. Upsert Hentai Content with new fields
-            const resContent = await pool.query(`
-                INSERT INTO hentai_content (slug, title, poster_url, status, synopsis, genres, is_active)
-                VALUES ($1, $2, $3, 'Finalizado', $4, $5, true)
-                ON CONFLICT (slug) 
-                DO UPDATE SET 
-                    title = EXCLUDED.title,
-                    poster_url = EXCLUDED.poster_url,
-                    synopsis = COALESCE(EXCLUDED.synopsis, hentai_content.synopsis),
-                    genres = COALESCE(EXCLUDED.genres, hentai_content.genres),
-                    updated_at = CURRENT_TIMESTAMP
-                RETURNING id;
-            `, [item.slug, item.title, item.poster_path, synopsis, JSON.stringify(genres)]);
-
-            const hentaiId = resContent.rows[0].id;
-
-            // Si no pudimos extraer los episodios del payload, intentamos al menos el episodio 1
-            if (episodesList.length === 0) {
-                episodesList = [{ number: 1 }];
-            }
-
-            // 2. Fetch and Upsert ALL Episodes
-            for (const ep of episodesList) {
-                try {
-                    const servers = await hentailaScraper.getVideoServers(item.slug, ep.number);
-
-                    if (servers && servers.length > 0) {
-                        await pool.query(`
-                            INSERT INTO hentai_episodes (hentai_id, episode_number, video_servers, is_active)
-                            VALUES ($1, $2, $3, true)
-                            ON CONFLICT (hentai_id, episode_number)
-                            DO UPDATE SET
-                                video_servers = EXCLUDED.video_servers,
-                                updated_at = CURRENT_TIMESTAMP;
-                        `, [hentaiId, ep.number, JSON.stringify(servers)]);
-                    }
-                } catch (err) {
-                    console.error(`[HentaiBot] Error obteniendo episodio ${ep.number} de ${item.slug}:`, err.message);
-                }
-            }
-
+            const { episodesSynced } = await syncHentaiItem(pool, item);
             syncedCount++;
+            episodesCount += episodesSynced;
         }
 
-        console.log(`[HentaiBot] Sincronización completada. ${syncedCount} items procesados.`);
-        return { ok: true, count: syncedCount };
-
+        console.log(`[HentaiBot] Sincronización /hub completada. ${syncedCount} títulos y ${episodesCount} episodios procesados.`);
+        return { ok: true, count: syncedCount, episodesCount };
     } catch (error) {
         console.error('[HentaiBot] Error en la sincronización:', error);
         return { ok: false, count: 0 };
+    } finally {
+        isSyncingHentaiCatalog = false;
+    }
+}
+
+/**
+ * Scraper incremental del catálogo paginado (/catalogo?page=N),
+ * equivalente a syncNextCatalogPage() de animes.
+ */
+export async function syncNextHentaiCatalogPage(pool) {
+    if (isSyncingHentaiCatalog) {
+        return { ok: true, count: 0, skipped: true };
+    }
+    isSyncingHentaiCatalog = true;
+    const page = currentHentaiCatalogPage;
+    console.log(`[HentaiBot] Sincronizando página ${page} del catálogo de Hentaila...`);
+
+    try {
+        const { items, totalPages } = await hentailaScraper.getCatalogPage(page);
+        if (!items || items.length === 0) {
+            currentHentaiCatalogPage = 1;
+            return { ok: false, page, count: 0 };
+        }
+
+        let syncedCount = 0;
+        let episodesCount = 0;
+        for (const item of items) {
+            const { episodesSynced } = await syncHentaiItem(pool, item);
+            syncedCount++;
+            episodesCount += episodesSynced;
+        }
+
+        currentHentaiCatalogPage = page >= totalPages ? 1 : page + 1;
+        console.log(`[HentaiBot] Página ${page}/${totalPages} completada (${syncedCount} títulos, ${episodesCount} episodios). Próxima: ${currentHentaiCatalogPage}`);
+        return { ok: true, page, totalPages, count: syncedCount, episodesCount };
+    } catch (error) {
+        console.error(`[HentaiBot] Error sincronizando página ${page}:`, error.message);
+        return { ok: false, page, count: 0 };
+    } finally {
+        isSyncingHentaiCatalog = false;
     }
 }
 
@@ -110,70 +151,36 @@ export async function syncHentaiSingle(pool, slug) {
     console.log(`[HentaiBot] Extracción On-Demand para: ${slug}`);
     let synopsis = null;
     let genres = null;
+    let status = null;
     let episodesList = [];
-    
+
     try {
-        const html = await hentailaScraper.fetchHtml(`https://hentaila.com/media/${slug}/1`);
-        const match = html.match(/\{type:"data",data:(\{media:\{.*?\}\}),uses:/);
-        if (match) {
-            try {
-                const dataObj = eval('(' + match[1].replace(/void 0/g, 'null') + ')');
-                if (dataObj && dataObj.media) {
-                    synopsis = dataObj.media.synopsis || null;
-                    if (dataObj.media.genres) {
-                        genres = dataObj.media.genres.map(g => g.name);
-                    }
-                    if (dataObj.media.episodes && Array.isArray(dataObj.media.episodes)) {
-                        episodesList = dataObj.media.episodes;
-                    }
-                }
-            } catch (evalErr) {
-                console.error(`[HentaiBot] Error evaluando SvelteKit payload para ${slug} (On-Demand):`, evalErr.message);
-            }
+        const details = await hentailaScraper.getMediaDetails(slug);
+        if (details) {
+            synopsis = details.synopsis;
+            genres = details.genres;
+            status = details.status;
+            episodesList = details.episodes;
         }
     } catch (fetchErr) {
         console.error(`[HentaiBot] Error obteniendo detalles para ${slug} (On-Demand):`, fetchErr.message);
     }
 
-    // Actualizamos el contenido existente con la sinopsis y géneros
     const resContent = await pool.query(`
         UPDATE hentai_content
         SET synopsis = COALESCE($1, synopsis),
             genres = COALESCE($2, genres),
+            status = COALESCE($3, status),
             updated_at = CURRENT_TIMESTAMP
-        WHERE slug = $3
+        WHERE slug = $4
         RETURNING id;
-    `, [synopsis, JSON.stringify(genres), slug]);
+    `, [synopsis, genres ? JSON.stringify(genres) : null, status, slug]);
 
     if (resContent.rows.length === 0) return false;
-    
+
     const hentaiId = resContent.rows[0].id;
+    const scrapedCount = await upsertEpisodesForHentai(pool, hentaiId, slug, episodesList);
 
-    if (episodesList.length === 0) {
-        episodesList = [{ number: 1 }];
-    }
-
-    let scrapedCount = 0;
-    for (const ep of episodesList) {
-        try {
-            const servers = await hentailaScraper.getVideoServers(slug, ep.number);
-
-            if (servers && servers.length > 0) {
-                await pool.query(`
-                    INSERT INTO hentai_episodes (hentai_id, episode_number, video_servers, is_active)
-                    VALUES ($1, $2, $3, true)
-                    ON CONFLICT (hentai_id, episode_number)
-                    DO UPDATE SET
-                        video_servers = EXCLUDED.video_servers,
-                        updated_at = CURRENT_TIMESTAMP;
-                `, [hentaiId, ep.number, JSON.stringify(servers)]);
-                scrapedCount++;
-            }
-        } catch (err) {
-            console.error(`[HentaiBot] Error obteniendo episodio ${ep.number} de ${slug} (On-Demand):`, err.message);
-        }
-    }
-    
     console.log(`[HentaiBot] Extracción On-Demand completada. ${scrapedCount} episodios extraídos.`);
     return true;
 }

@@ -17,6 +17,7 @@ import {
 import { findJkAnimeSlug } from '../services/jkanimeScraper.js';
 import { searchAniListMetadata } from '../services/anilistService.js';
 import { findAnimeAv1Slug, getAnimeAv1PageData } from '../services/animeav1Scraper.js';
+import { syncHentaiCatalog, syncNextHentaiCatalogPage } from '../services/hentaiBotService.js';
 
 const router = express.Router();
 router.use(authenticateAdmin);
@@ -259,6 +260,32 @@ router.post('/fix-missing-images', async (req, res) => {
       jobId: fixJob.jobId,
       message: 'Proceso de recuperación de imágenes iniciado.',
     });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/hentai/sync
+ * Dispara la sincronización de Hentaila (/hub) y sus episodios.
+ */
+router.post('/hentai/sync', async (req, res) => {
+  try {
+    const result = await syncHentaiCatalog(pool);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/hentai/catalog-page
+ * Sincroniza la siguiente página del catálogo paginado de Hentaila.
+ */
+router.post('/hentai/catalog-page', async (req, res) => {
+  try {
+    const result = await syncNextHentaiCatalogPage(pool);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ ok: false, message: e.message });
   }

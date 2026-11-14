@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
 import { runIncrementalMangaScraping } from './services/mangaBotService.js';
-import { syncHentaiCatalog } from './services/hentaiBotService.js';
+import { syncHentaiCatalog, syncNextHentaiCatalogPage } from './services/hentaiBotService.js';
 import pool from './db.js';
 
 export function startBotSchedulers() {
@@ -60,14 +60,23 @@ export function startBotSchedulers() {
     }
   });
 
-  // Tarea 6: Hentai Bot Sincronización (Cada 30 minutos)
+  // Tarea 6: Hentai Bot Sincronización /hub (Cada 30 minutos)
   // '*/30 * * * *' -> cada 30 minutos
   cron.schedule('*/30 * * * *', async () => {
-    console.log('[Cron] Ejecutando Hentai Bot...');
+    console.log('[Cron] Ejecutando Hentai Bot (/hub)...');
     try {
       await syncHentaiCatalog(pool);
     } catch (e) {
       console.error('[Cron] Error en Hentai Bot:', e.message);
+    }
+  });
+
+  // Tarea 7: Hentai Bot Catálogo Incremental (Cada 15 minutos)
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      await syncNextHentaiCatalogPage(pool);
+    } catch (e) {
+      console.error('[Cron] Error en Hentai Bot Catálogo:', e.message);
     }
   });
 
@@ -77,7 +86,8 @@ export function startBotSchedulers() {
   console.log(' - Sync Catalog Incremental: Cada 10 minutos');
   console.log(' - Fix Missing Images: Cada 12 horas');
   console.log(' - Manga Bot Incremental: Cada 1 hora');
-  console.log(' - Hentai Bot: Cada 30 minutos');
+  console.log(' - Hentai Bot (/hub): Cada 30 minutos');
+  console.log(' - Hentai Bot Catálogo Incremental: Cada 15 minutos');
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {
