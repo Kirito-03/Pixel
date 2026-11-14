@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import defaultPool from '../db.js';
 import { scrapeMangaList, getMangaDetail, getMangaChapters } from './mangaService.js';
 
 const BASE_URL = 'https://dragontranslation.org';
@@ -67,11 +68,12 @@ async function scrapeCatalogPage(page = 1) {
  * Sincroniza un manga específico obteniendo sus detalles y capítulos completos.
  */
 export async function syncMangaItem(pool, itemOrSlug) {
+  const db = pool || defaultPool;
   const slug = typeof itemOrSlug === 'string' ? itemOrSlug : itemOrSlug.slug;
   const initial = typeof itemOrSlug === 'object' ? itemOrSlug : null;
 
   try {
-    const detail = await getMangaDetail(pool, slug);
+    const detail = await getMangaDetail(db, slug);
     const title = detail?.title || initial?.title;
     if (!title) {
       console.log(`[MangaBot] Manga ${slug} no válido (Sin título).`);
@@ -79,7 +81,7 @@ export async function syncMangaItem(pool, itemOrSlug) {
     }
 
     // Refrescar y cachear capítulos en manga_chapters_cache
-    const chaptersData = await getMangaChapters(pool, slug, { forceRefresh: true });
+    const chaptersData = await getMangaChapters(db, slug, { forceRefresh: true });
     const chaptersCount = chaptersData?.chapters?.length || 0;
 
     console.log(`[MangaBot] ✓ Sincronizado ${title} (${chaptersCount} capítulos)`);
@@ -95,6 +97,7 @@ export async function syncMangaItem(pool, itemOrSlug) {
  * Equivalente a syncHentaiCatalog / syncAiringAnimes
  */
 export async function syncLatestManga(pool) {
+  const db = pool || defaultPool;
   if (isSyncingManga) {
     console.log('[MangaBot] Sincronización ya en curso, omitiendo ejecución simultánea.');
     return { ok: true, count: 0, skipped: true };
@@ -112,7 +115,7 @@ export async function syncLatestManga(pool) {
     let syncedCount = 0;
     let chaptersCount = 0;
     for (const item of items) {
-      const res = await syncMangaItem(pool, item);
+      const res = await syncMangaItem(db, item);
       if (res.ok) {
         syncedCount++;
         chaptersCount += (res.chaptersCount || 0);
@@ -135,6 +138,7 @@ export async function syncLatestManga(pool) {
  * Equivalente a syncNextCatalogPage / syncNextHentaiCatalogPage
  */
 export async function syncNextMangaCatalogPage(pool) {
+  const db = pool || defaultPool;
   if (isSyncingManga) {
     return { ok: true, count: 0, skipped: true };
   }
@@ -153,7 +157,7 @@ export async function syncNextMangaCatalogPage(pool) {
     let syncedCount = 0;
     let chaptersCount = 0;
     for (const item of items) {
-      const res = await syncMangaItem(pool, item);
+      const res = await syncMangaItem(db, item);
       if (res.ok) {
         syncedCount++;
         chaptersCount += (res.chaptersCount || 0);
@@ -178,20 +182,22 @@ export async function syncNextMangaCatalogPage(pool) {
  * Equivalente a syncHentaiSingle
  */
 export async function syncMangaSingle(pool, slug) {
+  const db = pool || defaultPool;
   console.log(`[MangaBot] Sincronización On-Demand para manga: ${slug}`);
-  return await syncMangaItem(pool, slug);
+  return await syncMangaItem(db, slug);
 }
 
 /**
  * Mantiene compatibilidad con llamadas anteriores
  */
 export async function runIncrementalMangaScraping(pool, startPage = 1, endPage = 1) {
+  const db = pool || defaultPool;
   console.log(`[MangaBot] Ejecutando scraping para páginas ${startPage} - ${endPage}...`);
   let total = 0;
   for (let p = startPage; p <= endPage; p++) {
     const items = await scrapeCatalogPage(p);
     for (const item of items) {
-      const res = await syncMangaItem(pool, item);
+      const res = await syncMangaItem(db, item);
       if (res.ok) total++;
       await sleep(1500);
     }
