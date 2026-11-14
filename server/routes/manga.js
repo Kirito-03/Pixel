@@ -29,10 +29,17 @@ router.get('/popular', async (req, res) => {
   }
 });
 
-router.get('/chapter/:chapterId/pages', async (req, res) => {
+router.get(['/chapter/:chapterId(*)/pages', '/chapter/:chapterId/pages', '/chapter-pages'], async (req, res) => {
   try {
-    const chapterId = String(req.params.chapterId || '').trim();
+    let chapterId = String(req.params.chapterId || req.query.url || req.query.chapterId || '').trim();
     if (!chapterId) return res.status(400).json({ message: 'chapterId requerido' });
+    try {
+      while (chapterId.includes('%')) {
+        const decoded = decodeURIComponent(chapterId);
+        if (decoded === chapterId) break;
+        chapterId = decoded;
+      }
+    } catch {}
     const result = await getChapterPages(pool, chapterId);
     return res.json(result || { baseUrl: null, pages: [], chapterId });
   } catch (e) {

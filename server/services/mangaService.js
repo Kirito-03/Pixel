@@ -840,7 +840,14 @@ export async function getMangaChapters(pool, id, { limit = 200, forceRefresh = f
 }
 
 export async function getChapterPages(pool, chapterUrl) {
-  const url = String(chapterUrl || '').trim();
+  let url = String(chapterUrl || '').trim();
+  try {
+    while (url.includes('%')) {
+      const decoded = decodeURIComponent(url);
+      if (decoded === url) break;
+      url = decoded;
+    }
+  } catch {}
   if (!url || !url.startsWith('http')) return null;
 
   try {
