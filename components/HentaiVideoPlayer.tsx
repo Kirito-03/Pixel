@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   serverSelectorContainer: {
     padding: 15,
     backgroundColor: '#111',
-    borderTopWidth: 1,
+    borderTopWidth: 0,
     borderTopColor: '#333',
   },
   serverTitle: {
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   serverButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 0,
     backgroundColor: '#333',
     marginRight: 10,
   },

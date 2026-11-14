@@ -1,21 +1,45 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NSFWAnime } from '../services/nsfwApi';
+import { useTheme } from '../contexts/ThemeContext';
 
-export const HentaiCard = ({ item, onPress }: { item: NSFWAnime, onPress: () => void }) => {
+interface HentaiCardProps {
+  item: NSFWAnime;
+  onPress: () => void;
+}
+
+export const HentaiCard = ({ item, onPress }: HentaiCardProps) => {
+  const { colors } = useTheme();
   const [imageError, setImageError] = useState(false);
   const isWeb = Platform.OS === 'web';
+
+  useEffect(() => {
+    setImageError(false);
+  }, [item.poster_path]);
+
   return (
     <TouchableOpacity
-      activeOpacity={0.88}
+      activeOpacity={0.85}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={item.title}
       style={[styles.cardOuter, isWeb ? ({ cursor: 'pointer' } as any) : null]}
     >
       <View style={styles.card}>
-        <View style={styles.posterBox}>
-          {(!item.poster_path || imageError) ? (
-            <View style={{flex:1, backgroundColor:'#222', justifyContent:'center', alignItems:'center'}}>
-              <Text style={{color:'#666', fontWeight:'bold'}}>18+</Text>
+        <View
+          style={[
+            styles.posterBox,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.glassBorder,
+            },
+          ]}
+        >
+          {!item.poster_path || imageError ? (
+            <View style={[styles.fallbackBox, { backgroundColor: colors.cardLight }]}>
+              <Ionicons name="film-outline" size={28} color={colors.textMuted} />
+              <Text style={[styles.fallbackText, { color: colors.textMuted }]}>18+</Text>
             </View>
           ) : (
             <Image
@@ -25,11 +49,13 @@ export const HentaiCard = ({ item, onPress }: { item: NSFWAnime, onPress: () => 
               onError={() => setImageError(true)}
             />
           )}
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>Finalizado</Text>
+          <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+            <Text style={styles.badgeText}>18+</Text>
           </View>
         </View>
-        <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
+          {item.title}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -37,8 +63,7 @@ export const HentaiCard = ({ item, onPress }: { item: NSFWAnime, onPress: () => 
 
 const styles = StyleSheet.create({
   cardOuter: {
-    flex: 1,
-    minWidth: 140,
+    width: '100%',
   },
   card: {
     width: '100%',
@@ -46,30 +71,40 @@ const styles = StyleSheet.create({
   posterBox: {
     width: '100%',
     aspectRatio: 0.7,
-    backgroundColor: '#222',
-    borderRadius: 8,
+    borderRadius: 0,
+    borderWidth: 0,
     overflow: 'hidden',
     position: 'relative',
     marginBottom: 8,
   },
+  fallbackBox: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fallbackText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   cardTitle: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
+    lineHeight: 18,
     textAlign: 'left',
   },
-  statusBadge: {
+  badge: {
     position: 'absolute',
-    top: 6,
-    left: 6,
-    backgroundColor: '#E50914',
+    top: 8,
+    left: 8,
     paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 0,
   },
-  statusText: {
+  badgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: 'bold',
-  }
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
 });
