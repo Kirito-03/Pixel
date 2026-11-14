@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   View,
   Text,
-  Image,
+  TextInput,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
@@ -17,6 +17,8 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
+import CatalogHero from '../components/CatalogHero';
+import { catalogCategories, filterCatalog } from '../utils/catalogFilters';
 import HentaiShelf from '../components/HentaiShelf';
 import HentaiSeriesModal from '../components/HentaiSeriesModal';
 import HentaiVideoPlayer from '../components/HentaiVideoPlayer';
@@ -40,7 +42,9 @@ export default function NSFWScreen() {
   const [error, setError] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [items, setItems] = useState<NSFWAnime[]>([]);
-  const [heroImageError, setHeroImageError] = useState(false);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<string | null>(null);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string>('Todos');
@@ -115,12 +119,17 @@ export default function NSFWScreen() {
   }, [adultContentEnabled, profileId, activeFilter]);
 
   const handleResetFilters = () => {
-    if (activeFilter !== 'Todos') {
-      setActiveFilter('Todos');
-    } else if (adultContentEnabled) {
-      loadContent({ filter: 'Todos' });
-    }
+    setQuery('');
+    setCategory(null);
+    setCategoriesOpen(false);
+    if (activeFilter !== 'Todos') setActiveFilter('Todos');
   };
+
+  useEffect(() => {
+    setQuery('');
+    setCategory(null);
+    setCategoriesOpen(false);
+  }, [profileId, adultContentEnabled]);
 
   const handleCardPress = (item: NSFWAnime) => {
     if (!adultContentEnabled) return;
@@ -183,18 +192,20 @@ export default function NSFWScreen() {
     return result;
   }, [items]);
 
-  const heroItem = uniqueItems.length > 0 ? uniqueItems[0] : null;
-
-  useEffect(() => {
-    setHeroImageError(false);
-  }, [heroItem?.poster_path]);
-
+  const categories = useMemo(() => catalogCategories(uniqueItems), [uniqueItems]);
+  const filteredItems = useMemo(() => filterCatalog(uniqueItems, query, category), [uniqueItems, query, category]);
+  const heroItems = useMemo(() => uniqueItems.slice(0, 5).map(item => ({
+    key: item.slug || String(item.id), title: item.title, poster: item.poster_path,
+    banner: item.banner_path || item.banner_url || item.backdrop_path,
+    description: item.synopsis,
+  })), [uniqueItems]);
+  const hasHero = adultContentEnabled && !loading && !error && heroItems.length > 0;
   // Partition all unique items into disjoint horizontal shelves of 12 (no silent truncation)
   const shelves = useMemo(() => {
     const groups: { key: string; title: string; items: NSFWAnime[]; accentColor: string }[] = [];
-    for (let i = 0; i < uniqueItems.length; i += SHELF_CHUNK_SIZE) {
+    for (let i = 0; i < filteredItems.length; i += SHELF_CHUNK_SIZE) {
       const chunkIndex = Math.floor(i / SHELF_CHUNK_SIZE);
-      const chunk = uniqueItems.slice(i, i + SHELF_CHUNK_SIZE);
+      const chunk = filteredItems.slice(i, i + SHELF_CHUNK_SIZE);
       let title = 'Novedades';
       let accentColor = colors.primary;
 
@@ -214,14 +225,15 @@ export default function NSFWScreen() {
       });
     }
     return groups;
-  }, [uniqueItems, colors.primary, colors.accentBlue, colors.accentGreen]);
+  }, [filteredItems, colors.primary, colors.accentBlue, colors.accentGreen]);
 
   const horizontalPadding = isSmallScreen ? 16 : 24;
-  const hasActiveFilters = activeFilter !== 'Todos';
+  const hasActiveFilters = activeFilter !== 'Todos' || !!query.trim() || category !== null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
+        black
         activeSection="Hentai"
         onNavPress={navigateByLabel}
         onSearchPress={() => navigateByLabel('Buscar')}
@@ -231,13 +243,18 @@ export default function NSFWScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={{
-          paddingTop: headerHeight + 20,
+          paddingTop: hasHero ? 0 : headerHeight + 20,
           paddingBottom: Math.max(40, insets.bottom + 24),
-          paddingHorizontal: horizontalPadding,
+          paddingHorizontal: 0,
         }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.mainContent}>
+        {hasHero ? <CatalogHero items={heroItems} onOpen={key => {
+          const item = uniqueItems.find(entry => (entry.slug || String(entry.id)) === key);
+          if (item) handleCardPress(item);
+        }} /> : null}
+        <View style={[styles.mainContent, { paddingHorizontal: horizontalPadding, paddingTop: hasHero ? 16 : 0 }]}>
           {!adultContentEnabled ? (
             <View style={[styles.stateCard, { backgroundColor: colors.card }]}>
               <Ionicons name="lock-closed-outline" size={48} color={colors.primary} />
@@ -264,15 +281,34 @@ export default function NSFWScreen() {
             </View>
           ) : (
             <>
-              {/* Encabezado de sección */}
-              <View style={styles.topSection}>
+              <View style={[styles.topSection, { flexDirection: isSmallScreen ? 'column' : 'row', alignItems: isSmallScreen ? 'stretch' : 'center', gap: 20 }]}>
                 <View style={styles.titleRow}>
                   <Text style={[styles.title, { color: colors.text }]}>H Anime</Text>
-                  <View style={[styles.ageBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.ageBadgeText, { color: '#FFFFFF' }]}>18+</Text>
+                  <View style={[styles.ageBadge, { backgroundColor: colors.primary }]}><Text style={[styles.ageBadgeText, { color: '#fff' }]}>18+</Text></View>
+                </View>
+                <View style={[styles.localTools, { width: isSmallScreen ? '100%' : 520 }]}>
+                  <View style={[styles.searchBox, { backgroundColor: colors.card }]}>
+                    <Ionicons name="search" size={18} color={colors.textMuted} />
+                    <TextInput accessibilityLabel="Buscar en esta sección" placeholder="Buscar en esta sección…" placeholderTextColor={colors.textMuted} value={query} onChangeText={setQuery} style={[styles.searchInput, { color: colors.text }]} returnKeyType="search" />
+                    {query ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar búsqueda de esta sección" onPress={() => setQuery('')} style={styles.clearSearch}><Ionicons name="close" size={20} color={colors.text} /></TouchableOpacity> : null}
                   </View>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Filtrar por categoría" accessibilityState={{ expanded: categoriesOpen }} onPress={() => setCategoriesOpen(open => !open)} style={[styles.categoryToggle, { backgroundColor: category ? colors.primary : colors.card }]}>
+                    <Text style={{ color: category ? '#fff' : colors.text, fontSize: 13, flexShrink: 1 }} numberOfLines={1}>{category || 'Categorías'}</Text><Ionicons name={categoriesOpen ? 'chevron-up' : 'chevron-down'} size={16} color={category ? '#fff' : colors.text} />
+                  </TouchableOpacity>
                 </View>
               </View>
+              {categoriesOpen ? <ScrollView style={{ maxHeight: 220, marginBottom: 20 }} keyboardShouldPersistTaps="handled">
+                <View style={styles.categoryPanel}>
+                  {[null, ...categories].map(label => <TouchableOpacity key={label ? `category:${label}` : '__all'} accessibilityRole="button" accessibilityLabel={label ? `Categoría ${label}` : 'Todas las categorías'} accessibilityState={{ selected: category === label }} onPress={() => { setCategory(label); setCategoriesOpen(false); }} style={[styles.filterChip, { backgroundColor: category === label ? colors.primary : colors.card }]}>
+                    <Text style={{ color: category === label ? '#fff' : colors.text, fontSize: 13 }}>{label || 'Todas las categorías'}</Text>
+                  </TouchableOpacity>)}
+                </View>
+                {!categories.length ? <Text style={{ color: colors.textMuted, marginTop: 12 }}>Este catálogo todavía no tiene categorías registradas.</Text> : null}
+              </ScrollView> : null}
+              {hasActiveFilters && !loading ? <View style={styles.resultSummary}>
+                <Text style={{ color: colors.textMuted }}>{filteredItems.length} {filteredItems.length === 1 ? 'título' : 'títulos'}{category ? ` · ${category}` : ''}</Text>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Restablecer búsqueda y filtros" onPress={handleResetFilters}><Text style={{ color: colors.primary }}>Restablecer</Text></TouchableOpacity>
+              </View> : null}
 
               {/* Filtros de estado */}
               <ScrollView
@@ -361,7 +397,7 @@ export default function NSFWScreen() {
                     <Text style={styles.primaryBtnText}>Reintentar</Text>
                   </TouchableOpacity>
                 </View>
-              ) : uniqueItems.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <View style={[styles.stateCard, { backgroundColor: colors.card }]}>
                   <Ionicons name="search-outline" size={44} color={colors.textMuted} />
                   <Text style={[styles.stateTitle, { color: colors.text }]}>
@@ -406,122 +442,6 @@ export default function NSFWScreen() {
                 </View>
               ) : (
                 <>
-                  {/* Hero / Encabezado destacado sin estiramiento ni autoplay */}
-                  {heroItem && (
-                    <View
-                      style={[
-                        styles.heroCard,
-                        {
-                          backgroundColor: colors.card,
-                          padding: isSmallScreen ? 16 : 24,
-                          gap: isSmallScreen ? 16 : 24,
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.heroPosterBox,
-                          {
-                            width: isSmallScreen ? 108 : 176,
-                            backgroundColor: colors.cardLight,
-                          },
-                        ]}
-                      >
-                        {!heroItem.poster_path || heroImageError ? (
-                          <View
-                            style={[
-                              styles.heroPosterFallback,
-                              { backgroundColor: colors.cardLight },
-                            ]}
-                          >
-                            <Ionicons name="film-outline" size={32} color={colors.textMuted} />
-                            <Text style={[styles.heroFallbackText, { color: colors.textMuted }]}>
-                              18+
-                            </Text>
-                          </View>
-                        ) : (
-                          <Image
-                            source={{ uri: heroItem.poster_path }}
-                            style={StyleSheet.absoluteFillObject}
-                            resizeMode="cover"
-                            onError={() => setHeroImageError(true)}
-                          />
-                        )}
-                      </View>
-
-                      <View style={styles.heroInfo}>
-                        <View style={styles.heroMetaRow}>
-                          <View style={[styles.ageBadge, { backgroundColor: colors.primary }]}>
-                            <Text style={[styles.ageBadgeText, { color: '#FFFFFF' }]}>18+</Text>
-                          </View>
-                          <Text style={[styles.heroEyebrow, { color: colors.textMuted }]}>
-                            DESTACADO
-                          </Text>
-                          {Boolean(heroItem.type) && (
-                            <Text style={[styles.heroType, { color: colors.textSecondary }]}>
-                              {heroItem.type}
-                            </Text>
-                          )}
-                        </View>
-
-                        <Text
-                          style={[
-                            styles.heroTitle,
-                            { color: colors.text, fontSize: isSmallScreen ? 20 : 28 },
-                          ]}
-                          numberOfLines={2}
-                        >
-                          {heroItem.title}
-                        </Text>
-
-                        {Boolean(heroItem.synopsis) && (
-                          <Text
-                            style={[styles.heroSynopsis, { color: colors.textSecondary }]}
-                            numberOfLines={isSmallScreen ? 2 : 3}
-                          >
-                            {heroItem.synopsis}
-                          </Text>
-                        )}
-
-                        {Array.isArray(heroItem.genres) && heroItem.genres.length > 0 && (
-                          <View style={styles.heroGenresRow}>
-                            {heroItem.genres.slice(0, 3).map((genre) => (
-                              <View
-                                key={genre}
-                                style={[
-                                  styles.heroGenreTag,
-                                  { backgroundColor: colors.surfaceElevated },
-                                ]}
-                              >
-                                <Text
-                                  style={[styles.heroGenreText, { color: colors.textSecondary }]}
-                                >
-                                  {genre}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
-
-                        <View style={styles.heroActions}>
-                          <TouchableOpacity
-                            accessibilityRole="button"
-                            accessibilityLabel={`Abrir ficha de ${heroItem.title}`}
-                            style={[
-                              styles.primaryBtn,
-                              { backgroundColor: colors.primary },
-                              isWeb && ({ cursor: 'pointer' } as any),
-                            ]}
-                            onPress={() => handleCardPress(heroItem)}
-                          >
-                            <Ionicons name="information-circle-outline" size={18} color="#FFFFFF" />
-                            <Text style={styles.primaryBtnText}>Abrir ficha</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
                   {/* Filas horizontales troceadas por 12 */}
                   <View style={styles.shelvesWrapper}>
                     {shelves.map((shelf) => (
@@ -639,79 +559,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  heroCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 0,
-    borderWidth: 0,
-    marginBottom: 28,
-  },
-  heroPosterBox: {
-    aspectRatio: 0.7,
-    borderRadius: 0,
-    borderWidth: 0,
-    overflow: 'hidden',
-    position: 'relative',
-    flexShrink: 0,
-  },
-  heroPosterFallback: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-  },
-  heroFallbackText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  heroInfo: {
-    flex: 1,
-    gap: 10,
-  },
-  heroMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  heroEyebrow: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  heroType: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  heroSynopsis: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  heroGenresRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  heroGenreTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 0,
-    borderWidth: 0,
-  },
-  heroGenreText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  heroActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
+  localTools: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 12, height: 48 },
+  searchInput: { flex: 1, minWidth: 0, height: '100%', fontSize: 14 },
+  clearSearch: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center' },
+  categoryToggle: { maxWidth: 180, minHeight: 48, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  categoryPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  resultSummary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12 },
   shelvesWrapper: {
     marginTop: 4,
   },

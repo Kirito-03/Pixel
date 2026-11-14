@@ -5,6 +5,9 @@ export interface NSFWAnime {
     slug: string;
     title: string;
     poster_path: string;
+    banner_path?: string;
+    banner_url?: string;
+    backdrop_path?: string;
     type: string;
     is_nsfw: boolean;
     synopsis?: string;

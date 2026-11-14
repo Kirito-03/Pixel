@@ -21,3 +21,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-13-cierre-diseno-git]]: diseño sin bordes, validación y estado al publicar Git.
 
 - [[2026-11-13-buscador-universal-y-filas]]: búsqueda anime/manga y catálogo adulto separado con filas.
+
+- [[2026-11-13-hero-categorias-busqueda]]: hero panorámico, categorías y buscador propio de la sección H.
