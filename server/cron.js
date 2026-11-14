@@ -1,6 +1,5 @@
 import cron from 'node-cron';
 import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
-import { runIncrementalMangaScraping } from './services/mangaBotService.js';
 import { syncHentaiCatalog, syncNextHentaiCatalogPage } from './services/hentaiBotService.js';
 import pool from './db.js';
 
@@ -54,6 +53,7 @@ export function startBotSchedulers() {
   cron.schedule('0 * * * *', async () => {
     console.log('[Cron] Ejecutando Manga Bot Incremental...');
     try {
+      const { runIncrementalMangaScraping } = await import('./services/mangaBotService.js');
       await runIncrementalMangaScraping(pool, 1, 1);
     } catch (e) {
       console.error('[Cron] Error en Manga Bot:', e.message);
