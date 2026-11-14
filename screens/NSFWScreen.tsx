@@ -27,6 +27,7 @@ import HentaiSeriesModal from '../components/HentaiSeriesModal';
 import HentaiVideoPlayer from '../components/HentaiVideoPlayer';
 import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
 import { useTabNavigation } from '../hooks/useTabNavigation';
+import { getAdjacentEpisodes } from '../utils/episodeNavigation';
 
 const FILTERS = ['Todos', 'Nuevos caps', 'Finalizado'] as const;
 
@@ -66,11 +67,15 @@ export default function NSFWScreen() {
   const [showPlayer, setShowPlayer] = useState(false);
   const [playingServers, setPlayingServers] = useState<{ server: string; url: string }[]>([]);
   const [playingEpisode, setPlayingEpisode] = useState<number>(1);
+  const [playingEpisodes, setPlayingEpisodes] = useState<{ number: number }[]>([]);
   const [fetchingVideo, setFetchingVideo] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
 
   // Monotonic request IDs to discard stale async responses on filter/profile/guard changes
   const catalogRequestIdRef = useRef(0);
   const videoRequestIdRef = useRef(0);
+  const showPlayerRef = useRef(false);
+  showPlayerRef.current = showPlayer;
   const profileId = currentProfile?.id ?? null;
 
   const loadContent = useCallback(
@@ -112,7 +117,9 @@ export default function NSFWScreen() {
     setSelectedAnime(null);
     setShowPlayer(false);
     setPlayingServers([]);
+    setPlayingEpisodes([]);
     setFetchingVideo(false);
+    setPlayerError(null);
     setVideoError(null);
     setError(null);
     setItems([]);
@@ -161,17 +168,37 @@ export default function NSFWScreen() {
 
   const handleCardPress = (item: NSFWAnime) => {
     if (!adultContentEnabled) return;
+    videoRequestIdRef.current += 1;
+    setFetchingVideo(false);
+    setShowPlayer(false);
+    setPlayingServers([]);
     setVideoError(null);
+    setPlayerError(null);
+    setPlayingEpisodes([]);
     setSelectedAnime(item);
     setShowSeriesModal(true);
   };
 
-  const handlePlayEpisode = async (slug: string, episodeNumber: number) => {
-    if (!adultContentEnabled || fetchingVideo) return;
+  const handlePlayEpisode = async (
+    slug: string,
+    episodeNumber: number,
+    episodes?: { number: number }[]
+  ) => {
+    if (!adultContentEnabled) return;
+
+    if (Array.isArray(episodes)) {
+      setPlayingEpisodes(episodes);
+    }
 
     const reqId = ++videoRequestIdRef.current;
     setFetchingVideo(true);
     setVideoError(null);
+    setPlayerError(null);
+
+    if (showPlayerRef.current) {
+      setPlayingEpisode(episodeNumber);
+      setPlayingServers([]);
+    }
 
     try {
       const servers = await nsfwApi.getServers(slug, episodeNumber);
@@ -183,17 +210,25 @@ export default function NSFWScreen() {
         setShowPlayer(true);
       } else {
         const msg = 'No se encontraron servidores de video para este episodio.';
-        setVideoError(msg);
-        if (!isWeb) {
-          Alert.alert('Error', msg);
+        if (showPlayerRef.current) {
+          setPlayerError(msg);
+        } else {
+          setVideoError(msg);
+          if (!isWeb) {
+            Alert.alert('Error', msg);
+          }
         }
       }
     } catch {
       if (reqId !== videoRequestIdRef.current) return;
       const msg = 'Ocurrió un error al buscar servidores de video.';
-      setVideoError(msg);
-      if (!isWeb) {
-        Alert.alert('Error', msg);
+      if (showPlayerRef.current) {
+        setPlayerError(msg);
+      } else {
+        setVideoError(msg);
+        if (!isWeb) {
+          Alert.alert('Error', msg);
+        }
       }
     } finally {
       if (reqId === videoRequestIdRef.current) {
@@ -202,10 +237,23 @@ export default function NSFWScreen() {
     }
   };
 
-  const closePlayer = () => {
+  const closePlayer = useCallback(() => {
+    videoRequestIdRef.current += 1;
+    setFetchingVideo(false);
+    setPlayerError(null);
     setShowPlayer(false);
     setPlayingServers([]);
-  };
+  }, []);
+
+  const currentSeriesEpisodes = useMemo(() => {
+    if (playingEpisodes.length > 0) return playingEpisodes;
+    return Array.isArray(selectedAnime?.episodes) ? selectedAnime.episodes : [];
+  }, [playingEpisodes, selectedAnime]);
+
+  const { previous: previousEpisode, next: nextEpisode } = useMemo(
+    () => getAdjacentEpisodes(currentSeriesEpisodes, playingEpisode),
+    [currentSeriesEpisodes, playingEpisode]
+  );
 
   // Deduplicate items so no title repeats across shelves
   const uniqueItems = useMemo(() => {
@@ -496,7 +544,7 @@ export default function NSFWScreen() {
       </ScrollView>
 
       {/* Overlay no destructivo mientras se buscan servidores de video */}
-      {fetchingVideo && (
+      {fetchingVideo && !showPlayer && (
         <View style={styles.fetchingOverlay}>
           <View style={[styles.fetchingBox, { backgroundColor: colors.card }]}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -509,14 +557,18 @@ export default function NSFWScreen() {
 
       {/* Series Details Modal */}
       <HentaiSeriesModal
-        visible={showSeriesModal && adultContentEnabled}
-        onClose={() => setShowSeriesModal(false)}
+        visible={showSeriesModal && !showPlayer && !fetchingVideo && adultContentEnabled}
+        onClose={() => {
+          setShowSeriesModal(false);
+          setSelectedAnime(null);
+          setPlayingEpisodes([]);
+        }}
         anime={selectedAnime}
         onPlayEpisode={handlePlayEpisode}
       />
 
       {/* Episode Player Modal */}
-      {showPlayer && adultContentEnabled && playingServers.length > 0 && selectedAnime && (
+      {showPlayer && adultContentEnabled && selectedAnime && (
         <Modal
           visible={showPlayer}
           animationType="slide"
@@ -528,6 +580,39 @@ export default function NSFWScreen() {
             episodeNumber={playingEpisode}
             servers={playingServers}
             onClose={closePlayer}
+            hasPreviousEpisode={previousEpisode !== null}
+            hasNextEpisode={nextEpisode !== null}
+            previousEpisodeNumber={previousEpisode?.number ?? null}
+            nextEpisodeNumber={nextEpisode?.number ?? null}
+            onPreviousEpisode={
+              previousEpisode
+                ? () =>
+                    handlePlayEpisode(
+                      selectedAnime.slug,
+                      previousEpisode.number,
+                      currentSeriesEpisodes
+                    )
+                : undefined
+            }
+            onNextEpisode={
+              nextEpisode
+                ? () =>
+                    handlePlayEpisode(
+                      selectedAnime.slug,
+                      nextEpisode.number,
+                      currentSeriesEpisodes
+                    )
+                : undefined
+            }
+            loadingServers={fetchingVideo}
+            error={playerError}
+            onRetry={() =>
+              handlePlayEpisode(
+                selectedAnime.slug,
+                playingEpisode,
+                currentSeriesEpisodes
+              )
+            }
           />
         </Modal>
       )}

@@ -19,6 +19,12 @@ export const EMBEDDED_PLAYER_BRIDGE = `
     var media = video();
     send({ type: 'pixel:player', canControl: !!media, playing: !!media && !media.paused, currentTime: media ? media.currentTime : 0, duration: media && Number.isFinite(media.duration) ? media.duration : 0 });
   }
+  window.__pixelSeekPlayback = function (seconds) {
+    var media = video();
+    if (!media || !Number.isFinite(seconds) || seconds < 0 || !Number.isFinite(media.duration) || media.duration <= 0) return;
+    media.currentTime = Math.min(seconds, Math.max(0, media.duration - 1));
+    report();
+  };
   window.__pixelTogglePlayback = function () {
     var media = video();
     if (!media) return;

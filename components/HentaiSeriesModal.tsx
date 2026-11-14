@@ -18,12 +18,13 @@ import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
 import { useProfile } from '../contexts/ProfileContext';
 import MyListButton from './MyListButton';
 import { useTheme } from '../contexts/ThemeContext';
+import { getFirstEpisode, sortEpisodesAscending } from '../utils/episodeNavigation';
 
 interface HentaiSeriesModalProps {
   visible: boolean;
   onClose: () => void;
   anime: NSFWAnime | null;
-  onPlayEpisode: (slug: string, episodeNumber: number) => void;
+  onPlayEpisode: (slug: string, episodeNumber: number, episodes?: { number: number }[]) => void;
 }
 
 export default function HentaiSeriesModal({
@@ -101,8 +102,8 @@ export default function HentaiSeriesModal({
   if (!visible || !anime || !adultContentEnabled) return null;
 
   const displayData = details || anime;
-  const episodes = Array.isArray(displayData.episodes) ? displayData.episodes : [];
-  const firstEpisode = episodes.length > 0 ? episodes[0] : null;
+  const episodes = sortEpisodesAscending(displayData.episodes);
+  const firstEpisode = getFirstEpisode(episodes);
 
   return (
     <Modal
@@ -211,8 +212,7 @@ export default function HentaiSeriesModal({
                       style={[styles.playHeroBtn, isWeb && ({ cursor: 'pointer' } as any)]}
                       activeOpacity={0.85}
                       onPress={() => {
-                        onClose();
-                        onPlayEpisode(displayData.slug, firstEpisode.number);
+                        onPlayEpisode(displayData.slug, firstEpisode.number, episodes);
                       }}
                     >
                       <Ionicons name="play" size={18} color="#000" />
@@ -299,8 +299,7 @@ export default function HentaiSeriesModal({
                     ]}
                     activeOpacity={0.75}
                     onPress={() => {
-                      onClose();
-                      onPlayEpisode(displayData.slug, ep.number);
+                      onPlayEpisode(displayData.slug, ep.number, episodes);
                     }}
                   >
                     <View

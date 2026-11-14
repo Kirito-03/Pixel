@@ -55,6 +55,7 @@ const pbStyles = StyleSheet.create({
 // CONTINUE WATCHING CARD
 // ─────────────────────────────────────────────
 interface ContinueCardProps {
+  positionKnown?: boolean;
   item: ContentItem;
   currentEpisode?: number;
   totalEpisodes?: number;
@@ -63,7 +64,7 @@ interface ContinueCardProps {
   onRemove: () => void;
 }
 
-export function ContinueWatchingCard({ item, currentEpisode = 1, totalEpisodes, progress, onPress, onRemove }: ContinueCardProps) {
+export function ContinueWatchingCard({ positionKnown = true, item, currentEpisode = 1, totalEpisodes, progress, onPress, onRemove }: ContinueCardProps) {
   const { colors, theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const isWeb = Platform.OS === 'web';
@@ -127,12 +128,11 @@ export function ContinueWatchingCard({ item, currentEpisode = 1, totalEpisodes, 
           <View style={cwStyles.infoRow}>
             <Text style={[cwStyles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
           </View>
-          {totalEpisodes ? (
-            <Text style={[cwStyles.episode, { color: colors.textMuted }]}>
-              Episodio {currentEpisode} de {totalEpisodes}
-            </Text>
-          ) : null}
-          <ProgressBar progress={progressValue} height={3} />
+          <Text style={[cwStyles.episode, { color: colors.textMuted }]}>
+            Episodio {currentEpisode}{totalEpisodes ? ` de ${totalEpisodes}` : ''}{!positionKnown ? ' · Abrir capítulo' : ''}
+          </Text>
+          {positionKnown ? <ProgressBar progress={progressValue} height={3} /> :
+            <Text style={[cwStyles.episode, { color: colors.textMuted }]}>Este servidor no permite guardar el minuto.</Text>}
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -254,9 +254,9 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, r
       </View>
       <View style={wlStyles.info}>
         <Text style={[wlStyles.title, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
-        {item.type !== 'manga' && totalEpisodes ? (
+        {item.type !== 'manga' && currentEpisode !== undefined ? (
           <Text style={[wlStyles.meta, { color: colors.textMuted }]} numberOfLines={1}>
-            {currentEpisode ? `Ep. ${currentEpisode} / ${totalEpisodes}` : `${totalEpisodes} episodios`}
+            Ep. {currentEpisode}{totalEpisodes ? ` / ${totalEpisodes}` : ''}{progressValue > 0 ? ` · ${percent}%` : ''}
           </Text>
         ) : progressValue > 0 ? (
           <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{percent}% visto</Text>

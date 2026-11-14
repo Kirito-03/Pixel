@@ -2,11 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Hls from 'hls.js';
+import { progressApi } from '../services/progressApi';
 import { getCurrentBaseURL } from '../services/databaseService';
 
 const EpisodePlayer: React.FC<any> = ({
   episode,
   animeTitle,
+  animeId,
+  profileId,
+  resumeTimeSeconds,
   seasonNumber,
   onClose,
   onNextEpisode,
@@ -17,6 +21,41 @@ const EpisodePlayer: React.FC<any> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState('');
   const [serverIndex, setServerIndex] = useState(0);
+  const [progressError, setProgressError] = useState(false);
+  const progressRef = useRef<null | { current_time: number; duration: number; position_known: boolean }>(null);
+  const lastSent = useRef(0);
+  const restored = useRef(false);
+  const endedRef = useRef(false);
+  const saveRef = useRef<(force?: boolean) => void>(() => {});
+
+  useEffect(() => {
+    progressRef.current = null; lastSent.current = 0; restored.current = false; endedRef.current = false;
+    setServerIndex(0); setError(''); setProgressError(false);
+    let active = true;
+    const save = (force = false) => {
+      const snapshot = progressRef.current;
+      if (!snapshot || !profileId || !animeId || (!force && Date.now() - lastSent.current < 15000)) return;
+      lastSent.current = Date.now();
+      void progressApi.save(Number(profileId), {
+        anime_id: Number(animeId), episode_id: Number(episode.id), ...snapshot,
+        episode_number: Number(episode.number ?? episode.episode_number), season: Number(seasonNumber || 1),
+        title: animeTitle, thumbnail: episode.thumbnail_url || episode.thumbnail,
+      }).then(() => { if (active) setProgressError(false); }).catch(() => { if (active) setProgressError(true); });
+    };
+    saveRef.current = save;
+    const flush = () => save(true);
+    const hidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', hidden);
+    return () => { active = false; flush(); window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', hidden); };
+  }, [episode?.id, animeId, profileId, seasonNumber, animeTitle]);
+  const snapshotVideo = (force = false) => {
+    const video = videoRef.current;
+    if (!video || !restored.current || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    progressRef.current = { current_time: video.currentTime, duration: video.duration, position_known: true };
+    saveRef.current(force);
+  };
+  const leave = (action?: () => void) => { snapshotVideo(true); action?.(); };
+
 
   // Fallback to episode.url if external_servers is empty
   let servers = [];
@@ -76,7 +115,7 @@ const EpisodePlayer: React.FC<any> = ({
     <View style={styles.container}>
       {/* Header/Close Button */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton} onPress={onClose}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => leave(onClose)}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.titleText}>
@@ -85,6 +124,7 @@ const EpisodePlayer: React.FC<any> = ({
         <View style={{ width: 40 }} />
       </View>
 
+      {progressError && <Text style={styles.progressNotice}>No se pudo guardar el avance. Revisa tu conexión.</Text>}
       {error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
@@ -92,7 +132,12 @@ const EpisodePlayer: React.FC<any> = ({
       ) : isIframe ? (
         <View style={styles.iframeContainer}>
           <iframe
+            title="Reproductor del episodio"
             src={source}
+            onLoad={() => {
+              progressRef.current = { current_time: 0, duration: 0, position_known: false };
+              saveRef.current(true);
+            }}
             style={styles.video as any}
             allowFullScreen
             frameBorder="0"
@@ -106,6 +151,20 @@ const EpisodePlayer: React.FC<any> = ({
           controls
           autoPlay
           playsInline
+          onLoadedMetadata={() => {
+            const video = videoRef.current;
+            if (!video) return;
+            if (!restored.current && resumeTimeSeconds > 0 && Number.isFinite(video.duration))
+              video.currentTime = Math.min(resumeTimeSeconds, Math.max(0, video.duration - 1));
+            restored.current = true;
+          }}
+          onTimeUpdate={() => snapshotVideo()}
+          onPause={() => snapshotVideo(true)}
+          onSeeked={() => snapshotVideo(true)}
+          onEnded={() => {
+            snapshotVideo(true);
+            if (!endedRef.current && hasNextEpisode) { endedRef.current = true; onNextEpisode?.(); }
+          }}
         />
       )}
       
@@ -131,13 +190,13 @@ const EpisodePlayer: React.FC<any> = ({
       {/* Navigation Controls */}
       <View style={styles.controlsRow}>
          {hasPreviousEpisode && (
-            <TouchableOpacity style={styles.navButton} onPress={onPreviousEpisode}>
+            <TouchableOpacity style={styles.navButton} onPress={() => leave(onPreviousEpisode)}>
                <Ionicons name="play-skip-back" size={24} color="#fff" />
                <Text style={styles.navText}>Anterior</Text>
             </TouchableOpacity>
          )}
          {hasNextEpisode && (
-            <TouchableOpacity style={styles.navButton} onPress={onNextEpisode}>
+            <TouchableOpacity style={styles.navButton} onPress={() => leave(onNextEpisode)}>
                <Text style={styles.navText}>Siguiente</Text>
                <Ionicons name="play-skip-forward" size={24} color="#fff" />
             </TouchableOpacity>
@@ -152,6 +211,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  progressNotice: { position: 'absolute', top: 75, alignSelf: 'center', zIndex: 20, backgroundColor: '#292015', color: '#fff', padding: 10 },
   header: {
     position: 'absolute',
     top: 0,

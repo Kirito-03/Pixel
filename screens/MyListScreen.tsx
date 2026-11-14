@@ -94,18 +94,22 @@ export default function MyListScreen() {
     if (items.length === 0) setLoading(true);
     setLoadError('');
     try {
-      // Playback progress is optional: its endpoint must not hide saved favorites when unavailable.
-      continueWatchingApi.get(currentProfile.id).then(rows => {
-        if (request === listRequest.current && scope === scopeRef.current) setContinueRows(rows);
-      }).catch(() => {
-        if (request === listRequest.current && scope === scopeRef.current) setContinueRows([]);
-      });
-
-      const entries = await myListApi.getMyList(currentProfile.id, { includeAdult: adultContentEnabled });
+      // Favorites remain usable when history is temporarily unavailable.
+      const [entries, history] = await Promise.all([
+        myListApi.getMyList(currentProfile.id, { includeAdult: adultContentEnabled }),
+        continueWatchingApi.get(currentProfile.id).then(rows => ({ rows, failed: false })).catch(() => ({ rows: [] as ContinueWatchingEntry[], failed: true })),
+      ]);
       if (request !== listRequest.current || scope !== scopeRef.current) return;
+      setContinueRows(history.rows);
+      if (history.failed) setLoadError('Tus guardados están disponibles; no pudimos cargar el progreso. Reintenta para actualizarlo.');
       const metaMap = new Map<number, MyListEntry>();
       for (const e of entries) {
-        if (e.content_type === 'anime') metaMap.set(Number(e.content_id), e);
+        if (e.content_type === 'anime') {
+          const watched = history.rows.find(row => row.anime_id === Number(e.content_id));
+          metaMap.set(Number(e.content_id), watched ? { ...e, episode_id: watched.episode_id, episode_number: watched.episode_number,
+            current_time: watched.current_time, duration: watched.duration, progress_percent: watched.progress_percent,
+            season: watched.season, last_watched_at: watched.updated_at } : e);
+        }
       }
       setMetaByAnimeId(metaMap);
       if (entries.length === 0) { setItems([]); setLoadedScope(scope); return; }
@@ -237,7 +241,7 @@ export default function MyListScreen() {
 
   // ── Continuar viendo desde endpoint dedicado
   const continueItems = (loadedScope === currentScope ? continueRows : [])
-    .filter((row) => row.current_time > 0)
+    .filter((row) => row.current_time > 0 || row.position_known === false)
     .filter((row) => row.duration <= 0 || row.current_time < row.duration * 0.95)
     .slice(0, 6)
     .map((row) => {
@@ -333,6 +337,7 @@ export default function MyListScreen() {
                   currentEpisode={currentEpisode}
                   totalEpisodes={totalEpisodes}
                   progress={progress}
+                  positionKnown={row.position_known}
                   onPress={() => {
                     (async () => {
                       let targetEpisodeId: number | null = row.episode_id ?? null;
@@ -379,12 +384,13 @@ export default function MyListScreen() {
           <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
           <Text accessibilityRole="alert" style={[styles.emptyText, { color: colors.textSecondary }]}>{loadError}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar Mi Lista" onPress={loadMyList} style={[styles.emptyAction, { backgroundColor: colors.primary }]}><Text style={styles.emptyActionText}>Reintentar</Text></TouchableOpacity>
-        </View> : visibleItems.length === 0 ? <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+        </View> : null}
+        {visibleItems.length === 0 ? (loadError ? null : <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
           <Ionicons name="bookmark-outline" size={42} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>{allItems.length ? 'Sin guardados de este tipo' : 'Tu próxima historia empieza aquí'}</Text>
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>{allItems.length ? 'Prueba otro filtro para ver tu colección.' : 'Guarda anime y manga desde sus detalles y encuéntralos aquí.'}</Text>
           <TouchableOpacity accessibilityRole="button" onPress={() => allItems.length ? setKind('all') : navigateByLabel('Inicio')} style={[styles.emptyAction, { backgroundColor: colors.primary }]}><Text style={styles.emptyActionText}>{allItems.length ? 'Ver todo' : 'Explorar catálogo'}</Text></TouchableOpacity>
-        </View> : <View style={styles.section}>
+        </View>) : <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Tus guardados</Text>
             <Text style={{ color: colors.textMuted, fontSize: 12 }}>{visibleItems.length} {visibleItems.length === 1 ? 'título' : 'títulos'}</Text>

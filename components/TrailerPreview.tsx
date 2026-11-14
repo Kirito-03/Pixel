@@ -9,7 +9,7 @@ interface TrailerPreviewProps {
   initialMuted?: boolean;
 }
 
-export default function TrailerPreview({ id, onEnded, initialMuted = true }: TrailerPreviewProps) {
+export default function TrailerPreview({ id, onEnded, initialMuted = false }: TrailerPreviewProps) {
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
 
   const [isMuted, setIsMuted] = useState(initialMuted);
@@ -27,7 +27,7 @@ export default function TrailerPreview({ id, onEnded, initialMuted = true }: Tra
         `);
       } else {
         webViewRef.current.injectJavaScript(`
-          if (window.player && window.player.unMute) { window.player.unMute(); window.player.setVolume(100); }
+          if (window.player && window.player.unMute) { window.player.unMute(); window.player.setVolume(100); window.player.playVideo(); }
           else { 
             document.querySelector('iframe')?.contentWindow?.postMessage('{"event":"command","func":"unMute"}', '*'); 
             document.querySelector('iframe')?.contentWindow?.postMessage('{"event":"command","func":"setVolume","args":[100]}', '*'); 
@@ -63,6 +63,7 @@ export default function TrailerPreview({ id, onEnded, initialMuted = true }: Tra
             window.player = new YT.Player('player', {
               events: {
                 onReady: function(event) { ${initialMuted ? 'event.target.mute();' : 'event.target.unMute();'} event.target.playVideo(); },
+                onAutoplayBlocked: function(event) { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('BLOCKED'); event.target.mute(); event.target.playVideo(); },
                 onStateChange: function(event) {
                   if (event.data === YT.PlayerState.ENDED && window.ReactNativeWebView) window.ReactNativeWebView.postMessage('ENDED');
                 }
@@ -85,6 +86,7 @@ export default function TrailerPreview({ id, onEnded, initialMuted = true }: Tra
         mediaPlaybackRequiresUserAction={false}
         scalesPageToFit
         onMessage={(event) => {
+          if (event.nativeEvent.data === 'BLOCKED') setIsMuted(true);
           if (event.nativeEvent.data === 'ENDED') {
             onEnded?.();
           }

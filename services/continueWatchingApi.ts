@@ -1,35 +1,24 @@
+import { watchProgressStore } from './watchProgressStore';
 import { backendClient } from './backendClient';
-
 export interface ContinueWatchingEntry {
-  anime_id: number;
-  episode_id: number;
-  current_time: number;
-  duration: number;
-  progress_percent: number | string;
-  thumbnail: string;
-  title: string;
-  episode_number: number | null;
-  season: number | null;
-  updated_at: string;
+  anime_id: number; episode_id: number; current_time: number; duration: number;
+  progress_percent: number; thumbnail: string; title: string; episode_number: number | null;
+  season: number | null; updated_at: string; position_known: boolean;
 }
-
 export const continueWatchingApi = {
-  async get(userId: number) {
-    const { data } = await backendClient.get('/continue-watching', {
-      headers: { 'x-profile-id': String(userId) },
-      params: { userId },
-    });
-    const rows = (Array.isArray(data) ? data : []) as ContinueWatchingEntry[];
-    return rows.map((row) => ({
-      ...row,
-      anime_id: Number(row.anime_id),
-      episode_id: Number(row.episode_id),
-      current_time: Number(row.current_time || 0),
-      duration: Number(row.duration || 0),
-      progress_percent: Number(row.progress_percent || 0),
-      episode_number: row.episode_number === null ? null : Number(row.episode_number),
-      season: row.season === null ? null : Number(row.season),
+  async get(profileId: number): Promise<ContinueWatchingEntry[]> {
+    const progress = await watchProgressStore.list(profileId);
+    return Promise.all(progress.map(async row => {
+      let title = row.title || '', thumbnail = row.thumbnail || '';
+      if (!title || !thumbnail) {
+        try {
+          const { data } = await backendClient.get(`/api/catalog/anime/${row.anime_id}`, { withCredentials: false });
+          title ||= data?.title || ''; thumbnail ||= data?.banner_url || data?.poster_url || '';
+        } catch { /* Retain saved position even if metadata is unavailable. */ }
+      }
+      return { ...row, title: title || `Anime #${row.anime_id}`, thumbnail, episode_number: row.episode_number ?? null,
+        season: row.season ?? null, updated_at: row.updated_at || '', position_known: row.position_known !== false,
+        progress_percent: row.duration > 0 ? Math.min(100, row.current_time / row.duration * 100) : 0 };
     }));
   },
 };
-

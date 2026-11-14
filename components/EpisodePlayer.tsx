@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
+  AppState,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -45,7 +46,7 @@ interface NativePlayerProps {
   onClose: () => void;
   onNextEpisode?: () => void;
   onPreviousEpisode?: () => void;
-  onProgress: (payload: { current_time: number; duration: number }, opts?: { force?: boolean }) => void;
+  onProgress: (payload: { current_time: number; duration: number; position_known?: boolean }, opts?: { force?: boolean }) => void;
 }
 
 export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
@@ -63,6 +64,8 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSentSecond = useRef(0);
+  const lastSentAt = useRef(0);
+  const lastValidSnapshot = useRef<{ current_time: number; duration: number } | null>(null);
 
   const player = useVideoPlayer(videoUrl, p => {
     p.play();
@@ -70,7 +73,35 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
 
   const [playing, setPlaying] = useState(player.playing);
   const [playbackError, setPlaybackError] = useState('');
-  const resumed = useRef(false);
+  const resumed = useRef(resumeTimeSeconds <= 0);
+  useEffect(() => {
+    resumed.current = resumeTimeSeconds <= 0;
+    lastValidSnapshot.current = null;
+    lastSentSecond.current = 0;
+    lastSentAt.current = 0;
+  }, [videoUrl, resumeTimeSeconds]);
+
+  const captureSnapshot = useCallback(() => {
+    if (!resumed.current) return null;
+    const cur = Math.floor(player.currentTime ?? 0);
+    const dur = Math.floor(player.duration ?? 0);
+    if (!Number.isFinite(cur) || cur <= 0) return null;
+    const snap = { current_time: cur, duration: Number.isFinite(dur) && dur > 0 ? dur : 0 };
+    lastValidSnapshot.current = snap;
+    return snap;
+  }, [player]);
+
+  const flushProgress = useCallback((force = true) => {
+    const snap = captureSnapshot() || lastValidSnapshot.current;
+    if (!snap || snap.current_time <= 0) return;
+    lastSentSecond.current = snap.current_time;
+    lastSentAt.current = Date.now();
+    onProgress({ ...snap, position_known: true }, { force });
+  }, [captureSnapshot, onProgress]);
+
+  const flushProgressRef = useRef(flushProgress);
+  flushProgressRef.current = flushProgress;
+
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
@@ -80,6 +111,9 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
     const playingSubscription = player.addListener('playingChange', event => {
       setPlaying(event.isPlaying);
       resetControlsTimer();
+      if (!event.isPlaying) {
+        flushProgressRef.current(true);
+      }
     });
     const statusSubscription = player.addListener('statusChange', event => {
       setPlaybackError(event.status === 'error' ? event.error?.message || 'No se pudo reproducir este vídeo.' : '');
@@ -95,27 +129,59 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
     };
   }, [player, resetControlsTimer, resumeTimeSeconds]);
 
-  // Track progress every ~2s polling
+  // Track progress every 15s (including backward seeks)
   useEffect(() => {
     const interval = setInterval(() => {
-      const cur = Math.floor(player.currentTime ?? 0);
-      const dur = Math.floor(player.duration ?? 0);
-      if (cur > 0 && (cur - lastSentSecond.current) >= 5) {
-        lastSentSecond.current = cur;
-        onProgress({ current_time: cur, duration: dur });
+      const snap = captureSnapshot();
+      if (!snap || !player.playing) return;
+      const now = Date.now();
+      const moved = Math.abs(snap.current_time - lastSentSecond.current);
+      const elapsed = lastSentAt.current > 0 ? now - lastSentAt.current : 0;
+      if (moved >= 15 || (elapsed >= 15000 && snap.current_time !== lastSentSecond.current)) {
+        lastSentSecond.current = snap.current_time;
+        lastSentAt.current = now;
+        onProgress({ ...snap, position_known: true });
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [player, onProgress]);
+  }, [player, captureSnapshot, onProgress]);
+
+  // Flush last valid snapshot on background or unmount
+  useEffect(() => {
+    const sub = AppState?.addEventListener?.('change', state => {
+      if (state === 'background' || state === 'inactive') {
+        flushProgressRef.current(true);
+      }
+    });
+    return () => {
+      sub?.remove?.();
+      flushProgressRef.current(true);
+    };
+  }, []);
 
   // Advancing is tied to the actual end event, never to pausing near the end.
   useEffect(() => {
     const subscription = player.addListener('playToEnd', () => {
-      onProgress({ current_time: Math.floor(player.currentTime || 0), duration: Math.floor(player.duration || 0) }, { force: true });
+      flushProgressRef.current(true);
       if (hasNextEpisode && onNextEpisode) onNextEpisode();
     });
     return () => subscription.remove();
-  }, [player, hasNextEpisode, onNextEpisode, onProgress]);
+  }, [player, hasNextEpisode, onNextEpisode]);
+
+  const handleClose = useCallback(() => {
+    flushProgressRef.current(true);
+    onClose();
+  }, [onClose]);
+
+  const handleNextEpisode = useCallback(() => {
+    flushProgressRef.current(true);
+    onNextEpisode?.();
+  }, [onNextEpisode]);
+
+  const handlePreviousEpisode = useCallback(() => {
+    flushProgressRef.current(true);
+    onPreviousEpisode?.();
+  }, [onPreviousEpisode]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }} onTouchStart={resetControlsTimer}>
@@ -145,7 +211,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
             paddingTop: 44, paddingHorizontal: 20, paddingBottom: 16, gap: 14,
           }}>
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleClose}
               style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}
             >
               <Ionicons name="arrow-back" size={20} color="#fff" />
@@ -164,7 +230,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 40,
           }} pointerEvents="box-none">
             {hasPreviousEpisode && (
-              <TouchableOpacity onPress={onPreviousEpisode}
+              <TouchableOpacity onPress={handlePreviousEpisode}
                 style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}>
                 <Ionicons name="play-skip-back" size={24} color="#fff" />
               </TouchableOpacity>
@@ -176,7 +242,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
               <Ionicons name={playing ? 'pause' : 'play'} size={30} color="#fff" />
             </TouchableOpacity>
             {hasNextEpisode && (
-              <TouchableOpacity onPress={onNextEpisode}
+              <TouchableOpacity onPress={handleNextEpisode}
                 style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}>
                 <Ionicons name="play-skip-forward" size={24} color="#fff" />
               </TouchableOpacity>
@@ -222,43 +288,199 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uiOpacity = useRef(new Animated.Value(1)).current;
   const lastProgressSecond = useRef<number>(0);
-  const inFlightProgress = useRef<Promise<any> | null>(null);
+  const lastProgressSavedAt = useRef<number>(0);
+  const savedUnknownMarkerRef = useRef<boolean>(false);
+  const prevEmbedPlayingRef = useRef<boolean>(false);
+  const embedResumedRef = useRef(false);
+  const latestSnapshotRef = useRef<{
+    animeId: number;
+    episodeId: number;
+    episodeNumber: number;
+    seasonNumber: number;
+    title?: string;
+    thumbnail?: string;
+    current_time: number;
+    duration: number;
+    position_known: boolean;
+  } | null>(null);
+  const lastSavedStateRef = useRef<{
+    episodeId: number;
+    current_time: number;
+    duration: number;
+    position_known: boolean;
+  } | null>(null);
 
   const episodeId = useMemo(() => {
     const n = Number(episode.id);
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [episode.id]);
 
+  const episodeThumbnail = episode.image || (episode as any).thumbnail || undefined;
+  const episodeTitleMeta = animeTitle || episode.title || undefined;
+
+  const saveProgressRecord = useCallback(
+    (snap: {
+      animeId: number;
+      episodeId: number;
+      episodeNumber: number;
+      seasonNumber: number;
+      title?: string;
+      thumbnail?: string;
+      current_time: number;
+      duration: number;
+      position_known: boolean;
+    }) => {
+      if (!profileId || !snap.episodeId || !snap.animeId) return Promise.resolve();
+      lastSavedStateRef.current = {
+        episodeId: snap.episodeId,
+        current_time: snap.current_time,
+        duration: snap.duration,
+        position_known: snap.position_known,
+      };
+      return progressApi
+        .save(profileId, {
+          anime_id: snap.animeId,
+          episode_id: snap.episodeId,
+          current_time: snap.current_time,
+          duration: snap.duration,
+          position_known: snap.position_known,
+          ...(Number.isFinite(snap.episodeNumber) && snap.episodeNumber >= 0 ? { episode_number: snap.episodeNumber } : {}),
+          ...(Number.isFinite(snap.seasonNumber) && snap.seasonNumber >= 0 ? { season: snap.seasonNumber } : {}),
+          ...(snap.title ? { title: snap.title } : {}),
+          ...(snap.thumbnail ? { thumbnail: snap.thumbnail } : {}),
+        })
+        .catch((e) => { lastSavedStateRef.current = null; console.log('[EpisodePlayer][progress][error]', e); });
+    },
+    [profileId]
+  );
+
   const sendProgress = useCallback(
-    async (payload: { current_time: number; duration: number }, options?: { force?: boolean }) => {
-      if (!profileId) return;
-      if (!episodeId) return;
+    async (
+      payload: { current_time: number; duration: number; position_known?: boolean },
+      options?: { force?: boolean }
+    ) => {
+      if (!profileId || !episodeId || !animeId) return;
+      const positionKnown = payload.position_known !== false;
+      const force = options?.force === true;
+
+      if (!positionKnown) {
+        const marker = {
+          animeId,
+          episodeId,
+          episodeNumber: episode.number,
+          seasonNumber,
+          title: episodeTitleMeta,
+          thumbnail: episodeThumbnail,
+          current_time: 0,
+          duration: 0,
+          position_known: false,
+        };
+        if (!latestSnapshotRef.current || !latestSnapshotRef.current.position_known) {
+          latestSnapshotRef.current = marker;
+        }
+        if (!force && savedUnknownMarkerRef.current) return;
+        savedUnknownMarkerRef.current = true;
+        await saveProgressRecord(marker);
+        return;
+      }
+
       const currentTime = Number(payload.current_time);
       if (!Number.isFinite(currentTime) || currentTime < 0) return;
-      const durationRaw = Number(payload.duration);
-      const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : 0;
-
-      const force = options?.force === true;
       const currentSecond = Math.floor(currentTime);
-      if (!force && currentSecond <= 0) return;
-      if (!force && currentSecond - lastProgressSecond.current < 5) return;
-      if (inFlightProgress.current) return;
+      if (currentSecond <= 0) return;
+
+      const durationRaw = Number(payload.duration);
+      const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.floor(durationRaw) : 0;
+
+      const snapshot = {
+        animeId,
+        episodeId,
+        episodeNumber: episode.number,
+        seasonNumber,
+        title: episodeTitleMeta,
+        thumbnail: episodeThumbnail,
+        current_time: currentSecond,
+        duration,
+        position_known: true,
+      };
+      latestSnapshotRef.current = snapshot;
+
+      const now = Date.now();
+      if (!force) {
+        const delta = Math.abs(currentSecond - lastProgressSecond.current);
+        const elapsed = lastProgressSavedAt.current > 0 ? now - lastProgressSavedAt.current : 0;
+        if (delta < 15 && !(elapsed >= 15000 && currentSecond !== lastProgressSecond.current)) return;
+      }
 
       lastProgressSecond.current = currentSecond;
-
-      inFlightProgress.current = progressApi
-        .save(profileId, {
-          anime_id: animeId,
-          episode_id: episodeId,
-          current_time: currentSecond,
-          duration: Math.floor(duration),
-        })
-        .catch((e) => console.log('[EpisodePlayer][progress][error]', e))
-        .finally(() => { inFlightProgress.current = null; });
-      await inFlightProgress.current;
+      lastProgressSavedAt.current = now;
+      await saveProgressRecord(snapshot);
     },
-    [animeId, episodeId, profileId]
+    [animeId, episodeId, episode.number, seasonNumber, episodeTitleMeta, episodeThumbnail, profileId, saveProgressRecord]
   );
+
+  const flushLatestSnapshot = useCallback(() => {
+    const snap = latestSnapshotRef.current;
+    if (!snap || !profileId || !snap.episodeId || !snap.animeId) return;
+    if (snap.position_known && snap.current_time <= 0) return;
+    const prev = lastSavedStateRef.current;
+    if (
+      prev &&
+      prev.episodeId === snap.episodeId &&
+      prev.current_time === snap.current_time &&
+      prev.duration === snap.duration &&
+      prev.position_known === snap.position_known
+    ) {
+      return;
+    }
+    if (!snap.position_known) {
+      if (savedUnknownMarkerRef.current) return;
+      savedUnknownMarkerRef.current = true;
+    }
+    saveProgressRecord(snap);
+  }, [profileId, saveProgressRecord]);
+
+  const flushLatestSnapshotRef = useRef(flushLatestSnapshot);
+  flushLatestSnapshotRef.current = flushLatestSnapshot;
+
+  useEffect(() => {
+    const sub = AppState?.addEventListener?.('change', state => {
+      if (state === 'background' || state === 'inactive') {
+        flushLatestSnapshotRef.current();
+      }
+    });
+    return () => {
+      sub?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      flushLatestSnapshot();
+      latestSnapshotRef.current = null;
+      lastSavedStateRef.current = null;
+      lastProgressSecond.current = 0;
+      lastProgressSavedAt.current = 0;
+      savedUnknownMarkerRef.current = false;
+      prevEmbedPlayingRef.current = false;
+      embedResumedRef.current = false;
+    };
+  }, [episodeId, animeId, profileId, saveProgressRecord]);
+
+  const handleClose = useCallback(() => {
+    flushLatestSnapshotRef.current();
+    onClose();
+  }, [onClose]);
+
+  const handleNextEpisode = useCallback(() => {
+    flushLatestSnapshotRef.current();
+    onNextEpisode?.();
+  }, [onNextEpisode]);
+
+  const handlePreviousEpisode = useCallback(() => {
+    flushLatestSnapshotRef.current();
+    onPreviousEpisode?.();
+  }, [onPreviousEpisode]);
 
   // ── Auto-hide UI ────────────────────────────────────────────
   const showUITemporarily = useCallback(() => {
@@ -461,7 +683,34 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
               if (event.nativeEvent.data === 'user_interaction') { showUITemporarily(); return; }
               try {
                 const message = JSON.parse(event.nativeEvent.data);
-                if (message.type === 'pixel:player') { setCanControlEmbed(message.canControl === true); setIsPlaying(message.playing === true); }
+                if (message.type === 'pixel:player') {
+                  const canControl = message.canControl === true;
+                  const nowPlaying = message.playing === true;
+                  const wasPlaying = prevEmbedPlayingRef.current;
+                  prevEmbedPlayingRef.current = nowPlaying;
+                  setCanControlEmbed(canControl);
+                  setIsPlaying(nowPlaying);
+
+                  if (canControl) {
+                    const cur = Number(message.currentTime);
+                    const dur = Number(message.duration);
+                    const curSec = Number.isFinite(cur) && cur > 0 ? Math.floor(cur) : 0;
+                    const durSec = Number.isFinite(dur) && dur > 0 ? Math.floor(dur) : 0;
+                    if (!embedResumedRef.current && resumeTimeSeconds > 0) {
+                      if (durSec > 0 && Number.isFinite(resumeTimeSeconds)) {
+                        embedResumedRef.current = true;
+                        webViewRef.current?.injectJavaScript(`window.__pixelSeekPlayback?.(${Number(resumeTimeSeconds)}); true;`);
+                      }
+                      return;
+                    }
+                    if (curSec > 0) {
+                      const pausedNow = wasPlaying && !nowPlaying;
+                      sendProgress({ current_time: curSec, duration: durSec, position_known: true }, { force: pausedNow });
+                    }
+                  } else {
+                    sendProgress({ current_time: 0, duration: 0, position_known: false });
+                  }
+                }
               } catch { /* Ignore unrelated messages from the provider. */ }
             }}
             onLoadStart={() => setWebViewLoading(true)}
@@ -496,7 +745,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
             
             {/* Top Bar */}
             <View style={styles.topBar}>
-              <TouchableOpacity style={styles.backBtn} onPress={onClose}>
+              <TouchableOpacity style={styles.backBtn} onPress={handleClose}>
                 <Ionicons name="arrow-back" size={20} color="#fff" />
               </TouchableOpacity>
               <View style={styles.titleBlock}>
@@ -514,12 +763,12 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
             </TouchableOpacity>}
             {/* Navigation Buttons */}
             {hasPreviousEpisode && (
-              <TouchableOpacity style={[styles.floatNav, styles.floatNavLeft]} onPress={onPreviousEpisode}>
+              <TouchableOpacity style={[styles.floatNav, styles.floatNavLeft]} onPress={handlePreviousEpisode}>
                 <Ionicons name="chevron-back" size={28} color="#fff" />
               </TouchableOpacity>
             )}
             {hasNextEpisode && (
-              <TouchableOpacity style={[styles.floatNav, styles.floatNavRight]} onPress={onNextEpisode}>
+              <TouchableOpacity style={[styles.floatNav, styles.floatNavRight]} onPress={handleNextEpisode}>
                 <Ionicons name="chevron-forward" size={28} color="#fff" />
               </TouchableOpacity>
             )}
@@ -530,19 +779,20 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
 
     return (
       <NativeVideoPlayer
+        key={`${profileId}:${animeId}:${episodeId}`}
         videoUrl={videoUrl}
         resumeTimeSeconds={resumeTimeSeconds}
         episode={episode}
         animeTitle={animeTitle}
         hasNextEpisode={hasNextEpisode}
         hasPreviousEpisode={hasPreviousEpisode}
-        onClose={onClose}
-        onNextEpisode={onNextEpisode}
-        onPreviousEpisode={onPreviousEpisode}
+        onClose={handleClose}
+        onNextEpisode={onNextEpisode ? handleNextEpisode : undefined}
+        onPreviousEpisode={onPreviousEpisode ? handlePreviousEpisode : undefined}
         onProgress={sendProgress}
       />
     );
-  }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, onClose, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds]);
+  }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds]);
 
   // ── Loading / Error screens ──────────────────────────────────
   if (loading) {
@@ -572,7 +822,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
             <Ionicons name="refresh" size={16} color="#fff" />
             <Text style={styles.retryButtonText}>Reintentar</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
             <Text style={styles.closeButtonText}>← Volver</Text>
           </TouchableOpacity>
         </LinearGradient>

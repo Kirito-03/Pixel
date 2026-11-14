@@ -52,6 +52,23 @@ service cloud.firestore {
         }
 
 
+        match /watch_progress/{animeId} {
+          function validProgress() {
+            let e = request.resource.data;
+            return e.keys().hasAll(['anime_id','episode_id','current_time','duration','position_known','updated_at']) &&
+              e.keys().hasOnly(['anime_id','episode_id','current_time','duration','position_known','updated_at','episode_number','season','title','thumbnail']) &&
+              e.anime_id is int && e.anime_id > 0 && e.episode_id is int && e.episode_id > 0 &&
+              e.current_time is int && e.current_time >= 0 && e.duration is int && e.duration >= 0 &&
+              e.position_known is bool && e.updated_at is timestamp &&
+              (!('episode_number' in e) || (e.episode_number is number && e.episode_number >= 0)) &&
+              (!('season' in e) || (e.season is number && e.season >= 0)) &&
+              (!('title' in e) || (e.title is string && e.title.size() <= 300)) &&
+              (!('thumbnail' in e) || (e.thumbnail is string && e.thumbnail.size() <= 2048));
+          }
+          allow read, delete: if isOwner(uid);
+          allow create, update: if isOwner(uid) && exists(/databases/$(database)/documents/profiles/$(uid)/profiles/$(profileId)) && validProgress();
+        }
+
         // ✅ DOWNLOADS ANIDADA DENTRO DE PROFILES/{PROFILEID}
         match /downloads/{docId} {
           allow create: if isOwner(uid) &&
