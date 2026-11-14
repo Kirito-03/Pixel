@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
+import TrailerPreview from '../TrailerPreview';
 import { getImageUrl } from '../../services/api';
 import { getAnimeImageUrl } from '../../services/anilistService';
 import type { AnimeHeroSectionProps } from './types';
@@ -52,55 +52,7 @@ export default function AnimeHeroSection({ hook }: AnimeHeroSectionProps) {
             <Ionicons name="close" size={20} color="#FFFFFF" />
             <Text style={styles.trailerCloseText}>Cerrar</Text>
           </TouchableOpacity>
-          {Platform.OS === 'web' ? (
-            <iframe
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-              }}
-              src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&controls=0&modestbranding=1&loop=0&playlist=${trailerKey}&rel=0&showinfo=0&mute=1&playsinline=1`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              onError={() => {
-                setTrailerDelay(false);
-                setTrailerFinished(true);
-                openExternalTrailer(trailerKey);
-              }}
-              onLoad={() => {
-                setTimeout(() => {
-                  setTrailerDelay(false);
-                  setTrailerFinished(true);
-                }, 8000);
-              }}
-            />
-          ) : (
-            <WebView
-              style={styles.trailerBackgroundVideo}
-              source={{
-                uri: `https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&controls=0&modestbranding=1&loop=0&playlist=${trailerKey}&rel=0&showinfo=0&mute=1&playsinline=1`,
-              }}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
-              mediaPlaybackRequiresUserAction={false}
-              scalesPageToFit={true}
-              onError={() => {
-                setTrailerDelay(false);
-                setTrailerFinished(true);
-                openExternalTrailer(trailerKey);
-              }}
-              onLoadEnd={() => {
-                setTimeout(() => {
-                  setTrailerDelay(false);
-                  setTrailerFinished(true);
-                }, 120000);
-              }}
-            />
-          )}
+          <TrailerPreview id={trailerKey} onEnded={handleCloseTrailer} />
         </View>
       ) : (
         <>

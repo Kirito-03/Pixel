@@ -892,7 +892,7 @@ export default function AnimeSeriesModal({
                     <Ionicons name="close" size={20} color="#FFFFFF" />
                     <Text style={styles.trailerCloseText}>Detener tráiler</Text>
                   </TouchableOpacity>
-                  <TrailerPreview id={trailerKey} />
+                  <TrailerPreview id={trailerKey} onEnded={handleCloseTrailer} />
                 </View>
               ) : (
                 <>

@@ -37,6 +37,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useMyList } from '../contexts/MyListContext';
 import AnimeSeriesModalWrapper from './AnimeSeriesModalWrapper';
 import databaseService from '../services/databaseService';
+import TrailerPreview from './TrailerPreview';
 
 interface MovieModalProps {
   content: ContentItem | null;
@@ -568,61 +569,14 @@ export default function MovieModal({
               <View style={[styles.heroSection, { height: isSmallScreen ? height * 0.55 : height * 0.65 }]}>
                 {/* Imagen de fondo o trailer */}
                 {trailerDelay && trailerKey && !trailerFinished ? (
-                  <View style={styles.trailerBackground} pointerEvents="none">
-                    {Platform.OS === 'web' ? (
-                    <iframe
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        border: 'none',
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
+                  <View style={styles.trailerBackground}>
+                    <TrailerPreview
+                      id={trailerKey}
+                      onEnded={() => {
+                        setTrailerDelay(false);
+                        setTrailerFinished(true);
                       }}
-                        src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&controls=0&modestbranding=1&loop=0&playlist=${trailerKey}&rel=0&showinfo=0&mute=1&playsinline=1`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                        onError={() => {
-                          setTrailerDelay(false);
-                          setTrailerFinished(true);
-                          openExternalTrailer(trailerKey);
-                        }}
-                        onLoad={() => {
-                          // Cuando el iframe carga, configuramos un listener para el final del video
-                          setTimeout(() => {
-                            setTrailerDelay(false);
-                            setTrailerFinished(true);
-                            // Mostrar imagen de fondo cuando termine el trailer
-                          }, 8000); // ~8s: fallback corto si el trailer no reproduce
-                        }}
                     />
-                  ) : (
-                    <WebView
-                        pointerEvents="none"
-                        style={styles.trailerBackgroundVideo}
-                      source={{
-                          uri: `https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&controls=0&modestbranding=1&loop=0&playlist=${trailerKey}&rel=0&showinfo=0&mute=1&playsinline=1`,
-                      }}
-                      allowsFullscreenVideo
-                      javaScriptEnabled
-                      domStorageEnabled
-                        mediaPlaybackRequiresUserAction={false}
-                        scalesPageToFit={true}
-                        onError={() => {
-                          // Si el trailer falla, ocultarlo y volver al backdrop
-                          setTrailerDelay(false);
-                          setTrailerFinished(true);
-                        }}
-                        onLoadEnd={() => {
-                          // Fallback para móvil: después de 2 minutos vuelve a imagen
-                          setTimeout(() => {
-                            setTrailerDelay(false);
-                            setTrailerFinished(true);
-                            // Mostrar imagen de fondo cuando termine el trailer
-                          }, 120000);
-                        }}
-                      />
-                    )}
                   </View>
                 ) : (
                   <>

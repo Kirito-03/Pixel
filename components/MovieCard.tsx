@@ -276,7 +276,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
         >
           {/* Imagen del anime en grande */}
           <View style={{ width: '100%', height: POPUP_IMG_HEIGHT, overflow: 'hidden' as any }}>
-            {previewId && !previewClosed ? <TrailerPreview id={previewId} /> : <><Image
+            {previewId && !previewClosed ? <TrailerPreview id={previewId} onEnded={() => setPreviewClosed(true)} /> : <><Image
               source={{ uri: getImageSource() }}
               style={{ width: '100%', height: '100%' } as any}
               resizeMode="cover"

@@ -2,12 +2,13 @@ import { backendClient } from './backendClient';
 import { getCurrentBaseURL } from './db/networkClient';
 
 function normalizeCover<T extends { cover_url?: string | null }>(manga: T): T {
-  if (!manga || !manga.cover_url) return manga;
-  if (manga.cover_url.startsWith('/api/manga-cover?')) {
-    return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}${manga.cover_url}&v=2` };
+  const cover = manga?.cover_url;
+  if (!manga || !cover) return manga;
+  if (cover.startsWith('/api/manga-cover?')) {
+    return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}${cover}&v=2` };
   }
-  if (manga.cover_url.includes('dragontranslation.org')) {
-    return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}/api/proxy/manga-image?url=${encodeURIComponent(manga.cover_url)}` };
+  if (cover.includes('dragontranslation.org')) {
+    return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}/api/proxy/manga-image?url=${encodeURIComponent(cover)}` };
   }
   return manga;
 }
