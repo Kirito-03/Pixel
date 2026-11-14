@@ -201,6 +201,7 @@ app.use('/resume-target', resumeTargetRoutes);
 // Proxy: cors-proxy va bajo /api, translate y anilist bajo /proxy
 app.use('/api', proxyRoutes);
 app.use('/proxy', proxyRoutes);
+app.use('/api/proxy', proxyRoutes);
 
 // Nuevos routers extraídos
 app.use('/profiles', profilesRoutes);
