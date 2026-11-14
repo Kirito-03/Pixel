@@ -18,6 +18,7 @@ import { findJkAnimeSlug } from '../services/jkanimeScraper.js';
 import { searchAniListMetadata } from '../services/anilistService.js';
 import { findAnimeAv1Slug, getAnimeAv1PageData } from '../services/animeav1Scraper.js';
 import { syncHentaiCatalog, syncNextHentaiCatalogPage } from '../services/hentaiBotService.js';
+import { syncLatestManga, syncNextMangaCatalogPage, syncMangaSingle } from '../services/mangaBotService.js';
 
 const router = express.Router();
 router.use(authenticateAdmin);
@@ -285,6 +286,46 @@ router.post('/hentai/sync', async (req, res) => {
 router.post('/hentai/catalog-page', async (req, res) => {
   try {
     const result = await syncNextHentaiCatalogPage(pool);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/manga/sync
+ * Dispara la sincronización de novedades de Manga (DragonTranslation) y sus capítulos.
+ */
+router.post('/manga/sync', async (req, res) => {
+  try {
+    const result = await syncLatestManga(pool);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/manga/catalog-page
+ * Sincroniza la siguiente página del catálogo paginado de Manga (DragonTranslation).
+ */
+router.post('/manga/catalog-page', async (req, res) => {
+  try {
+    const result = await syncNextMangaCatalogPage(pool);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, message: e.message });
+  }
+});
+
+/**
+ * POST /api/admin/bot/manga/single/:slug
+ * Sincroniza los detalles y capítulos de un manga específico bajo demanda.
+ */
+router.post('/manga/single/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await syncMangaSingle(pool, slug);
     res.json(result);
   } catch (e) {
     res.status(500).json({ ok: false, message: e.message });

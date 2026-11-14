@@ -1,77 +1,176 @@
 import * as cheerio from 'cheerio';
 import { launch } from 'cloakbrowser';
+import net from 'net';
 
 const BASE_URL = 'https://dragontranslation.org';
 const TIMEOUT = 60000;
 
 let browserInstance = null;
+let currentProxyMode = null; // null | string
 
-export async function getBrowserPage() {
-  if (!browserInstance) {
-    browserInstance = await launch({ 
-      headless: true, 
-      humanize: true,
-      args: ['--fingerprint-platform=linux', '--disable-http2', '--proxy-server=socks5://100.95.206.57:1080']
-    });
-  }
-  const page = await browserInstance.newPage();
-  
-  // Cancelar (Dismiss) automáticamente alertas/confirmaciones para evitar popups de publicidad
-  page.on('dialog', async dialog => {
-    await dialog.dismiss();
+/**
+ * Verifica rápidamente si un servidor proxy SOCKS5 responde en el puerto especificado
+ */
+function isProxyReachable(proxyUrl, timeoutMs = 1500) {
+  return new Promise(resolve => {
+    try {
+      const parsed = new URL(proxyUrl);
+      const port = parseInt(parsed.port, 10) || 1080;
+      const host = parsed.hostname;
+      const socket = net.createConnection({ host, port, timeout: timeoutMs });
+      socket.on('connect', () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.on('timeout', () => {
+        socket.destroy();
+        resolve(false);
+      });
+      socket.on('error', () => {
+        socket.destroy();
+        resolve(false);
+      });
+    } catch {
+      resolve(false);
+    }
   });
-  
-  return { browser: browserInstance, page };
 }
 
-export async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = TIMEOUT) {
-  const { page } = await getBrowserPage();
+/**
+ * Resuelve qué proxy usar:
+ * Lee de MANGA_PROXY (lista separada por comas) o usa el del celular por defecto (100.95.206.57:1080).
+ * Retorna el primer proxy activo o null si ninguno responde.
+ */
+export async function resolveActiveProxy() {
+  const defaultProxies = 'socks5://127.0.0.1:1080,socks5://100.109.195.44:1080,socks5://100.95.206.57:1080';
+  const envProxies = (process.env.MANGA_PROXY || process.env.PROXY_SOCKS5 || defaultProxies)
+    .split(',')
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  for (const proxy of envProxies) {
+    const reachable = await isProxyReachable(proxy);
+    if (reachable) {
+      return proxy;
+    }
+  }
+  return null;
+}
+
+export async function closeBrowserInstance() {
+  if (browserInstance) {
+    try { await browserInstance.close(); } catch {}
+    browserInstance = null;
+    currentProxyMode = null;
+  }
+}
+
+export async function getBrowserPage(overrideProxy = undefined) {
+  const targetProxy = overrideProxy !== undefined ? overrideProxy : await resolveActiveProxy();
+
+  // Si la instancia actual tiene otra configuración de proxy o perdió la conexión, reiniciar
+  if (browserInstance && (currentProxyMode !== targetProxy || !browserInstance.isConnected?.())) {
+    await closeBrowserInstance();
+  }
+
+  if (!browserInstance) {
+    const args = ['--fingerprint-platform=linux', '--disable-http2'];
+    if (targetProxy) {
+      console.log(`[MangaService] Iniciando Cloakbrowser con proxy: ${targetProxy}`);
+      args.push(`--proxy-server=${targetProxy}`);
+    } else {
+      console.log(`[MangaService] Iniciando Cloakbrowser con conexión directa (sin proxy)`);
+    }
+
+    try {
+      browserInstance = await launch({ 
+        headless: true, 
+        humanize: true,
+        args
+      });
+      currentProxyMode = targetProxy;
+    } catch (err) {
+      await closeBrowserInstance();
+      throw err;
+    }
+  }
+
+  try {
+    const page = await browserInstance.newPage();
+    page.on('dialog', async dialog => {
+      await dialog.dismiss();
+    });
+    return { browser: browserInstance, page, proxy: currentProxyMode };
+  } catch (err) {
+    await closeBrowserInstance();
+    throw err;
+  }
+}
+
+async function executeFetch(url, waitSelector, timeoutMs, forcedProxy = undefined) {
+  const { page, proxy } = await getBrowserPage(forcedProxy);
   try {
     const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
     if (res && res.status() === 404) {
-       const err = new Error('Not Found');
-       err.status = 404;
-       throw err;
+      const err = new Error('Not Found');
+      err.status = 404;
+      throw err;
     }
-    
-    // Esperar a que Cloudflare termine su verificación y cargue el contenido real
+
     if (waitSelector) {
       let found = false;
       let attempts = 0;
       while (!found && attempts < 15) {
         try {
-          // Check if it exists immediately
           if (await page.$(waitSelector).catch(() => null)) {
             found = true;
             break;
           }
           await new Promise(r => setTimeout(r, 2000));
           attempts++;
-        } catch (e) {
-          // Ignore execution context errors during reload
+        } catch {
           await new Promise(r => setTimeout(r, 2000));
         }
       }
       if (!found) {
-        console.warn(`No se encontró ${waitSelector}, quizás no hay resultados o Cloudflare tardó demasiado.`);
-        try {
-          await page.screenshot({ path: '/app/cloudflare_timeout.png', fullPage: true });
-          const errorHtml = await page.content();
-          import('fs').then(fs => fs.writeFileSync('/app/cloudflare_timeout.html', errorHtml));
-          console.warn('Screenshot and HTML saved for debugging.');
-        } catch(e) {
-          console.error('Failed to save debug info:', e.message);
-        }
+        console.warn(`[MangaService] No se encontró ${waitSelector} en ${url} (proxy: ${proxy || 'directo'})`);
+        throw new Error(`Timeout esperando selector ${waitSelector}`);
       }
     } else {
       await new Promise(r => setTimeout(r, 5000));
     }
-    
+
     const html = await page.content();
     await page.close();
     return html;
   } catch (err) {
     await page.close().catch(() => {});
+    throw err;
+  }
+}
+
+export async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = TIMEOUT) {
+  try {
+    // Intento 1: con el proxy preferido o directo según disponibilidad actual
+    return await executeFetch(url, waitSelector, timeoutMs);
+  } catch (err) {
+    if (err.status === 404) throw err;
+    console.warn(`[MangaService] Falló intento primario en ${url}: ${err.message}. Probando fallback alternativo...`);
+
+    // Intento 2 (Fallback): si estaba usando proxy, probar directo; si estaba directo, probar con proxy si responde
+    const activeProxy = currentProxyMode;
+    const fallbackProxy = activeProxy ? null : await resolveActiveProxy();
+
+    if (activeProxy !== fallbackProxy) {
+      try {
+        console.log(`[MangaService] Ejecutando fallback (${fallbackProxy ? 'proxy: ' + fallbackProxy : 'conexión directa'})...`);
+        return await executeFetch(url, waitSelector, timeoutMs, fallbackProxy);
+      } catch (fallbackErr) {
+        console.error(`[MangaService] Fallback también falló para ${url}:`, fallbackErr.message);
+        throw fallbackErr;
+      }
+    }
+
     throw err;
   }
 }
@@ -181,9 +280,9 @@ export async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
     ON CONFLICT (manga_id)
     DO UPDATE SET
       title = EXCLUDED.title,
-      description = EXCLUDED.description,
-      cover_url = EXCLUDED.cover_url,
-      status = EXCLUDED.status,
+      description = COALESCE(NULLIF(EXCLUDED.description, ''), manga_cache.description),
+      cover_url = COALESCE(NULLIF(EXCLUDED.cover_url, ''), manga_cache.cover_url),
+      status = COALESCE(NULLIF(EXCLUDED.status, ''), manga_cache.status),
       tags = EXCLUDED.tags,
       content_rating = EXCLUDED.content_rating,
       year = EXCLUDED.year,
@@ -220,27 +319,35 @@ export async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
 // ----------------------------------------------------------------------
 
 export async function scrapeMangaList(url) {
-  const html = await fetchHtmlWithCloak(url, '.acard');
+  const html = await fetchHtmlWithCloak(url, '#mkAgrid, .agrid, .reading-content, h1');
   const $ = cheerio.load(html);
   const items = [];
 
-  $('.acard').each((i, el) => {
+  $('#mkAgrid a, .agrid a, .acard').each((i, el) => {
     const link = $(el).attr('href');
-    if (!link) return;
+    if (!link || !link.includes('/manga/')) return;
 
     // Extraer el slug del href: https://dragontranslation.org/manga/slug/
     const match = link.match(/\/manga\/([^\/]+)\/?/);
     if (!match) return;
     const id = match[1];
 
-    const title = $(el).find('.ac-t').text().trim();
-    let cover_url = $(el).find('.ac-cover').attr('src') || $(el).find('.ac-cover').attr('data-src');
+    let title = $(el).attr('title') || $(el).find('img').attr('alt') || $(el).find('.ac-t, .m3ae409d').text().trim() || $(el).text().trim();
+    if (title.toLowerCase().startsWith('manga')) {
+      title = title.substring(5).trim();
+    }
+
+    let cover_url = $(el).find('img').attr('src') || $(el).find('img').attr('data-src');
+    if (!cover_url && $(el).find('img').attr('srcset')) {
+      cover_url = $(el).find('img').attr('srcset').split(',')[0].trim().split(' ')[0];
+    }
     if (cover_url && cover_url.includes(' ')) cover_url = cover_url.split(' ')[0];
 
     const statusText = $(el).find('.ac-status').text().trim().toLowerCase();
     const status = statusText.includes('ongoing') ? 'ongoing' : 'completed';
 
-    const latest_chapter = $(el).find('.ac-ch').text().replace('Capitulo', '').trim() || null;
+    const chText = $(el).find('.ac-ch').text().trim();
+    const latest_chapter = chText.replace(/capitulo/i, '').trim() || null;
     const chapter_count = parseInt(latest_chapter) || 0;
 
     items.push({
@@ -428,34 +535,51 @@ export async function getMangaDetail(pool, id) {
   // Scrape detail
   const url = `${BASE_URL}/manga/${mangaId}/`;
   try {
-    const html = await fetchHtmlWithCloak(url, '.htitle');
+    const html = await fetchHtmlWithCloak(url, 'h1');
     const $ = cheerio.load(html);
 
-    const title = $('.htitle').text().trim();
+    const titleElem = $('h1').clone();
+    titleElem.children('.manga-title-badges').remove();
+    let title = titleElem.text().trim();
+    if (title.toLowerCase().startsWith('manga')) {
+      title = title.substring(5).trim();
+    }
+    if (!title) title = $('h1').text().replace(/^manga/i, '').trim();
     if (!title) return null;
 
-    let cover_url = $('.hposter img').attr('src') || $('.hposter img').attr('data-src');
+    let cover_url = $('.summary_image img, .tab-summary img, .wp-post-image, .c-poster img').first().attr('src') ||
+                    $('.summary_image img, .tab-summary img, .wp-post-image, .c-poster img').first().attr('data-src');
+    if (!cover_url && $('.summary_image img, .tab-summary img, .wp-post-image').first().attr('srcset')) {
+      cover_url = $('.summary_image img, .tab-summary img, .wp-post-image').first().attr('srcset').split(',')[0].trim().split(' ')[0];
+    }
     if (cover_url && cover_url.includes(' ')) cover_url = cover_url.split(' ')[0];
 
-    const description = $('.syn p').text().trim();
+    let description = $('.mbee38d1 p, .manga-excerpt, .summary__content, .description-summary, .post-content').text().trim();
+    if (!description) {
+      $('p').each((_, el) => {
+        const t = $(el).text().trim();
+        if (t.length > 40 && !description) {
+          description = t;
+        }
+      });
+    }
     
     const tags = [];
-    $('.hchips--genres .chip').each((_, el) => {
-      tags.push($(el).text().trim());
+    $('a[href*="/manga-genre/"], a[href*="/genre/"]').each((_, el) => {
+      const g = $(el).text().trim();
+      if (g && !tags.includes(g)) tags.push(g);
     });
 
     let status = 'ongoing';
-    $('.sir').each((_, el) => {
-      if ($(el).find('.l').text().includes('Estado')) {
-         const s = $(el).find('.v').text().toLowerCase();
-         if (s.includes('completed') || s.includes('completado')) status = 'completed';
-      }
-    });
+    const rawStatus = $('.mc724232, .post-status, .summary-content, .ac-status').text().toLowerCase();
+    if (rawStatus.includes('completed') || rawStatus.includes('completado') || rawStatus.includes('finalizado')) {
+      status = 'completed';
+    }
 
     const mapped = {
       id: mangaId,
       title,
-      description,
+      description: description || '',
       cover_url,
       status,
       tags,
@@ -536,28 +660,62 @@ export async function getMangaChapters(pool, id, { limit = 200, forceRefresh = f
   const url = `${BASE_URL}/manga/${mangaId}/`;
   const chapters = [];
   try {
-    const html = await fetchHtmlWithCloak(url, '#mk-chapters-data');
+    const html = await fetchHtmlWithCloak(url, 'h1');
     const $ = cheerio.load(html);
-    const scriptJson = $('#mk-chapters-data').html();
+    
+    let scriptJson = null;
+    $('script[type="application/json"]').each((_, el) => {
+      const content = $(el).html() || '';
+      if (content.includes('"items"') && (content.includes('"mangaId"') || content.includes('"url"'))) {
+        scriptJson = content;
+      }
+    });
     
     if (scriptJson) {
       const data = JSON.parse(scriptJson);
-      if (data && data.items) {
+      if (data && data.items && Array.isArray(data.items)) {
         for (const item of data.items) {
-           chapters.push({
-             id: item.url, // Usamos la URL completa como ID para getChapterPages
-             manga_id: mangaId,
-             chapter: item.num,
-             title: item.name,
-             volume: null,
-             translated_language: 'es',
-             publish_at: new Date().toISOString(), // No hay fecha exacta ISO
-             readable_at: new Date().toISOString(),
-             pages: null,
-             external_url: item.url
-           });
+          const chNum = String(item.num || '').trim();
+          chapters.push({
+            id: item.url, // Usamos la URL completa como ID para getChapterPages
+            manga_id: mangaId,
+            chapter: chNum,
+            title: item.name || `Capítulo ${chNum}`,
+            volume: null,
+            translated_language: 'es',
+            publish_at: new Date().toISOString(),
+            readable_at: new Date().toISOString(),
+            pages: null,
+            external_url: item.url
+          });
         }
       }
+    }
+
+    // Fallback: si no vino en JSON script, buscar links del DOM
+    if (chapters.length === 0) {
+      $('a').each((_, el) => {
+        const href = $(el).attr('href') || '';
+        if (href.includes(`/manga/${mangaId}/capitulo-`)) {
+          const numMatch = href.match(/capitulo-([0-9.]+)/i);
+          const chNum = numMatch ? numMatch[1] : '';
+          const name = $(el).text().trim() || `Capítulo ${chNum}`;
+          if (!chapters.some(c => c.external_url === href)) {
+            chapters.push({
+              id: href,
+              manga_id: mangaId,
+              chapter: chNum,
+              title: name,
+              volume: null,
+              translated_language: 'es',
+              publish_at: new Date().toISOString(),
+              readable_at: new Date().toISOString(),
+              pages: null,
+              external_url: href
+            });
+          }
+        }
+      });
     }
   } catch (error) {
     console.error("Error scraping chapters:", error);
@@ -597,6 +755,14 @@ export async function getMangaChapters(pool, id, { limit = 200, forceRefresh = f
         c.external_url,
       ]
     );
+  }
+
+  if (chapters.length > 0) {
+    const latestCh = chapters[0]?.chapter || null;
+    await pool.query(
+      `UPDATE manga_cache SET chapter_count = $1, latest_chapter = COALESCE($2, latest_chapter), md_updated_at = CURRENT_TIMESTAMP WHERE manga_id = $3`,
+      [chapters.length, latestCh, mangaId]
+    ).catch(() => {});
   }
 
   const cachedRows = await pool.query(
@@ -643,9 +809,11 @@ export async function getChapterPages(pool, chapterUrl) {
     const $ = cheerio.load(html);
     const pages = [];
     
-    $('.reading-content .wp-manga-chapter-img').each((_, el) => {
-       const src = $(el).attr('src') || $(el).attr('data-src');
-       if (src) pages.push(src.trim());
+    $('.reading-content img, .wp-manga-chapter-img').each((_, el) => {
+       const src = $(el).attr('data-src') || $(el).attr('src') || $(el).attr('data-lazy-src');
+       if (src && !pages.includes(src.trim()) && !src.includes('logo') && !src.includes('icon')) {
+         pages.push(src.trim());
+       }
     });
     
     // 3. Guardar las páginas encontradas en la caché para futuras consultas

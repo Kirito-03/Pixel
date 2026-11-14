@@ -22,13 +22,6 @@ const HOST = process.env.HOST || '0.0.0.0';
   }
 
   try {
-    const { startMangaScheduler } = await import('./services/mangaScheduler.js');
-    startMangaScheduler({ pool: (await import('./db.js')).default });
-  } catch (e) {
-    console.error('Error iniciando scheduler de manga:', e.message);
-  }
-
-  try {
     const { startTranscodeQueueWorker } = await import('./services/transcodeQueueWorker.js');
     startTranscodeQueueWorker({ concurrency: 1 });
   } catch (e) {

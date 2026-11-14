@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
 import { syncHentaiCatalog, syncNextHentaiCatalogPage } from './services/hentaiBotService.js';
+import { syncLatestManga, syncNextMangaCatalogPage } from './services/mangaBotService.js';
 import pool from './db.js';
 
 export function startBotSchedulers() {
@@ -49,18 +50,27 @@ export function startBotSchedulers() {
     }
   });
 
-  // Tarea 5: Manga Bot Incremental (Cada 1 hora)
-  cron.schedule('0 * * * *', async () => {
-    console.log('[Cron] Ejecutando Manga Bot Incremental...');
+  // Tarea 5: Manga Bot Novedades (Cada 30 minutos)
+  // '*/30 * * * *' -> cada 30 minutos
+  cron.schedule('*/30 * * * *', async () => {
+    console.log('[Cron] Ejecutando Manga Bot Novedades...');
     try {
-      const { runIncrementalMangaScraping } = await import('./services/mangaBotService.js');
-      await runIncrementalMangaScraping(pool, 1, 1);
+      await syncLatestManga(pool);
     } catch (e) {
-      console.error('[Cron] Error en Manga Bot:', e.message);
+      console.error('[Cron] Error en Manga Bot Novedades:', e.message);
     }
   });
 
-  // Tarea 6: Hentai Bot Sincronización /hub (Cada 30 minutos)
+  // Tarea 6: Manga Bot Catálogo Incremental (Cada 20 minutos)
+  cron.schedule('*/20 * * * *', async () => {
+    try {
+      await syncNextMangaCatalogPage(pool);
+    } catch (e) {
+      console.error('[Cron] Error en Manga Bot Catálogo:', e.message);
+    }
+  });
+
+  // Tarea 7: Hentai Bot Sincronización /hub (Cada 30 minutos)
   // '*/30 * * * *' -> cada 30 minutos
   cron.schedule('*/30 * * * *', async () => {
     console.log('[Cron] Ejecutando Hentai Bot (/hub)...');
@@ -71,7 +81,7 @@ export function startBotSchedulers() {
     }
   });
 
-  // Tarea 7: Hentai Bot Catálogo Incremental (Cada 15 minutos)
+  // Tarea 8: Hentai Bot Catálogo Incremental (Cada 15 minutos)
   cron.schedule('*/15 * * * *', async () => {
     try {
       await syncNextHentaiCatalogPage(pool);
@@ -85,7 +95,8 @@ export function startBotSchedulers() {
   console.log(' - Sync Airing: Diario a las 02:00 AM');
   console.log(' - Sync Catalog Incremental: Cada 10 minutos');
   console.log(' - Fix Missing Images: Cada 12 horas');
-  console.log(' - Manga Bot Incremental: Cada 1 hora');
+  console.log(' - Manga Bot Novedades: Cada 30 minutos');
+  console.log(' - Manga Bot Catálogo Incremental: Cada 20 minutos');
   console.log(' - Hentai Bot (/hub): Cada 30 minutos');
   console.log(' - Hentai Bot Catálogo Incremental: Cada 15 minutos');
 
@@ -102,6 +113,12 @@ export function startBotSchedulers() {
       if (parseInt(resHentai.rows[0].count, 10) === 0) {
         console.log('[Cron] La base de datos de H Anime está vacía. Iniciando primera sincronización...');
         await syncHentaiCatalog(pool);
+      }
+
+      const resManga = await pool.query('SELECT COUNT(*) FROM manga_cache');
+      if (parseInt(resManga.rows[0].count, 10) === 0) {
+        console.log('[Cron] La base de datos de Manga está vacía. Iniciando primera sincronización...');
+        await syncLatestManga(pool);
       }
     } catch (e) {
       console.error('[Cron] Error al verificar estado inicial de la BD:', e.message);
