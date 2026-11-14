@@ -13,9 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { MangaStatus } from '../services/mangaApi';
 import { useTheme } from '../contexts/ThemeContext';
 
+const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return `Act. ${d.getDate()} abr`;
+  if (Number.isNaN(d.getTime())) return '';
+  return `Act. ${d.getDate()} ${MONTHS_ES[d.getMonth()] || ''}`.trim();
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -109,30 +112,32 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
           />
 
           {/* Badge estado */}
-          <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] }]}>
-            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] || '#E50914' }]}>
+            <Text style={styles.statusText}>{String(item.status).toUpperCase()}</Text>
           </View>
 
           {/* Rating */}
           <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={10} color="#FFF" />
+            <Ionicons name="star" size={10} color="#FFD700" />
             <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
+          </View>
+
+          {/* Capítulos */}
+          <View style={styles.chapterPill}>
+            <Ionicons name="book-outline" size={10} color="#FFF" />
+            <Text style={styles.chapterPillText}>{item.chapters ? `Cap. ${item.chapters}` : 'Leer'}</Text>
           </View>
         </View>
 
         {/* Info */}
         <View style={styles.cardInfo}>
-          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-          <View style={styles.cardMeta}>
-            <Ionicons name="document-text-outline" size={10} color={colors.textMuted} />
-            <Text style={[styles.cardMetaText, { color: colors.textMuted }]}>{item.chapters} caps.</Text>
-            {item.updatedAt && (
-              <>
-                <Ionicons name="time-outline" size={10} color={colors.textMuted} style={{ marginLeft: 4 }} />
-                <Text style={[styles.cardMetaText, { color: colors.textMuted }]}>{formatDate(item.updatedAt)}</Text>
-              </>
-            )}
-          </View>
+          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
+          {item.updatedAt ? (
+            <View style={styles.cardMeta}>
+              <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+              <Text style={[styles.cardMetaText, { color: colors.textMuted }]}>{formatDate(item.updatedAt)}</Text>
+            </View>
+          ) : null}
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -236,14 +241,36 @@ export function MangaFilterChips({ active, onChange }: FilterChipsProps) {
 // ─────────────────────────────────────────────
 const styles = StyleSheet.create({
   /* CARD */
-  cardOuter: { flex: 1, minWidth: 140 },
+  cardOuter: { width: '100%' },
   card: {
     backgroundColor: 'transparent',
   },
   posterBox: {
-    height: 240,
-    backgroundColor: '#1a1a1a',
+    width: '100%',
+    aspectRatio: 2 / 3,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a22',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     position: 'relative',
+  },
+  chapterPill: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  chapterPillText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   gradientOverlay: {
     position: 'absolute',

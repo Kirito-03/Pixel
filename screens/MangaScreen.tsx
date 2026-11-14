@@ -8,9 +8,12 @@ import {
   Platform,
   ActivityIndicator,
   TextInput,
+  TouchableOpacity,
+  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../components/Header';
@@ -27,9 +30,19 @@ export default function MangaScreen() {
   const navigation = useNavigation<any>();
   const { navigateByLabel } = useTabNavigation();
 
+  const gutter = isSmallScreen ? 16 : width >= 1200 ? 32 : 24;
+  const gap = isSmallScreen ? 12 : 16;
+  const columns =
+    width >= 1360 ? 6 : width >= 1100 ? 5 : width >= 820 ? 4 : width >= 560 ? 3 : 2;
+  const containerWidth = Math.min(width, 1440);
+  const cardWidth = Math.floor((containerWidth - gutter * 2 - (columns - 1) * gap) / columns);
+
   const [activeFilter, setActiveFilter] = useState<MangaFilter>('Todos');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [items, setItems] = useState<Manga[]>([]);
   const [popular, setPopular] = useState<Array<Manga & { rank: number }>>([]);
 
@@ -64,251 +77,426 @@ export default function MangaScreen() {
     let cancelled = false;
     const run = async () => {
       setLoading(true);
+      setPage(1);
       try {
         const status = activeFilter === 'Todos' ? undefined : activeFilter;
         const q = search.trim();
-        const list = await mangaApi.list({
-          page: 1,
-          limit: isSmallScreen ? 24 : 48,
-          status,
-          search: q || undefined,
-          order: 'updated',
-        });
-        const pop = await mangaApi.popular({ limit: 3 });
+        const limit = isSmallScreen ? 24 : 36;
+        const [list, pop] = await Promise.all([
+          mangaApi.list({
+            page: 1,
+            limit,
+            status,
+            search: q || undefined,
+            order: 'updated',
+          }),
+          mangaApi.popular({ limit: 6 }).catch(() => ({ items: [] })),
+        ]);
         if (cancelled) return;
-        setItems((list.items || list.data || []) as any);
-        setPopular((pop.items || []) as any);
+        const rows = (list.items || list.data || []) as Manga[];
+        setItems(rows);
+        setHasMore(rows.length >= limit);
+        setPopular((pop.items || []) as Array<Manga & { rank: number }>);
       } catch {
         if (cancelled) return;
         setItems([]);
-        setPopular([]);
+        setHasMore(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    const t = setTimeout(run, 260);
+    const t = setTimeout(run, 240);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
   }, [activeFilter, search, isSmallScreen]);
 
-  // 8 columnas en pantallas grandes para evitar el espacio negro
-  const columns = Math.max(2, Math.min(8, Math.floor((width - 40) / 180)));
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const status = activeFilter === 'Todos' ? undefined : activeFilter;
+      const q = search.trim();
+      const limit = isSmallScreen ? 24 : 36;
+      const list = await mangaApi.list({
+        page: nextPage,
+        limit,
+        status,
+        search: q || undefined,
+        order: 'updated',
+      });
+      const rows = (list.items || list.data || []) as Manga[];
+      setItems((prev) => {
+        const seen = new Set(prev.map((x) => x.id));
+        return [...prev, ...rows.filter((x) => !seen.has(x.id))];
+      });
+      setPage(nextPage);
+      setHasMore(rows.length >= limit);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const mapped = useMemo(() => items.map(toUI), [items]);
-  const chunks: typeof mapped[] = [];
-  for (let i = 0; i < mapped.length; i += columns) {
-    chunks.push(mapped.slice(i, i + columns));
-  }
+  const featured = !search.trim() && activeFilter === 'Todos' && popular.length > 0 ? popular[0] : null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
-        black={true}
+        black={theme === 'dark'}
         activeSection="Manga"
         onProfilePress={() => navigateByLabel('Perfil')}
         onSearchPress={() => navigateByLabel('Buscar')}
         onNavPress={navigateByLabel}
       />
       <View style={{ height: headerHeight }} />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        stickyHeaderIndices={[0]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingHorizontal: gutter, paddingBottom: Math.max(48, insets.bottom + 24) },
+        ]}
       >
-        <View style={[styles.headerArea, { backgroundColor: colors.background }]}>
-          <Text style={styles.superTitle}>LEE EN LÍNEA</Text>
-          <Text style={[styles.mainTitle, { color: colors.text }]}>
-            MANG<Text style={{color: '#E50914'}}>A</Text>
-          </Text>
-
-          <View style={[styles.searchWrapper, { backgroundColor: colors.card, borderColor: theme === 'dark' ? '#222' : 'rgba(0,0,0,0.1)' }]}>
-            <View style={styles.searchRedLine} />
-            <Ionicons name="search" size={20} color={colors.textMuted || "#444"} style={{marginLeft: 16, marginRight: 12}} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }, Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any : {}]}
-              placeholder="Buscar manga..."
-              placeholderTextColor={colors.textMuted || "#444"}
-              value={search}
-              onChangeText={setSearch}
-            />
-            {loading && <ActivityIndicator size="small" color="#E50914" style={{ marginRight: 16 }} />}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.filtersWrapper}>
-            <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
-            <Text style={[styles.resultsCount, { color: colors.textMuted }]}>{mapped.length} resultados</Text>
-          </View>
-
-          {/* ── GRID DE CARDS ── */}
-          {loading ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color="#E50914" />
-            </View>
-          ) : mapped.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={48} color={theme === 'dark' ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.2)"} />
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No hay manga para este filtro.</Text>
-            </View>
-          ) : (
-            <View style={{ marginTop: 24, gap: 12 }}>
-              {chunks.map((row, rIdx) => (
-                <View key={`row-${rIdx}`} style={styles.gridRow}>
-                  {row.map((it) => (
-                    <MangaCard
-                      key={it.id}
-                      item={it}
-                      onPress={() => navigation.navigate('MangaDetail', { id: it.id })}
-                    />
-                  ))}
-                  {/* Fill empty spaces in last row if needed (Flexbox) */}
-                  {Array.from({ length: columns - row.length }).map((_, fIdx) => (
-                    <View key={`fill-${rIdx}-${fIdx}`} style={{ flex: 1, minWidth: 140 }} />
-                  ))}
+        <View style={styles.boundedContent}>
+          {/* ── HERO DESTACADO ── */}
+          {featured ? (
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => navigation.navigate('MangaDetail', { id: featured.id })}
+              style={[
+                styles.heroCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                },
+              ]}
+            >
+              {featured.cover_url ? (
+                <Image
+                  source={{ uri: featured.cover_url }}
+                  style={styles.heroBackdrop}
+                  resizeMode="cover"
+                  blurRadius={Platform.OS === 'web' ? 18 : 12}
+                />
+              ) : null}
+              <LinearGradient
+                colors={['rgba(10,10,14,0.68)', 'rgba(10,10,14,0.92)', '#0A0A0E']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={[styles.heroInner, isSmallScreen && styles.heroInnerMobile]}>
+                {featured.cover_url ? (
+                  <Image
+                    source={{ uri: featured.cover_url }}
+                    style={[styles.heroCover, isSmallScreen && styles.heroCoverMobile]}
+                    resizeMode="cover"
+                  />
+                ) : null}
+                <View style={styles.heroCopy}>
+                  <View style={styles.heroBadgeRow}>
+                    <View style={styles.heroTopPill}>
+                      <Ionicons name="flame" size={12} color="#FFF" />
+                      <Text style={styles.heroTopPillText}>TOP #1 DESTACADO</Text>
+                    </View>
+                    <View style={styles.heroMetaPill}>
+                      <Ionicons name="star" size={12} color="#FFD700" />
+                      <Text style={styles.heroMetaPillText}>{stableRating(featured.id).toFixed(1)}</Text>
+                    </View>
+                    {featured.chapter_count ? (
+                      <View style={styles.heroMetaPill}>
+                        <Text style={styles.heroMetaPillText}>{featured.chapter_count} caps.</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.heroTitle, isSmallScreen && { fontSize: 22, lineHeight: 28 }]} numberOfLines={2}>
+                    {featured.title}
+                  </Text>
+                  <Text style={styles.heroDesc} numberOfLines={isSmallScreen ? 2 : 3}>
+                    {featured.description || 'Explora los capítulos disponibles en alta calidad desde MangaDex y sigue tu lectura al instante.'}
+                  </Text>
+                  <View style={styles.heroActions}>
+                    <TouchableOpacity
+                      style={styles.heroPrimaryBtn}
+                      onPress={() => navigation.navigate('MangaDetail', { id: featured.id })}
+                    >
+                      <Ionicons name="book" size={16} color="#FFF" />
+                      <Text style={styles.heroPrimaryBtnText}>Leer ahora</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              ))}
+              </View>
+            </TouchableOpacity>
+          ) : null}
+
+          {/* ── HEADER + BUSCADOR ── */}
+          <View style={styles.toolbarHeader}>
+            <View>
+              <Text style={[styles.superTitle, { color: colors.primary }]}>BIBLIOTECA MANGADEX</Text>
+              <Text style={[styles.mainTitle, { color: colors.text, fontSize: isSmallScreen ? 28 : 36 }]}>
+                Manga
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.searchWrapper,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                  width: isSmallScreen ? '100%' : 360,
+                },
+              ]}
+            >
+              <Ionicons name="search" size={18} color={colors.textMuted || '#888'} style={{ marginLeft: 14, marginRight: 10 }} />
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  { color: colors.text },
+                  Platform.OS === 'web'
+                    ? ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any)
+                    : {},
+                ]}
+                placeholder="Buscar manga por título..."
+                placeholderTextColor={colors.textMuted || '#777'}
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search ? (
+                <TouchableOpacity onPress={() => setSearch('')} style={{ paddingHorizontal: 12 }}>
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted || '#777'} />
+                </TouchableOpacity>
+              ) : loading ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 14 }} />
+              ) : null}
+            </View>
+          </View>
+
+          {/* ── POPULARES (RANKING) ── */}
+          {!search.trim() && popular.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleRow}>
+                  <Ionicons name="trending-up" size={20} color={colors.primary} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Populares de la semana</Text>
+                </View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rankingScroll}>
+                {popular.map((p, idx) => (
+                  <View key={p.id} style={{ width: isSmallScreen ? 270 : 320 }}>
+                    <MangaRankingItem
+                      item={{
+                        id: p.id,
+                        title: p.title,
+                        image: p.cover_url || '',
+                        status: p.status,
+                        rating: stableRating(p.id),
+                        chapters: p.chapter_count || p.latest_chapter || 0,
+                        rank: p.rank || idx + 1,
+                        updatedAt: p.updated_at || '',
+                      }}
+                      isTop={idx === 0}
+                      onPress={() => navigation.navigate('MangaDetail', { id: p.id })}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
             </View>
           )}
-        </View>
 
-        {/* ── POPULARES (RANKING) ── */}
-        {!search.trim() && popular.length > 0 && (
-          <View style={[styles.section, { marginTop: 40 }]}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Ranking Popular</Text>
+          {/* ── FILTROS Y CATÁLOGO ── */}
+          <View style={styles.section}>
+            <View style={[styles.filtersWrapper, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+                <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
+              </ScrollView>
+              <Text style={[styles.resultsCount, { color: colors.textMuted }]}>{mapped.length} títulos</Text>
             </View>
-            <View style={styles.rankingGrid}>
-              {popular.map((p, idx) => (
-                <MangaRankingItem
-                  key={p.id}
-                  item={{
-                    id: p.id,
-                    title: p.title,
-                    image: p.cover_url || '',
-                    status: p.status,
-                    rating: stableRating(p.id),
-                    chapters: p.chapter_count || 0,
-                    rank: p.rank,
-                    updatedAt: p.updated_at || '',
-                  }}
-                  isTop={idx === 0}
-                  onPress={() => navigation.navigate('MangaDetail', { id: p.id })}
-                />
-              ))}
-            </View>
+
+            {loading ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : mapped.length === 0 ? (
+              <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+                <Ionicons name="book-outline" size={44} color={colors.textMuted} />
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No encontramos mangas para este filtro.</Text>
+              </View>
+            ) : (
+              <>
+                <View style={[styles.catalogGrid, { gap }]}>
+                  {mapped.map((it) => (
+                    <View key={it.id} style={{ width: cardWidth }}>
+                      <MangaCard
+                        item={it}
+                        onPress={() => navigation.navigate('MangaDetail', { id: it.id })}
+                      />
+                    </View>
+                  ))}
+                </View>
+
+                {hasMore ? (
+                  <TouchableOpacity
+                    style={[styles.loadMoreBtn, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)' }]}
+                    onPress={loadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <>
+                        <Text style={[styles.loadMoreText, { color: colors.text }]}>Cargar más mangas</Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.text} />
+                      </>
+                    )}
+                  </TouchableOpacity>
+                ) : null}
+              </>
+            )}
           </View>
-        )}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#050505',
+  container: { flex: 1 },
+  scrollContent: { paddingTop: 16, flexGrow: 1 },
+  boundedContent: { width: '100%', maxWidth: 1440, alignSelf: 'center' },
+
+  heroCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    marginBottom: 28,
+    position: 'relative',
   },
-  headerArea: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-    zIndex: 10,
+  heroBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.45,
   },
-  superTitle: {
-    color: '#E50914',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 3,
-    marginBottom: 4,
+  heroInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 24,
+    gap: 24,
   },
-  mainTitle: {
-    color: '#FFF',
-    fontSize: 36, // Reduced from 52
-    fontWeight: '900',
-    letterSpacing: -1,
-    marginBottom: 20,
-    lineHeight: 38,
+  heroInnerMobile: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 14,
   },
+  heroCover: {
+    width: 132,
+    aspectRatio: 2 / 3,
+    borderRadius: 10,
+    backgroundColor: '#1a1a22',
+  },
+  heroCoverMobile: {
+    width: 92,
+  },
+  heroCopy: { flex: 1, gap: 10 },
+  heroBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  heroTopPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#E50914',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  heroTopPillText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  heroMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  heroMetaPillText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+  heroTitle: { color: '#FFF', fontSize: 28, fontWeight: '900', lineHeight: 34 },
+  heroDesc: { color: 'rgba(255,255,255,0.72)', fontSize: 13, lineHeight: 20 },
+  heroActions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  heroPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#E50914',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  heroPrimaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 13 },
+
+  toolbarHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    gap: 16,
+    marginBottom: 24,
+  },
+  superTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 2.4, marginBottom: 4 },
+  mainTitle: { fontWeight: '900', letterSpacing: -0.6 },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
     borderWidth: 1,
-    borderColor: '#222',
-    height: 48,
-    position: 'relative',
-    marginBottom: 10,
+    borderRadius: 12,
+    height: 46,
   },
-  searchRedLine: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    backgroundColor: '#E50914',
+  searchInput: { flex: 1, fontSize: 14, fontWeight: '500', height: '100%' },
+
+  section: { marginBottom: 32 },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  searchInput: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '500',
-    height: '100%',
-  },
-  scrollContent: {
-    paddingBottom: 60,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 36,
-  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 19, fontWeight: '800', letterSpacing: -0.2 },
+  rankingScroll: { gap: 12, paddingRight: 8 },
+
   filtersWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#222',
-    paddingBottom: 10,
-  },
-  resultsCount: {
-    color: '#555',
-    fontSize: 12,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    paddingBottom: 12,
     marginBottom: 20,
   },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  gridRow: {
+  resultsCount: { fontSize: 12, fontWeight: '600' },
+
+  catalogGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  loadMoreBtn: {
+    marginTop: 28,
+    alignSelf: 'center',
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
   },
+  loadMoreText: { fontSize: 13, fontWeight: '700' },
+
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    marginTop: 12,
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 14,
-  },
-  loaderContainer: {
-    minHeight: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rankingCol: { flexDirection: 'column' },
-  rankingGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    paddingVertical: 56,
+    borderRadius: 14,
     gap: 12,
   },
+  emptyText: { fontSize: 14 },
+  loaderContainer: { minHeight: 220, justifyContent: 'center', alignItems: 'center' },
 });

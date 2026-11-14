@@ -40,9 +40,12 @@ export default function MyListScreen() {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const insets = useSafeAreaInsets();
-  const gutter = isSmallScreen ? 16 : 24;
-  const columns = width >= 1120 ? 3 : width >= 768 ? 2 : 1;
-  const cardWidth = (Math.min(width, 1168) - gutter * 2 - (columns - 1) * 16) / columns;
+  const gutter = isSmallScreen ? 16 : width >= 1200 ? 32 : 24;
+  const gap = isSmallScreen ? 12 : 16;
+  const columns =
+    width >= 1360 ? 6 : width >= 1100 ? 5 : width >= 820 ? 4 : width >= 560 ? 3 : 2;
+  const containerWidth = Math.min(width, 1440);
+  const cardWidth = Math.floor((containerWidth - gutter * 2 - (columns - 1) * gap) / columns);
   const { currentProfile, adultContentEnabled } = useProfile();
   const { user } = useAuth();
   const { refreshMyList, removeFromMyList } = useMyList();
@@ -388,7 +391,7 @@ export default function MyListScreen() {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Tus guardados</Text>
             <Text style={{ color: colors.textMuted, fontSize: 12 }}>{visibleItems.length} {visibleItems.length === 1 ? 'título' : 'títulos'}</Text>
           </View>
-          <View style={styles.listGrid}>
+          <View style={[styles.listGrid, { gap }]}>
               {visibleItems.map((item) => (
                 (() => {
                   const meta = item.type === 'anime' ? metaByAnimeId.get(Number(item.id)) : undefined;
@@ -472,7 +475,7 @@ const styles = StyleSheet.create({
   loadingView: { flex: 1, backgroundColor: '#0A0A0A', alignItems: 'center' },
   loadingText: { color: 'rgba(255,255,255,0.4)', marginTop: 16, fontSize: 14 },
   scrollContent: { flexGrow: 1 },
-  boundedContent: { width: '100%', maxWidth: 1120, alignSelf: 'center' },
+  boundedContent: { width: '100%', maxWidth: 1440, alignSelf: 'center' },
   headingCopy: { flex: 1, minWidth: 180 },
   eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 2, marginBottom: 10 },
   collectionCount: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 14, alignSelf: 'flex-start' },

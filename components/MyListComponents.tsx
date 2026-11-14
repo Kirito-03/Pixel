@@ -220,7 +220,7 @@ interface WatchListItemProps {
 }
 
 export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, removing, onPress, onRemove }: WatchListItemProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const [imageFailed, setImageFailed] = useState(false);
   const poster = resolveImageUrl(item.poster_path, 'w500');
@@ -230,36 +230,52 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, r
   const label = item.type === 'manga' ? 'MANGA' : item.type === 'h_anime' ? 'H ANIME · 18+' : item.type === 'anime' ? 'ANIME' : item.type === 'movie' ? 'PELÍCULA' : 'SERIE';
   const accent = item.type === 'manga' ? colors.accentBlue : colors.primary;
   return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver detalles de ${item.title}`} activeOpacity={0.9} onPress={onPress}
-    onPressIn={() => Animated.spring(scale, { toValue: 0.99, useNativeDriver: true }).start()}
+    onPressIn={() => Animated.spring(scale, { toValue: 0.98, useNativeDriver: true }).start()}
     onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}>
-    <Animated.View style={[wlStyles.card, { backgroundColor: colors.card, transform: [{ scale }] }]}>
+    <Animated.View style={[wlStyles.card, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', transform: [{ scale }] }]}>
       <View style={wlStyles.thumb}>
         {poster && !imageFailed ? <Image source={{ uri: poster }} resizeMode="cover" style={StyleSheet.absoluteFillObject} onError={() => setImageFailed(true)} />
-          : <Ionicons name={item.type === 'manga' ? 'book-outline' : 'film-outline'} size={24} color={colors.textMuted} />}
+          : <View style={wlStyles.fallbackBox}>
+              <Ionicons name={item.type === 'manga' ? 'book-outline' : 'film-outline'} size={34} color={colors.textMuted} />
+            </View>}
+        <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent', 'rgba(0,0,0,0.85)']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+        <View style={[wlStyles.badge, { backgroundColor: accent }]}>
+          <Text style={wlStyles.type}>{label}</Text>
+        </View>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Eliminar ${item.title} de Mi Lista`} accessibilityState={{ busy: removing, disabled: removing }}
+          disabled={removing} style={wlStyles.remove} onPress={event => { event.stopPropagation(); onRemove(); }}>
+          {removing ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="close" size={16} color="#fff" />}
+        </TouchableOpacity>
+        {progressValue > 0 ? (
+          <View style={wlStyles.progressOverlay}>
+            <ProgressBar progress={progressValue} height={4} />
+          </View>
+        ) : null}
       </View>
       <View style={wlStyles.info}>
-        <Text style={[wlStyles.type, { color: accent }]}>{label}</Text>
         <Text style={[wlStyles.title, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
-        {item.type !== 'manga' && totalEpisodes ? <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{currentEpisode ? `Episodio ${currentEpisode} de ${totalEpisodes}` : `${totalEpisodes} episodios`}</Text> : null}
-        {progressValue > 0 ? <View style={wlStyles.progressRow}>
-          <View style={{ flex: 1 }}><ProgressBar progress={progressValue} /></View>
-          <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{percent}%</Text>
-        </View> : <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{item.type === 'manga' ? 'Leer detalles' : 'Ver detalles'}  →</Text>}
+        {item.type !== 'manga' && totalEpisodes ? (
+          <Text style={[wlStyles.meta, { color: colors.textMuted }]} numberOfLines={1}>
+            {currentEpisode ? `Ep. ${currentEpisode} / ${totalEpisodes}` : `${totalEpisodes} episodios`}
+          </Text>
+        ) : progressValue > 0 ? (
+          <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{percent}% visto</Text>
+        ) : (
+          <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{item.type === 'manga' ? 'Leer manga →' : 'Ver detalles →'}</Text>
+        )}
       </View>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Eliminar ${item.title} de Mi Lista`} accessibilityState={{ busy: removing, disabled: removing }}
-        disabled={removing} style={wlStyles.remove} onPress={event => { event.stopPropagation(); onRemove(); }}>
-        {removing ? <ActivityIndicator size="small" color={colors.textMuted} /> : <Ionicons name="close-outline" size={22} color={colors.textMuted} />}
-      </TouchableOpacity>
     </Animated.View>
   </TouchableOpacity>;
 }
 const wlStyles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', overflow: 'hidden', minHeight: 120 },
-  thumb: { width: 76, height: 120, backgroundColor: '#202026', justifyContent: 'center', alignItems: 'center' },
-  info: { flex: 1, minWidth: 0, paddingLeft: 14, paddingVertical: 12, gap: 6 },
-  type: { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-  title: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  meta: { fontSize: 11 },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  remove: { width: 44, minHeight: 44, alignSelf: 'flex-start', alignItems: 'center', justifyContent: 'center' },
+  card: { width: '100%', borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  thumb: { width: '100%', aspectRatio: 2 / 3, backgroundColor: '#18181f', position: 'relative', justifyContent: 'center', alignItems: 'center' },
+  fallbackBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  badge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  info: { padding: 11, gap: 4, minHeight: 68, justifyContent: 'space-between' },
+  type: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8, color: '#fff' },
+  title: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  meta: { fontSize: 11, fontWeight: '600' },
+  progressOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  remove: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
 });
