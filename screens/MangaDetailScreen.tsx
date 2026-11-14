@@ -309,7 +309,14 @@ export default function MangaDetailScreen() {
 
             <View style={[styles.chaptersSection, isSmallScreen ? styles.chaptersSectionMobile : styles.chaptersSectionWeb]}>
               <View style={styles.chaptersHeader}>
-                <Text style={styles.sectionTitle}>Capítulos</Text>
+                <View>
+                  <Text style={styles.sectionTitle}>Capítulos</Text>
+                  {readingProgress?.chapterId ? (
+                    <Text style={{ color: '#E50914', fontSize: 12, fontWeight: '700', marginTop: 4 }}>
+                      Último leído: {readingProgress.chapterNumber ? `Cap. ${readingProgress.chapterNumber}` : 'Guardado'}
+                    </Text>
+                  ) : null}
+                </View>
 
                 <View style={styles.languageControls}>
                   <TouchableOpacity
@@ -341,15 +348,21 @@ export default function MangaDetailScreen() {
                 {chapters.length === 0 ? (
                   <Text style={[styles.noChaptersText, { width: '100%' }]}>No hay capítulos disponibles.</Text>
                 ) : (
-                  chapters.map((chap, idx) => (
+                  chapters.map((chap, idx) => {
+                    const isLastRead = Boolean(readingProgress?.chapterId && String(readingProgress.chapterId) === String(chap.id));
+                    return (
                     <TouchableOpacity
                       key={chap.id}
                       accessibilityRole="button" accessibilityLabel={`Leer capítulo ${chap.chapter}`}
-                      style={[styles.chapterCard, { width: isSmallScreen ? '100%' : '49%' }]}
+                      style={[
+                        styles.chapterCard,
+                        { width: isSmallScreen ? '100%' : '49%' },
+                        isLastRead && { borderColor: 'rgba(229,9,20,0.75)', backgroundColor: 'rgba(229,9,20,0.12)' },
+                      ]}
                       activeOpacity={0.8}
                       onPress={() => openChapter(chap, idx)}
                     >
-                      <View style={styles.chapterNumber}>
+                      <View style={[styles.chapterNumber, isLastRead && { backgroundColor: '#E50914' }]}>
                         <Text style={styles.chapterNumberText}>{chap.chapter}</Text>
                       </View>
                       <View style={styles.chapterInfo}>
@@ -358,11 +371,13 @@ export default function MangaDetailScreen() {
                         </Text>
                         <Text style={styles.chapterDate}>
                           {chap.publish_at ? formatDate(chap.publish_at) : 'Sin fecha'}
+                          {isLastRead ? ' · Último leído' : ''}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+                      <Ionicons name="chevron-forward" size={18} color={isLastRead ? '#E50914' : 'rgba(255,255,255,0.4)'} />
                     </TouchableOpacity>
-                  ))
+                    );
+                  })
                 )}
               </View>
             </View>

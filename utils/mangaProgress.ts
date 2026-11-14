@@ -49,3 +49,36 @@ export async function getMangaProgress(
     return null;
   }
 }
+
+/** Load all saved manga reading progress keyed by mangaId. */
+export async function getAllMangaProgress(): Promise<
+  Record<string, MangaReadingProgress>
+> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const progressKeys = keys.filter((k) => k.startsWith(STORAGE_KEY_PREFIX));
+    if (progressKeys.length === 0) return {};
+    const pairs = await AsyncStorage.multiGet(progressKeys);
+    const result: Record<string, MangaReadingProgress> = {};
+    for (const [key, raw] of pairs) {
+      if (!raw) continue;
+      const mangaId = key.slice(STORAGE_KEY_PREFIX.length);
+      try {
+        const parsed = JSON.parse(raw) as Partial<MangaReadingProgress>;
+        if (mangaId && parsed?.chapterId) {
+          result[mangaId] = {
+            chapterId: String(parsed.chapterId),
+            chapterNumber: String(parsed.chapterNumber ?? ''),
+            updatedAt: Number(parsed.updatedAt ?? 0),
+          };
+        }
+      } catch {
+        // Ignore malformed entry
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+

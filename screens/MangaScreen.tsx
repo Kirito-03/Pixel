@@ -233,9 +233,6 @@ export default function MangaScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
               <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
             </ScrollView>
-            <Text style={[styles.resultsCount, { color: colors.textMuted }]}>
-              {mapped.length} {mapped.length === 1 ? 'título' : 'títulos'}
-            </Text>
           </View>
 
           {/* ── RECIÉN ACTUALIZADOS (GRID) ── */}

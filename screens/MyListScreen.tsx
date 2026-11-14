@@ -28,6 +28,7 @@ import { myListApi, MyListEntry, MyListContentType } from '../services/myListApi
 import { continueWatchingApi, ContinueWatchingEntry } from '../services/continueWatchingApi';
 import { progressApi } from '../services/progressApi';
 import { getResumeTarget } from '../services/resumeTarget';
+import { getAllMangaProgress, MangaReadingProgress } from '../utils/mangaProgress';
 
 function normalizeImagePath(path?: string | null): string {
   if (!path) return '';
@@ -64,6 +65,7 @@ export default function MyListScreen() {
   const [startFromTimeSeconds, setStartFromTimeSeconds] = useState<number | null>(null);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [metaByAnimeId, setMetaByAnimeId] = useState<Map<number, MyListEntry>>(new Map());
+  const [mangaProgressById, setMangaProgressById] = useState<Record<string, MangaReadingProgress>>({});
   const [continueRows, setContinueRows] = useState<ContinueWatchingEntry[]>([]);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmPayload, setConfirmPayload] = useState<{
@@ -83,6 +85,7 @@ export default function MyListScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      getAllMangaProgress().then(setMangaProgressById).catch(() => {});
       if (currentProfile && user?.uid) loadMyList();
     }, [currentProfile, user?.uid, adultContentEnabled])
   );
@@ -304,11 +307,6 @@ export default function MyListScreen() {
               Tus historias favoritas, listas para cuando quieras volver.
             </Text>
           </View>
-          <View style={[styles.collectionCount, { backgroundColor: colors.card }]}>
-            <Ionicons name="bookmark-outline" size={20} color={colors.primary} />
-            <Text style={[styles.countNumber, { color: colors.text }]}>{allItems.length}</Text>
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{allItems.length === 1 ? 'título guardado' : 'títulos guardados'}</Text>
-          </View>
         </View>
 
         {/* ── CONTINUAR VIENDO ── */}
@@ -393,7 +391,6 @@ export default function MyListScreen() {
         </View>) : <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Tus guardados</Text>
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{visibleItems.length} {visibleItems.length === 1 ? 'título' : 'títulos'}</Text>
           </View>
           <View style={[styles.listGrid, { gap }]}>
               {visibleItems.map((item) => (
@@ -402,6 +399,10 @@ export default function MyListScreen() {
                   const currentEpisode = typeof meta?.episode_number === 'number' ? meta.episode_number : undefined;
                   const totalEpisodes = typeof meta?.total_episodes === 'number' ? meta.total_episodes : undefined;
                   const progress = Number(meta?.progress_percent ?? 0) / 100;
+                  const mangaProg = item.type === 'manga' ? mangaProgressById[String(item.id)] : undefined;
+                  const mangaChapterLabel = mangaProg
+                    ? (mangaProg.chapterNumber ? `Último: Cap. ${mangaProg.chapterNumber}` : 'Leyendo')
+                    : undefined;
                   return (
                 <View
                   key={`${item.type}:${item.id}`}
@@ -411,6 +412,7 @@ export default function MyListScreen() {
                     item={item}
                     currentEpisode={currentEpisode}
                     totalEpisodes={totalEpisodes}
+                    mangaChapterLabel={mangaChapterLabel}
                     progress={progress}
                     removing={removingKey === `${item.type}:${item.id}`}
                     onPress={() => {

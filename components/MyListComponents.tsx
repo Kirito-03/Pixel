@@ -213,13 +213,14 @@ interface WatchListItemProps {
   item: SavedListItem;
   currentEpisode?: number;
   totalEpisodes?: number;
+  mangaChapterLabel?: string;
   progress?: number; // 0–1
   removing?: boolean;
   onPress: () => void;
   onRemove: () => void;
 }
 
-export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, removing, onPress, onRemove }: WatchListItemProps) {
+export function WatchListItem({ item, currentEpisode, totalEpisodes, mangaChapterLabel, progress, removing, onPress, onRemove }: WatchListItemProps) {
   const { colors, theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const [imageFailed, setImageFailed] = useState(false);
@@ -254,7 +255,11 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, r
       </View>
       <View style={wlStyles.info}>
         <Text style={[wlStyles.title, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
-        {item.type !== 'manga' && currentEpisode !== undefined ? (
+        {item.type === 'manga' && mangaChapterLabel ? (
+          <Text style={[wlStyles.meta, { color: '#E50914', fontWeight: '700' }]} numberOfLines={1}>
+            {mangaChapterLabel}
+          </Text>
+        ) : item.type !== 'manga' && currentEpisode !== undefined ? (
           <Text style={[wlStyles.meta, { color: colors.textMuted }]} numberOfLines={1}>
             Ep. {currentEpisode}{totalEpisodes ? ` / ${totalEpisodes}` : ''}{progressValue > 0 ? ` · ${percent}%` : ''}
           </Text>
