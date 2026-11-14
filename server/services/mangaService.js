@@ -851,15 +851,6 @@ export async function getChapterPages(pool, chapterUrl) {
   if (!url || !url.startsWith('http')) return null;
 
   try {
-    // 1. Revisar si las páginas ya están cacheadas en la DB
-    if (pool) {
-      const cacheQuery = await pool.query(`SELECT pages FROM manga_chapters_cache WHERE chapter_id = $1`, [url]);
-      if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].pages && cacheQuery.rows[0].pages.length > 0) {
-        return { baseUrl: '', pages: cacheQuery.rows[0].pages, chapterId: url, meta: { source: 'db', cache_hit: true } };
-      }
-    }
-
-    // 2. Si no están cacheadas, usamos el bot
     const html = await fetchHtmlWithCloak(url, '.reading-content');
     const $ = cheerio.load(html);
     const pages = [];
@@ -871,13 +862,12 @@ export async function getChapterPages(pool, chapterUrl) {
        }
     });
     
-    // 3. Guardar las páginas encontradas en la caché para futuras consultas
+    // Guardar el conteo de páginas en la base de datos
     if (pool && pages.length > 0) {
-      // pages es TEXT[] en la DB, pasamos el array nativo de JS directamente
       await pool.query(
-        `UPDATE manga_chapters_cache SET pages = $1::text[] WHERE chapter_id = $2`,
-        [pages, url]
-      );
+        `UPDATE manga_chapters_cache SET pages = $1 WHERE chapter_id = $2`,
+        [pages.length, url]
+      ).catch(() => {});
     }
     
     return { baseUrl: '', pages, chapterId: url, meta: { source: 'dragon', cache_hit: false } };
