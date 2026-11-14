@@ -41,6 +41,9 @@ router.get('/anime', async (req, res) => {
       where += ` AND (title ILIKE $${i} OR title_english ILIKE $${i} OR title_japanese ILIKE $${i})`;
       params.push(`%${search}%`);
       i++;
+    } else {
+      // Evitar mostrar en Inicio/Catálogo animes que aún no tienen carátula
+      where += ` AND NULLIF(TRIM(poster_url), '') IS NOT NULL`;
     }
 
     const countQuery = `SELECT COUNT(*)::int AS count FROM anime_content ${where}`;

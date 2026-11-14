@@ -495,6 +495,26 @@ async function runSyncAiringJob(job) {
   }
 }
 
+function buildTitleSearchCandidates(rawTitle) {
+  const original = String(rawTitle || '').trim();
+  if (!original) return [];
+
+  const stripped = original
+    .replace(/\((TV|OVA|ONA|Special|Movie|Dub|Sub)\)/gi, ' ')
+    .replace(/\bSeason\s+\d+\b/gi, ' ')
+    .replace(/\bPart\s+\d+\b/gi, ' ')
+    .replace(/\bMovie(\s+\d+)?\b/gi, ' ')
+    .replace(/\b(19|20)\d{2}\b/g, ' ')
+    .replace(/\b(Mini|Specials?|OVA|ONA)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const words = stripped.split(' ').filter(Boolean);
+  const shortened = words.length > 6 ? words.slice(0, 6).join(' ') : '';
+
+  return [...new Set([original, stripped, shortened].filter(Boolean))];
+}
+
 async function runMetadataJob(job, animeId, forceMalId = null) {
   try {
     job.progress.message = 'Buscando anime en BD...';
@@ -518,32 +538,32 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
       metadata = await searchAniListByMalId(forceMalId);
     }
 
-    // Fallback a buscar por título en AniList
+    // Fallback a buscar por título en AniList (probando variantes limpias si el título original falla)
+    const searchBase = anime.title_english || anime.title;
+    const candidates = buildTitleSearchCandidates(searchBase);
+
     if (!metadata) {
-      job.progress.message = `Buscando "${anime.title}" en AniList...`;
-      metadata = await searchAniListMetadata(anime.title_english || anime.title);
+      for (const candidate of candidates) {
+        job.progress.message = `Buscando "${candidate}" en AniList...`;
+        metadata = await searchAniListMetadata(candidate);
+        if (metadata) {
+          if (candidate !== searchBase) {
+            console.log(`[SmartBot] Match AniList con título limpio "${candidate}" para "${searchBase}"`);
+          }
+          break;
+        }
+      }
     }
 
     // Fallback a buscar en Jikan (MyAnimeList) si AniList falló
     if (!metadata) {
-      const searchStr = anime.title_english || anime.title;
-      job.progress.message = `Fallo AniList. Usando fallback Jikan para "${searchStr}"...`;
-      // Pequeña limpieza heurística para mejorar matches en Jikan
-      let cleanTitle = searchStr
-        .replace(/Season \d+/i, '')
-        .replace(/Part \d+/i, '')
-        .replace(/Movie( \d+)?/i, '')
-        .trim();
-
-      // Si el título sigue siendo kilométrico (más de 6 palabras), MyAnimeList suele tirar 504 al buscarlo
-      const words = cleanTitle.split(' ');
-      if (words.length > 6) {
-        cleanTitle = words.slice(0, 6).join(' ');
-      }
-
-      metadata = await searchJikanMetadata(cleanTitle);
-      if (metadata) {
-        console.log(`[SmartBot] Fallback Jikan exitoso para "${searchStr}" -> "${metadata.title}"`);
+      for (const candidate of candidates) {
+        job.progress.message = `Fallo AniList. Usando fallback Jikan para "${candidate}"...`;
+        metadata = await searchJikanMetadata(candidate);
+        if (metadata) {
+          console.log(`[SmartBot] Fallback Jikan exitoso para "${searchBase}" (${candidate}) -> "${metadata.title}"`);
+          break;
+        }
       }
     }
 
