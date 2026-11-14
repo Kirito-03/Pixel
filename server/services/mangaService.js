@@ -1,6 +1,18 @@
 import * as cheerio from 'cheerio';
-import { launch } from 'cloakbrowser';
+import axios from 'axios';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 import net from 'net';
+
+let launchCloak = null;
+try {
+  // CloakBrowser solo en plataformas compatibles (no Android Termux)
+  if (process.platform !== 'android') {
+    const cloak = await import('cloakbrowser');
+    launchCloak = cloak.launch;
+  }
+} catch (e) {
+  // CloakBrowser no disponible en este entorno
+}
 
 const BASE_URL = 'https://dragontranslation.org';
 const TIMEOUT = 60000;
@@ -65,7 +77,37 @@ export async function closeBrowserInstance() {
   }
 }
 
+async function fetchWithAxios(url, proxyUrl = null, timeoutMs = 15000) {
+  const agent = proxyUrl ? new SocksProxyAgent(proxyUrl) : undefined;
+  const res = await axios.get(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+      'Referer': 'https://dragontranslation.org/'
+    },
+    httpAgent: agent,
+    httpsAgent: agent,
+    timeout: timeoutMs,
+    validateStatus: s => s < 500
+  });
+
+  if (res.status === 404) {
+    const err = new Error('Not Found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (res.status === 200 && typeof res.data === 'string' && !res.data.includes('Just a moment...')) {
+    return res.data;
+  }
+  throw new Error(`HTTP status ${res.status} o reto Cloudflare`);
+}
+
 export async function getBrowserPage(overrideProxy = undefined) {
+  if (!launchCloak) {
+    throw new Error('CloakBrowser no disponible en este entorno');
+  }
   const targetProxy = overrideProxy !== undefined ? overrideProxy : await resolveActiveProxy();
 
   // Si la instancia actual tiene otra configuración de proxy o perdió la conexión, reiniciar
@@ -83,7 +125,7 @@ export async function getBrowserPage(overrideProxy = undefined) {
     }
 
     try {
-      browserInstance = await launch({ 
+      browserInstance = await launchCloak({ 
         headless: true, 
         humanize: true,
         args
@@ -150,29 +192,35 @@ async function executeFetch(url, waitSelector, timeoutMs, forcedProxy = undefine
 }
 
 export async function fetchHtmlWithCloak(url, waitSelector = null, timeoutMs = TIMEOUT) {
+  const activeProxy = await resolveActiveProxy();
+
+  // 1. Intento rápido vía HTTP con Axios (ideal para Termux / Android y navegación ágil)
   try {
-    // Intento 1: con el proxy preferido o directo según disponibilidad actual
-    return await executeFetch(url, waitSelector, timeoutMs);
-  } catch (err) {
-    if (err.status === 404) throw err;
-    console.warn(`[MangaService] Falló intento primario en ${url}: ${err.message}. Probando fallback alternativo...`);
-
-    // Intento 2 (Fallback): si estaba usando proxy, probar directo; si estaba directo, probar con proxy si responde
-    const activeProxy = currentProxyMode;
-    const fallbackProxy = activeProxy ? null : await resolveActiveProxy();
-
-    if (activeProxy !== fallbackProxy) {
+    return await fetchWithAxios(url, null, 12000);
+  } catch (axiosErr) {
+    if (axiosErr.status === 404) throw axiosErr;
+    // Si falló directo y hay proxy SOCKS5 disponible, probar con proxy
+    if (activeProxy) {
       try {
-        console.log(`[MangaService] Ejecutando fallback (${fallbackProxy ? 'proxy: ' + fallbackProxy : 'conexión directa'})...`);
-        return await executeFetch(url, waitSelector, timeoutMs, fallbackProxy);
-      } catch (fallbackErr) {
-        console.error(`[MangaService] Fallback también falló para ${url}:`, fallbackErr.message);
-        throw fallbackErr;
+        return await fetchWithAxios(url, activeProxy, 15000);
+      } catch (proxyAxiosErr) {
+        if (proxyAxiosErr.status === 404) throw proxyAxiosErr;
       }
     }
-
-    throw err;
   }
+
+  // 2. Si Axios fue bloqueado por Cloudflare y CloakBrowser está disponible en el entorno
+  if (launchCloak) {
+    try {
+      return await executeFetch(url, waitSelector, timeoutMs, activeProxy);
+    } catch (err) {
+      if (err.status === 404) throw err;
+      console.warn(`[MangaService] Falló CloakBrowser con proxy: ${err.message}. Probando fallback directo...`);
+      return await executeFetch(url, waitSelector, timeoutMs, null);
+    }
+  }
+
+  throw new Error(`No se pudo obtener el contenido de ${url}`);
 }
 
 // ----------------------------------------------------------------------
