@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   posterBox: {
     width: '100%',
     aspectRatio: 2 / 3,
-    borderRadius: 6,
+    borderRadius: 0,
     borderWidth: 1,
     overflow: 'hidden',
     backgroundColor: '#121216',
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.82)',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 2,
     maxWidth: '85%',
   },
   chapterPillText: {
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 2,
   },
   fallbackBadgeText: {
     color: 'rgba(255,255,255,0.72)',
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     left: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 2,
     maxWidth: '85%',
   },
   statusText: {
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#141414',
-    borderRadius: 10,
+    borderRadius: 2,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
+    borderRadius: 2,
     marginTop: 2,
   },
   rankStatusText: {
@@ -472,14 +472,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    minHeight: 44,
-    paddingHorizontal: 16,
+    minHeight: 38,
+    paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#141414',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 999,
+    borderRadius: 2,
   },
   chipActive: {
     backgroundColor: '#E50914',

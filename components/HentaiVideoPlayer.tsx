@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
+import { EMBEDDED_PLAYER_BRIDGE, shouldAllowEmbeddedNavigation } from '../utils/embeddedPlayerBridge';
 
 interface VideoServer {
   server: string;
@@ -151,6 +152,7 @@ export default function HentaiVideoPlayer({
                 style={styles.iframe as any}
                 allowFullScreen
                 frameBorder="0"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
                 onLoad={() => setLoading(false)}
               />
             ) : (
@@ -161,6 +163,17 @@ export default function HentaiVideoPlayer({
                 allowsFullscreenVideo={true}
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
+                mediaPlaybackRequiresUserAction={false}
+                setSupportMultipleWindows={false}
+                javaScriptCanOpenWindowsAutomatically={false}
+                injectedJavaScriptForMainFrameOnly={false}
+                injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
+                injectedJavaScript={EMBEDDED_PLAYER_BRIDGE}
+                injectedJavaScriptBeforeContentLoaded={EMBEDDED_PLAYER_BRIDGE}
+                onOpenWindow={() => {}}
+                onShouldStartLoadWithRequest={(request) =>
+                  shouldAllowEmbeddedNavigation(request.url || '', activeServer.url)
+                }
                 onLoadEnd={() => setLoading(false)}
                 startInLoadingState={true}
                 renderLoading={() => (

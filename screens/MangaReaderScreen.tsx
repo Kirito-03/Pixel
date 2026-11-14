@@ -6,6 +6,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Header from '../components/Header';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { mangaApi, MangaChapter } from '../services/mangaApi';
+import { saveMangaProgress } from '../utils/mangaProgress';
 
 type PreferredLanguage = 'es' | 'es-la' | 'en';
 
@@ -226,6 +227,13 @@ export default function MangaReaderScreen() {
       cancelled = true;
     };
   }, [chapterId]);
+
+  useEffect(() => {
+    const targetId = String(activeChapterId || chapterId || '').trim();
+    if (!mangaId || !targetId) return;
+    const current = chapters.find((c) => String(c?.id || '').trim() === targetId);
+    saveMangaProgress(mangaId, targetId, current?.chapter);
+  }, [mangaId, activeChapterId, chapterId, chapters]);
 
   const navigateToChapter = (target?: MangaChapter) => {
     const nextId = String(target?.id || '').trim();

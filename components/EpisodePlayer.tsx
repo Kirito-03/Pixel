@@ -19,7 +19,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { AnimeEpisode, VideoSource } from '../types';
 import { progressApi } from '../services/progressApi';
 
-import { EMBEDDED_PLAYER_BRIDGE } from '../utils/embeddedPlayerBridge';
+import { EMBEDDED_PLAYER_BRIDGE, shouldAllowEmbeddedNavigation } from '../utils/embeddedPlayerBridge';
 
 interface EpisodePlayerProps {
   episode: AnimeEpisode;
@@ -677,8 +677,13 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
             javaScriptEnabled
             domStorageEnabled
             mediaPlaybackRequiresUserAction={false}
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={false}
+            injectedJavaScriptForMainFrameOnly={false}
+            injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
             injectedJavaScript={EMBEDDED_PLAYER_BRIDGE}
             injectedJavaScriptBeforeContentLoaded={EMBEDDED_PLAYER_BRIDGE}
+            onOpenWindow={() => {}}
             onMessage={(event) => {
               if (event.nativeEvent.data === 'user_interaction') { showUITemporarily(); return; }
               try {
@@ -715,18 +720,9 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
             }}
             onLoadStart={() => setWebViewLoading(true)}
             onLoadEnd={() => setWebViewLoading(false)}
-            onShouldStartLoadWithRequest={(request) => {
-              // Bloquear navegación a páginas de anuncios conocidas
-              const url = request.url || '';
-              const isAd = url.includes('doubleclick') ||
-                           url.includes('googlesyndication') ||
-                           url.includes('adserver') ||
-                           url.includes('clickadu') ||
-                           url.includes('propellerads') ||
-                           url.includes('popcash') ||
-                           url.includes('adcash');
-              return !isAd;
-            }}
+            onShouldStartLoadWithRequest={(request) =>
+              shouldAllowEmbeddedNavigation(request.url || '', videoUrl)
+            }
           />
           {/* Indicador de carga propio del WebView */}
           {webViewLoading && (

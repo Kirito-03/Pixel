@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import Header from '../components/Header';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useMyList } from '../contexts/MyListContext';
 import { mangaApi, Manga, MangaChapter } from '../services/mangaApi';
+import { getMangaProgress, MangaReadingProgress, saveMangaProgress } from '../utils/mangaProgress';
 
 function formatDate(iso?: string | null) {
   if (!iso) return '';
@@ -45,6 +46,22 @@ export default function MangaDetailScreen() {
   const [preferredLanguage, setPreferredLanguage] = useState<'es' | 'es-la' | 'en'>('es');
   const [allowEnglishFallback, setAllowEnglishFallback] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [readingProgress, setReadingProgress] = useState<MangaReadingProgress | null>(null);
+
+  const loadProgress = useCallback(async () => {
+    if (!id) {
+      setReadingProgress(null);
+      return;
+    }
+    const progress = await getMangaProgress(id);
+    setReadingProgress(progress);
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProgress();
+    }, [loadProgress])
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +115,52 @@ export default function MangaDetailScreen() {
     return t.slice(0, 12);
   }, [manga?.tags]);
 
+  const firstChapter = useMemo(() => {
+    if (!chapters.length) return null;
+    return chapters.reduce<MangaChapter>((lowest, current) => {
+      const lowestNum = Number.parseFloat(String(lowest.chapter ?? ''));
+      const currentNum = Number.parseFloat(String(current.chapter ?? ''));
+      const lowestValid = Number.isFinite(lowestNum);
+      const currentValid = Number.isFinite(currentNum);
+      if (currentValid && lowestValid) {
+        return currentNum < lowestNum ? current : lowest;
+      }
+      if (currentValid && !lowestValid) return current;
+      return lowest;
+    }, chapters[chapters.length - 1]);
+  }, [chapters]);
+
+  const continueChapter = useMemo<MangaChapter | null>(() => {
+    if (!readingProgress?.chapterId) return null;
+    return (
+      chapters.find((c) => String(c.id) === String(readingProgress.chapterId)) ||
+      ({
+        id: readingProgress.chapterId,
+        manga_id: id,
+        chapter: readingProgress.chapterNumber || '',
+        title: '',
+        volume: null,
+        translated_language: selectedLanguage || preferredLanguage || 'es',
+        pages_count: 0,
+        publish_at: null,
+      } as unknown as MangaChapter)
+    );
+  }, [chapters, readingProgress, id, selectedLanguage, preferredLanguage]);
+
+  const primaryChapter = continueChapter || firstChapter;
+  const primaryButtonLabel = !chapters.length
+    ? 'Sin capítulos'
+    : continueChapter
+      ? (continueChapter.chapter ? `Continuar Cap. ${continueChapter.chapter}` : 'Continuar')
+      : 'Leer ahora';
+
   const openChapter = async (chapter: MangaChapter, _index?: number) => {
+    await saveMangaProgress(id, chapter.id, chapter.chapter);
+    setReadingProgress({
+      chapterId: chapter.id,
+      chapterNumber: String(chapter.chapter ?? ''),
+      updatedAt: Date.now(),
+    });
     const lang = selectedLanguage || preferredLanguage || 'es';
     navigation.navigate('MangaReader', {
       id,
@@ -209,16 +271,16 @@ export default function MangaDetailScreen() {
                 <View style={styles.actions}>
                   <TouchableOpacity
                     onPress={() => {
-                      if (!chapters.length) return;
-                      openChapter(chapters[0], 0);
+                      if (!primaryChapter) return;
+                      openChapter(primaryChapter);
                     }}
-                    accessibilityRole="button" accessibilityLabel="Leer manga"
+                    accessibilityRole="button" accessibilityLabel={primaryButtonLabel}
                     style={[styles.primaryBtn, !chapters.length && styles.btnDisabled]}
                     activeOpacity={0.9}
                     disabled={!chapters.length}
                   >
                     <Ionicons name="play" size={18} color="#000" />
-                    <Text style={styles.primaryText}>{chapters.length ? 'Leer ahora' : 'Sin capítulos'}</Text>
+                    <Text style={styles.primaryText}>{primaryButtonLabel}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -327,7 +389,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 2,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
@@ -374,7 +436,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   posterContainer: {
-    borderRadius: 8,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: '#1A1A1A',
     shadowColor: '#000',
@@ -446,7 +508,7 @@ const styles = StyleSheet.create({
   tag: {
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
@@ -478,7 +540,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 10,
     paddingVertical: 12,
-    borderRadius: 6,
+    borderRadius: 2,
     gap: 8,
   },
   btnDisabled: {
@@ -497,7 +559,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(60,60,60,0.85)',
     paddingHorizontal: 10,
     paddingVertical: 12,
-    borderRadius: 6,
+    borderRadius: 2,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
     gap: 8,
@@ -511,7 +573,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     width: 44,
     height: 44,
-    borderRadius: 6,
+    borderRadius: 2,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -547,13 +609,13 @@ const styles = StyleSheet.create({
   languageControls: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 6,
+    borderRadius: 2,
     padding: 2,
   },
   langChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 4,
+    borderRadius: 2,
   },
   langChipActive: {
     backgroundColor: '#E50914',
@@ -586,14 +648,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 2,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
   },
   chapterNumber: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 2,
     backgroundColor: '#1E1E1E',
     alignItems: 'center',
     justifyContent: 'center',
