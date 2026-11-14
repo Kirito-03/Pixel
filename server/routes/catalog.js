@@ -1,5 +1,7 @@
 import express from 'express';
 import pool from '../db.js';
+import { createLegacyAnimeResolver } from '../services/legacyAnimeMetadata.js';
+const resolveLegacyAnime = createLegacyAnimeResolver({ pool });
 
 const router = express.Router();
 
@@ -130,43 +132,8 @@ router.get('/anime/:id', async (req, res) => {
     );
 
     if (!result.rows.length) {
-      const numericId = Number(id);
-      if (Number.isSafeInteger(numericId) && numericId > 0) {
-        try {
-          const alRes = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              query: `query ($id: Int) { Media(id: $id, type: ANIME) { id title { romaji english native } description(asHtml: false) coverImage { large } bannerImage genres status episodes averageScore } }`,
-              variables: { id: numericId },
-            }),
-          });
-          if (alRes.ok) {
-            const alJson = await alRes.json();
-            const media = alJson?.data?.Media;
-            if (media) {
-              return res.json({
-                id: numericId,
-                tmdb_id: null,
-                title: media.title?.english || media.title?.romaji || `Anime #${numericId}`,
-                title_english: media.title?.english || null,
-                title_japanese: media.title?.native || null,
-                description: media.description || null,
-                poster_url: media.coverImage?.large || null,
-                banner_url: media.bannerImage || null,
-                genres: Array.isArray(media.genres) ? media.genres : [],
-                status: media.status || null,
-                total_episodes: media.episodes ?? null,
-                rating: typeof media.averageScore === 'number' ? media.averageScore / 10 : null,
-                source: 'anilist',
-                seasons: [],
-              });
-            }
-          }
-        } catch {
-          // Si AniList falla, devolver 404 normal
-        }
-      }
+      const legacy = await resolveLegacyAnime(id);
+      if (legacy) return res.json(legacy);
       return res.status(404).json({ message: 'Anime no encontrado' });
     }
 

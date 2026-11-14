@@ -40,6 +40,7 @@ import { offlineDownloads } from '../services/offlineDownloads';
 import { getResumeTarget } from '../services/resumeTarget';
 import { styles, heroStyles, continueStyles, infoStyles, epStyles, simStyles } from './AnimeSeriesModalStyles';
 import AnimeArtwork from './AnimeArtwork';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface AnimeSeriesModalProps {
   content: ContentItem | null;
@@ -83,6 +84,8 @@ export default function AnimeSeriesModal({
 
   const { width, height } = useWindowDimensions();
   const isSmallScreen = width < 768;
+  const androidCompact = Platform.OS === 'android' && isSmallScreen;
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -859,7 +862,7 @@ export default function AnimeSeriesModal({
         <Animated.View style={[styles.content, { opacity: contentFadeAnim, maxWidth: undefined, maxHeight: '100%', borderRadius: 0, overflow: 'hidden' }]}>
           {/* Botón cerrar estilo Pixel */}
           <>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar detalles" style={styles.closeButton} onPress={handleClose}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar detalles" style={[styles.closeButton, Platform.OS === 'android' && { top: insets.top + 12 }]} onPress={handleClose}>
               <Ionicons name="close" size={28} color="#FFFFFF" />
             </TouchableOpacity>
           </>
@@ -884,15 +887,15 @@ export default function AnimeSeriesModal({
             }
           >
             {/* HERO SECTION */}
-            <View style={[heroStyles.heroSection, { height: isSmallScreen ? Math.min(height * 0.55, 430) : Math.min(height * 0.62, 560) }]}>
+            <View style={[heroStyles.heroSection, androidCompact ? { height: undefined, minHeight: trailerDelay ? undefined : 500 } : { height: isSmallScreen ? Math.min(height * 0.55, 430) : Math.min(height * 0.62, 560) }]}>
               {/* Backdrop + gradiente cinematográfico */}
               {trailerDelay && trailerKey && !trailerFinished ? (
-                <View style={[styles.trailerBackground, { paddingTop: 40 }]}>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Detener tráiler" style={[styles.trailerCloseButton, { top: 4, left: 16, right: undefined, paddingVertical: 4 }]} onPress={handleCloseTrailer}>
+                <View style={[styles.trailerBackground, { paddingTop: 40 }, androidCompact && { position: 'relative', height: undefined, paddingTop: insets.top + 64, paddingBottom: 12 }]}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Detener tráiler" style={[styles.trailerCloseButton, { top: 4, left: 16, right: undefined, paddingVertical: 4 }, androidCompact && { position: 'relative', top: 0, left: 0, alignSelf: 'flex-start', marginLeft: 16, marginBottom: 10, minHeight: 44 }]} onPress={handleCloseTrailer}>
                     <Ionicons name="close" size={20} color="#FFFFFF" />
                     <Text style={styles.trailerCloseText}>Detener tráiler</Text>
                   </TouchableOpacity>
-                  <TrailerPreview id={trailerKey} onEnded={handleCloseTrailer} />
+                  {androidCompact ? <View style={{ width: '100%', aspectRatio: 16 / 9 }}><TrailerPreview id={trailerKey} onEnded={handleCloseTrailer} /></View> : <TrailerPreview id={trailerKey} onEnded={handleCloseTrailer} />}
                 </View>
               ) : (
                 <>
@@ -923,7 +926,7 @@ export default function AnimeSeriesModal({
 
               {/* Contenido sobre el backdrop */}
               {!trailerDelay && (
-                <View style={[heroStyles.heroContent, !isSmallScreen && { left: Math.max(24, (width - 1120) / 2), maxWidth: 740 }] }>
+                <View style={[heroStyles.heroContent, androidCompact && { position: 'relative', top: undefined, bottom: undefined, right: undefined, width: '100%', transform: [{ translateY: 0 }], paddingTop: insets.top + 88, paddingBottom: 28, paddingHorizontal: 20, maxWidth: undefined }, !isSmallScreen && { left: Math.max(24, (width - 1120) / 2), maxWidth: 740 }] }>
                   {/* Rating + año + estado */}
                   <View style={heroStyles.metaRow}>
                     {currentContent?.vote_average != null && currentContent.vote_average > 0 && (
@@ -991,14 +994,14 @@ export default function AnimeSeriesModal({
 
                   {/* Botones de acción */}
                   {currentContent?.type === 'anime' && (isRealAnime() || isAnimeMovie()) && (
-                    <View style={heroStyles.actionRow}>
-                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reproducir anime" disabled={loadingStreaming || !streamingInfo?.seasons?.some(s => s.episodes.length > 0)} style={[heroStyles.btnPlay, (!streamingInfo?.seasons?.some(s => s.episodes.length > 0)) && { opacity: 0.45 }]} onPress={handleWatchNow}>
+                    <View style={[heroStyles.actionRow, androidCompact && { flexWrap: 'nowrap', width: '100%', gap: 8 }]}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reproducir anime" disabled={loadingStreaming || !streamingInfo?.seasons?.some(s => s.episodes.length > 0)} style={[heroStyles.btnPlay, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, (!streamingInfo?.seasons?.some(s => s.episodes.length > 0)) && { opacity: 0.45 }]} onPress={handleWatchNow}>
                         <Ionicons name="play" size={18} color="#000" />
-                        <Text style={heroStyles.btnPlayText}>Reproducir</Text>
+                        <Text numberOfLines={1} style={[heroStyles.btnPlayText, androidCompact && { fontSize: 13, flexShrink: 1 }]}>{androidCompact ? 'Ver ahora' : 'Reproducir'}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[heroStyles.btnSecondary, isTogglingMyList && { opacity: 0.6 }]}
+                        style={[heroStyles.btnSecondary, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, isTogglingMyList && { opacity: 0.6 }]}
                         accessibilityRole="button" accessibilityLabel={currentInMyList ? "Quitar de Mi Lista" : "Añadir a Mi Lista"}
                         onPress={handleToggleList}
                         accessibilityState={{ busy: isTogglingMyList, disabled: isTogglingMyList }} disabled={isTogglingMyList}
@@ -1006,15 +1009,15 @@ export default function AnimeSeriesModal({
                         {isTogglingMyList
                           ? <ActivityIndicator size="small" color="#fff" />
                           : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color="#fff" />}
-                        <Text style={heroStyles.btnSecondaryText}>
+                        <Text numberOfLines={1} style={[heroStyles.btnSecondaryText, androidCompact && { flexShrink: 1, fontSize: 13 }]}>
                           {isTogglingMyList ? 'Guardando…' : currentInMyList ? 'En mi lista' : 'Mi lista'}
                         </Text>
                       </TouchableOpacity>
 
                       {trailerKey && (
-                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tráiler" style={heroStyles.btnIcon} onPress={handlePlayTrailer}>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tráiler" style={[heroStyles.btnIcon, androidCompact && { width: 48, minHeight: 48, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={handlePlayTrailer}>
                           <Ionicons name="play-circle-outline" size={22} color="#fff" />
-                          <Text style={heroStyles.btnIconText}>Trailer</Text>
+                          {!androidCompact && <Text style={heroStyles.btnIconText}>Trailer</Text>}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1031,7 +1034,7 @@ export default function AnimeSeriesModal({
               if (!nextEp) return null;
               return (
                 <TouchableOpacity
-                  style={continueStyles.card}
+                  style={[continueStyles.card, Platform.OS === 'android' && { marginTop: 0 }]}
                   onPress={async () => {
                     if (!currentProfile?.id || !currentContent?.id) {
                       handlePlayEpisode(nextEp, firstSeason, 0);

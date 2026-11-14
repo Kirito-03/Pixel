@@ -47,28 +47,29 @@ export default function TrailerPreview({ id, onEnded, initialMuted = true }: Tra
           * { margin:0; padding:0; box-sizing:border-box; }
           body, html { width:100%; height:100%; background:#000; overflow:hidden; }
           .wrap { position:relative; width:100%; height:100%; overflow:hidden; }
-          iframe { position:absolute; top:-10%; left:-5%; width:110%; height:120%; border:none; pointer-events:none; }
+          iframe, #player { position:absolute; top:0; left:0; width:100%; height:100%; border:none; }
         </style>
       </head>
       <body>
         <div class="wrap">
-          <iframe 
+          <iframe id="player"
             src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=${initialMuted ? 1 : 0}&playsinline=1&controls=0&fs=0&rel=0&iv_load_policy=3&cc_load_policy=0&disablekb=1&enablejsapi=1" 
             allow="autoplay; encrypted-media" 
             allowfullscreen>
           </iframe>
         </div>
         <script>
-          window.addEventListener('message', function(e) {
-            try {
-              var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-              if (data && (data.event === 'onStateChange' && data.info === 0) || (data.info && data.info.playerState === 0)) {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage('ENDED');
+          window.onYouTubeIframeAPIReady = function() {
+            window.player = new YT.Player('player', {
+              events: {
+                onReady: function(event) { ${initialMuted ? 'event.target.mute();' : 'event.target.unMute();'} event.target.playVideo(); },
+                onStateChange: function(event) {
+                  if (event.data === YT.PlayerState.ENDED && window.ReactNativeWebView) window.ReactNativeWebView.postMessage('ENDED');
                 }
               }
-            } catch(err) {}
-          });
+            });
+          };
+          var api = document.createElement('script'); api.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(api);
         </script>
       </body>
     </html>
@@ -106,7 +107,7 @@ export default function TrailerPreview({ id, onEnded, initialMuted = true }: Tra
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    minHeight: 200,
+    minHeight: 0,
     backgroundColor: '#000000',
     position: 'relative',
   },
@@ -125,7 +126,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    minHeight: 44,
+    paddingVertical: 8,
     borderRadius: 20,
     zIndex: 10,
   },

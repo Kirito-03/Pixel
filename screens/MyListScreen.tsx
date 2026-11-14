@@ -43,7 +43,7 @@ export default function MyListScreen() {
   const gutter = isSmallScreen ? 16 : width >= 1200 ? 32 : 24;
   const gap = isSmallScreen ? 12 : 16;
   const columns =
-    width >= 1360 ? 6 : width >= 1100 ? 5 : width >= 820 ? 4 : width >= 560 ? 3 : 2;
+    width >= 1320 ? 5 : width >= 1040 ? 4 : width >= 720 ? 3 : 2;
   const containerWidth = Math.min(width, 1440);
   const cardWidth = Math.floor((containerWidth - gutter * 2 - (columns - 1) * gap) / columns);
   const { currentProfile, adultContentEnabled } = useProfile();
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
   loadingView: { flex: 1, backgroundColor: '#0A0A0A', alignItems: 'center' },
   loadingText: { color: 'rgba(255,255,255,0.4)', marginTop: 16, fontSize: 14 },
   scrollContent: { flexGrow: 1 },
-  boundedContent: { width: '100%', maxWidth: 1440, alignSelf: 'center' },
+  boundedContent: { width: '100%', maxWidth: 1376, alignSelf: 'center' },
   headingCopy: { flex: 1, minWidth: 180 },
   eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 2, marginBottom: 10 },
   collectionCount: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 14, alignSelf: 'flex-start' },

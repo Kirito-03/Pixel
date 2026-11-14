@@ -18,98 +18,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { AnimeEpisode, VideoSource } from '../types';
 import { progressApi } from '../services/progressApi';
 
-const AD_BLOCK_SCRIPT = `
-(function() {
-  // Bloquear popups y nuevas ventanas
-  window.open = function() { return null; };
-  window.alert = function() {};
-  window.confirm = function() { return false; };
-
-  // Evitar que reescriban window.open
-  Object.defineProperty(window, 'open', {
-    get: function() { return function() { return null; }; },
-    set: function() {}
-  });
-
-  function removeAds() {
-    // Eliminar iframes maliciosos y elementos publicitarios
-    const adSelectors = [
-      'iframe[src*="ads"]', 'iframe[src*="ad."]', 'iframe[src*="doubleclick"]',
-      'iframe[src*="googlesyndication"]', 'iframe[src*="adsbygoogle"]',
-      'div[id*="overlay"]:not(#player)', 'div[id*="popup"]', 'div[id*="modal"]:not(#player)',
-      'div[class*="overlay"]:not(.player)', 'div[class*="popup"]',
-      'div[class*="ad-"]:not(.player)', 'div[class*="ads-"]',
-      'a[href*="claim"]', '.claim', '#claim',
-      '[class*="bonus"]', '[id*="bonus"]',
-      '[class*="promo"]', '[id*="promo"]',
-      'a[target="_blank"]' // Eliminar enlaces que abren nueva pestaña (suelen ser ads)
-    ];
-    
-    adSelectors.forEach(function(sel) {
-      try {
-        document.querySelectorAll(sel).forEach(function(el) {
-          if (!el.closest('#player') && !el.closest('video')) {
-            el.remove();
-          }
-        });
-      } catch(e) {}
-    });
-
-    // Ocultar overlays posicionados absolutos/fixed que cubren el reproductor (trampa de clic de Voe)
-    document.querySelectorAll('body > div, body > section, body > a').forEach(function(el) {
-      var style = window.getComputedStyle(el);
-      if ((style.position === 'fixed' || style.position === 'absolute') &&
-          style.zIndex > 100 && !el.id.includes('player') && !el.id.includes('video') && !el.className.includes('plyr')) {
-        el.style.display = 'none';
-        el.style.pointerEvents = 'none';
-      }
-      
-      // Voe inyecta a veces un div gigante transparente para atrapar clics
-      if ((style.width === '100%' || style.height === '100%') && style.opacity == 0 && el.tagName === 'DIV') {
-         el.remove();
-      }
-    });
-  }
-
-  removeAds();
-  setInterval(removeAds, 500);
-
-  // Interceptar TODOS los clics a nivel de documento
-  document.addEventListener('click', function(e) {
-    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('user_interaction');
-    
-    var target = e.target;
-    // Si el clic NO fue en el video o en los controles (plyr), bloquearlo agresivamente
-    if (target && !target.closest('.plyr') && !target.closest('video') && !target.closest('#player')) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-    }
-
-    if (target && target.tagName === 'A') {
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    }
-  }, true);
-
-  // Interceptar touch también
-  document.addEventListener('touchstart', function(e) {
-     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('user_interaction');
-     
-     var target = e.target;
-     if (target && !target.closest('.plyr') && !target.closest('video') && !target.closest('#player')) {
-        // Permitimos el touch, pero si es un enlace lo bloqueamos
-        if (target.tagName === 'A') {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-     }
-  }, true);
-
-  true;
-})();
-`;
+import { EMBEDDED_PLAYER_BRIDGE } from '../utils/embeddedPlayerBridge';
 
 interface EpisodePlayerProps {
   episode: AnimeEpisode;
@@ -117,6 +26,7 @@ interface EpisodePlayerProps {
   animeId: number;
   seasonNumber: number;
   profileId?: number;
+  resumeTimeSeconds?: number;
   onClose: () => void;
   onNextEpisode?: () => void;
   onPreviousEpisode?: () => void;
@@ -127,6 +37,7 @@ interface EpisodePlayerProps {
 // ── Native Video Player (Android / iOS) ─────────────────────────────────────
 interface NativePlayerProps {
   videoUrl: string;
+  resumeTimeSeconds?: number;
   episode: AnimeEpisode;
   animeTitle: string;
   hasNextEpisode: boolean;
@@ -137,8 +48,9 @@ interface NativePlayerProps {
   onProgress: (payload: { current_time: number; duration: number }, opts?: { force?: boolean }) => void;
 }
 
-const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
+export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   videoUrl,
+  resumeTimeSeconds = 0,
   episode,
   animeTitle,
   hasNextEpisode,
@@ -156,27 +68,32 @@ const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
     p.play();
   });
 
-  useEffect(() => {
-    console.log('NATIVE VIDEO URL:', videoUrl);
-  }, [videoUrl]);
-
-  useEffect(() => {
-    console.log('Video Player Status:', player.status);
-    if (player.status === 'error' || player.error) {
-      console.error('Video Player Error:', player.error);
-    }
-  }, [player.status, player.error]);
-
+  const [playing, setPlaying] = useState(player.playing);
+  const [playbackError, setPlaybackError] = useState('');
+  const resumed = useRef(false);
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
-    controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
-  }, []);
-
+    if (player.playing) controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
+  }, [player]);
   useEffect(() => {
+    const playingSubscription = player.addListener('playingChange', event => {
+      setPlaying(event.isPlaying);
+      resetControlsTimer();
+    });
+    const statusSubscription = player.addListener('statusChange', event => {
+      setPlaybackError(event.status === 'error' ? event.error?.message || 'No se pudo reproducir este vídeo.' : '');
+      if (event.status === 'readyToPlay' && !resumed.current && resumeTimeSeconds > 0) {
+        resumed.current = true;
+        player.currentTime = Math.min(resumeTimeSeconds, player.duration || resumeTimeSeconds);
+      }
+    });
     resetControlsTimer();
-    return () => { if (controlsTimer.current) clearTimeout(controlsTimer.current); };
-  }, []);
+    return () => {
+      playingSubscription.remove(); statusSubscription.remove();
+      if (controlsTimer.current) clearTimeout(controlsTimer.current);
+    };
+  }, [player, resetControlsTimer, resumeTimeSeconds]);
 
   // Track progress every ~2s polling
   useEffect(() => {
@@ -191,19 +108,13 @@ const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
     return () => clearInterval(interval);
   }, [player, onProgress]);
 
-  // Auto-advance on end
+  // Advancing is tied to the actual end event, never to pausing near the end.
   useEffect(() => {
-    const sub = player.addListener('playingChange', (isPlaying) => {
-      if (!isPlaying && (player.currentTime ?? 0) > 0) {
-        const dur = player.duration ?? 0;
-        const cur = player.currentTime ?? 0;
-        if (dur > 0 && cur >= dur * 0.95) {
-          onProgress({ current_time: Math.floor(cur), duration: Math.floor(dur) }, { force: true });
-          if (hasNextEpisode && onNextEpisode) onNextEpisode();
-        }
-      }
+    const subscription = player.addListener('playToEnd', () => {
+      onProgress({ current_time: Math.floor(player.currentTime || 0), duration: Math.floor(player.duration || 0) }, { force: true });
+      if (hasNextEpisode && onNextEpisode) onNextEpisode();
     });
-    return () => sub.remove();
+    return () => subscription.remove();
   }, [player, hasNextEpisode, onNextEpisode, onProgress]);
 
   return (
@@ -214,8 +125,10 @@ const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
         style={{ flex: 1 }}
         contentFit="contain"
         nativeControls={false}
+        surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
       />
 
+      {playbackError ? <Text accessibilityRole="alert" style={{ color: '#fff', position: 'absolute', top: '40%', left: 24, right: 24, textAlign: 'center' }}>{playbackError}</Text> : null}
       {showControls && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           {/* Top gradient */}
@@ -257,9 +170,10 @@ const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              onPress={() => player.playing ? player.pause() : player.play()}
+              accessibilityRole="button" accessibilityLabel={playing ? 'Pausar capítulo' : 'Reproducir capítulo'}
+              onPress={() => { if (player.playing) player.pause(); else player.play(); resetControlsTimer(); }}
               style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#E50914', justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name={player.playing ? 'pause' : 'play'} size={30} color="#fff" />
+              <Ionicons name={playing ? 'pause' : 'play'} size={30} color="#fff" />
             </TouchableOpacity>
             {hasNextEpisode && (
               <TouchableOpacity onPress={onNextEpisode}
@@ -288,6 +202,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   animeId,
   seasonNumber,
   profileId,
+  resumeTimeSeconds = 0,
   onClose,
   onNextEpisode,
   onPreviousEpisode,
@@ -301,6 +216,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showUI, setShowUI] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [canControlEmbed, setCanControlEmbed] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const webVideoRef = useRef<any>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -436,6 +352,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     try {
       setLoading(true);
       setError(null);
+      setCanControlEmbed(false);
       if (episode.url) {
         const directSources: VideoSource[] = [{ url: episode.url }];
         setSources(directSources);
@@ -524,25 +441,28 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
 
     // ── MOBILE: native expo-video ─────────────────────────────
     // Si no es un enlace directo de video (mp4, m3u8, webm), usamos WebView
-    const isDirectVideo = ext === 'm3u8' || ext === 'mp4' || ext === 'webm' || ext === 'mov';
+    const isDirectVideo = ext === 'm3u8' || ext === 'mp4' || ext === 'webm' || ext === 'mov' || /^(file|content):/i.test(videoUrl) || selectedSource.isM3U8 === true;
     
     if (!isDirectVideo) {
       return (
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <StatusBar hidden={true} translucent={true} />
           <WebView
+            ref={webViewRef}
             source={{ uri: videoUrl }}
             style={{ flex: 1 }}
             allowsFullscreenVideo
             javaScriptEnabled
             domStorageEnabled
             mediaPlaybackRequiresUserAction={false}
-            injectedJavaScript={AD_BLOCK_SCRIPT}
-            injectedJavaScriptBeforeContentLoaded={AD_BLOCK_SCRIPT}
+            injectedJavaScript={EMBEDDED_PLAYER_BRIDGE}
+            injectedJavaScriptBeforeContentLoaded={EMBEDDED_PLAYER_BRIDGE}
             onMessage={(event) => {
-              if (event.nativeEvent.data === 'user_interaction') {
-                showUITemporarily();
-              }
+              if (event.nativeEvent.data === 'user_interaction') { showUITemporarily(); return; }
+              try {
+                const message = JSON.parse(event.nativeEvent.data);
+                if (message.type === 'pixel:player') { setCanControlEmbed(message.canControl === true); setIsPlaying(message.playing === true); }
+              } catch { /* Ignore unrelated messages from the provider. */ }
             }}
             onLoadStart={() => setWebViewLoading(true)}
             onLoadEnd={() => setWebViewLoading(false)}
@@ -587,6 +507,11 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
               </View>
             </View>
 
+            {canControlEmbed && <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? 'Pausar capítulo' : 'Reproducir capítulo'}
+              style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: -32, marginTop: -32, width: 64, height: 64, borderRadius: 32, backgroundColor: '#E50914', justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => { webViewRef.current?.injectJavaScript('window.__pixelTogglePlayback && window.__pixelTogglePlayback(); true;'); showUITemporarily(); }}>
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color="#fff" />
+            </TouchableOpacity>}
             {/* Navigation Buttons */}
             {hasPreviousEpisode && (
               <TouchableOpacity style={[styles.floatNav, styles.floatNavLeft]} onPress={onPreviousEpisode}>
@@ -606,6 +531,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     return (
       <NativeVideoPlayer
         videoUrl={videoUrl}
+        resumeTimeSeconds={resumeTimeSeconds}
         episode={episode}
         animeTitle={animeTitle}
         hasNextEpisode={hasNextEpisode}
@@ -616,7 +542,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
         onProgress={sendProgress}
       />
     );
-  }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, onClose, sendProgress]);
+  }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, onClose, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds]);
 
   // ── Loading / Error screens ──────────────────────────────────
   if (loading) {

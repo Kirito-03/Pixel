@@ -24,6 +24,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   const { width, height } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
+  const androidCompact = Platform.OS === 'android' && isSmallScreen;
   const { currentProfile } = useProfile();
   const { isInMyList, toggleMyList, addToMyList } = useMyList();
   const [isToggling, setIsToggling] = useState(false);
@@ -192,10 +193,11 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         </Text>
 
         {/* Botones */}
-        <View style={styles.buttonsRow}>
+        <View style={[styles.buttonsRow, androidCompact && { gap: 10 }]}>
           <TouchableOpacity
             style={[
               styles.playButton,
+              androidCompact && { flexBasis: 0, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
               !isSmallScreen && { flex: 0, flexShrink: 0, paddingHorizontal: 24, minWidth: 180 },
               { backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000' },
               isWeb && playHover && {
@@ -215,6 +217,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
               numberOfLines={1}
               style={[
               styles.playButtonText,
+              androidCompact && { flexShrink: 1, fontSize: 12, letterSpacing: 0 },
               { color: theme === 'dark' ? '#000' : '#fff' },
               isWeb && playHover && { color: '#fff' },
             ]}>
@@ -225,6 +228,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           <TouchableOpacity
             style={[
               styles.infoButton,
+              androidCompact && { flexBasis: 0, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
               !isSmallScreen && { flex: 0, flexShrink: 0, paddingHorizontal: 24, minWidth: 200 },
               { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' },
               isWeb && infoHover && {
@@ -241,8 +245,8 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
             } : {})}
           >
             <Ionicons name="information-circle-outline" size={18} color={theme === 'dark' ? '#fff' : '#000'} />
-            <Text numberOfLines={1} style={[styles.infoButtonText, { color: theme === 'dark' ? '#fff' : '#000' }]}>
-              Más información
+            <Text numberOfLines={1} style={[styles.infoButtonText, androidCompact && { flexShrink: 1, fontSize: 12, letterSpacing: 0 }, { color: theme === 'dark' ? '#fff' : '#000' }]}>
+              {androidCompact ? 'Más info' : 'Más información'}
             </Text>
           </TouchableOpacity>
         </View>

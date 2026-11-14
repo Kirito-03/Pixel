@@ -27,3 +27,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-13-mi-lista-feedback]]: foco del buscador, carga/check al guardar y favoritos H separados por perfil.
 
 - [[2026-11-13-mi-lista-y-secciones-diarias]]: Mi Lista adaptable, cuatro filas H y destacados diarios; guardado H solo en detalle.
+
+- [[2026-11-14-android-manga-metadatos]]: APK Android con ajustes de tráiler/pausa/Inicio, Manga rediseñado, tarjetas grandes y metadata antigua cacheada.
