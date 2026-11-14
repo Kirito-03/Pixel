@@ -25,3 +25,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-13-hero-categorias-busqueda]]: hero panorámico, categorías y buscador propio de la sección H.
 
 - [[2026-11-13-mi-lista-feedback]]: foco del buscador, carga/check al guardar y favoritos H separados por perfil.
+
+- [[2026-11-13-mi-lista-y-secciones-diarias]]: Mi Lista adaptable, cuatro filas H y destacados diarios; guardado H solo en detalle.

@@ -9,6 +9,7 @@ export interface NSFWAnime {
     banner_url?: string;
     backdrop_path?: string;
     type: string;
+    status?: string;
     is_nsfw: boolean;
     synopsis?: string;
     genres?: string[];

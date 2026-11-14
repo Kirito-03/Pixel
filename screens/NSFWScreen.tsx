@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import CatalogHero from '../components/CatalogHero';
+import { catalogSections, dailySelection } from '../utils/catalogSections';
+import { useLocalDayKey } from '../hooks/useLocalDayKey';
 import { catalogCategories, filterCatalog } from '../utils/catalogFilters';
 import HentaiShelf from '../components/HentaiShelf';
 import HentaiSeriesModal from '../components/HentaiSeriesModal';
@@ -27,10 +29,10 @@ import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 
 const FILTERS = ['Todos', 'Nuevos caps', 'Finalizado'] as const;
-const SHELF_CHUNK_SIZE = 12;
 
 export default function NSFWScreen() {
   const { colors } = useTheme();
+  const day = useLocalDayKey();
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { adultContentEnabled, currentProfile } = useProfile();
@@ -46,6 +48,10 @@ export default function NSFWScreen() {
   const [videoError, setVideoError] = useState<string | null>(null);
   const [items, setItems] = useState<NSFWAnime[]>([]);
   const [query, setQuery] = useState('');
+  const [searchItems, setSearchItems] = useState<NSFWAnime[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchRevision, setSearchRevision] = useState(0);
   const [category, setCategory] = useState<string | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
@@ -120,6 +126,25 @@ export default function NSFWScreen() {
     // Intentionally keyed on adultContentEnabled, profileId, and activeFilter
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adultContentEnabled, profileId, activeFilter]);
+
+  useEffect(() => {
+    let active = true;
+    setSearchItems([]);
+    setSearchError(null);
+    if (!adultContentEnabled || !query.trim()) { setSearchLoading(false); return; }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        // Query the saved database too, so older titles outside the browse rows remain findable.
+        const found = await nsfwApi.getLatest(query.trim(), activeFilter);
+        if (active) setSearchItems(Array.isArray(found) ? found : []);
+      } catch { if (active) setSearchError('No se pudo completar la búsqueda. Intenta nuevamente.'); }
+      finally { if (active) setSearchLoading(false); }
+    }, 350);
+    return () => { active = false; clearTimeout(timer); };
+  }, [query, activeFilter, adultContentEnabled, profileId, searchRevision]);
+
+  const retryContent = () => query.trim() ? setSearchRevision(value => value + 1) : loadContent();
 
   const handleResetFilters = () => {
     setQuery('');
@@ -197,50 +222,47 @@ export default function NSFWScreen() {
 
   useEffect(() => {
     if (!adultContentEnabled || loading || typeof route.params?.slug !== 'string') return;
-    const selected = uniqueItems.find(item => item.slug === route.params.slug);
-    if (!selected) return;
-    setSelectedAnime(selected);
-    setShowSeriesModal(true);
-    navigation.setParams({ slug: undefined });
-  }, [route.params?.slug, uniqueItems, adultContentEnabled, loading, navigation]);
+    const slug = route.params.slug;
+    const selected = uniqueItems.find(item => item.slug === slug);
+    if (selected) {
+      setSelectedAnime(selected);
+      setShowSeriesModal(true);
+      navigation.setParams({ slug: undefined });
+      return;
+    }
+    let active = true;
+    // A saved title may be older than the latest browse batch.
+    nsfwApi.getDetails(slug).then(found => {
+      if (!active) return;
+      if (found) { setSelectedAnime(found); setShowSeriesModal(true); }
+      else setVideoError('Este título ya no está disponible en el catálogo.');
+      navigation.setParams({ slug: undefined });
+    }).catch(() => {
+      if (active) { setVideoError('No se pudo abrir el título guardado. Intenta nuevamente.'); navigation.setParams({ slug: undefined }); }
+    });
+    return () => { active = false; };
+  }, [route.params?.slug, uniqueItems, adultContentEnabled, loading, profileId, navigation]);
 
   const categories = useMemo(() => catalogCategories(uniqueItems), [uniqueItems]);
-  const filteredItems = useMemo(() => filterCatalog(uniqueItems, query, category), [uniqueItems, query, category]);
-  const heroItems = useMemo(() => uniqueItems.slice(0, 5).map(item => ({
+  const filteredItems = useMemo(() => {
+    const pool = query.trim() ? [...new Map([...searchItems, ...uniqueItems].map(item => [item.slug || String(item.id), item])).values()] : uniqueItems;
+    return filterCatalog(pool, query, category);
+  }, [uniqueItems, searchItems, query, category]);
+  const heroItems = useMemo(() => dailySelection(uniqueItems, day, 5).map(item => ({
     key: item.slug || String(item.id), title: item.title, poster: item.poster_path,
     banner: item.banner_path || item.banner_url || item.backdrop_path,
     description: item.synopsis,
-  })), [uniqueItems]);
+  })), [uniqueItems, day]);
   const hasHero = adultContentEnabled && !loading && !error && heroItems.length > 0;
-  // Partition all unique items into disjoint horizontal shelves of 12 (no silent truncation)
-  const shelves = useMemo(() => {
-    const groups: { key: string; title: string; items: NSFWAnime[]; accentColor: string }[] = [];
-    for (let i = 0; i < filteredItems.length; i += SHELF_CHUNK_SIZE) {
-      const chunkIndex = Math.floor(i / SHELF_CHUNK_SIZE);
-      const chunk = filteredItems.slice(i, i + SHELF_CHUNK_SIZE);
-      let title = 'Novedades';
-      let accentColor = colors.primary;
-
-      if (chunkIndex === 1) {
-        title = 'Más del catálogo';
-        accentColor = colors.accentBlue;
-      } else if (chunkIndex > 1) {
-        title = `Más del catálogo (${chunkIndex})`;
-        accentColor = chunkIndex % 2 === 0 ? colors.accentGreen : colors.primary;
-      }
-
-      groups.push({
-        key: `shelf-${chunkIndex}`,
-        title,
-        items: chunk,
-        accentColor,
-      });
-    }
-    return groups;
-  }, [filteredItems, colors.primary, colors.accentBlue, colors.accentGreen]);
-
   const horizontalPadding = isSmallScreen ? 16 : 24;
   const hasActiveFilters = activeFilter !== 'Todos' || !!query.trim() || category !== null;
+  const shelves = useMemo(() => {
+    // Browse has four curated rows. Filtering/searching exposes every matching loaded title.
+    const groups = hasActiveFilters
+      ? [{ key: 'results', title: 'Resultados', items: filteredItems }]
+      : catalogSections(uniqueItems, day);
+    return groups.map((group, index) => ({ ...group, accentColor: index % 2 ? colors.accentBlue : colors.primary }));
+  }, [filteredItems, uniqueItems, day, hasActiveFilters, colors.primary, colors.accentBlue]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -317,7 +339,7 @@ export default function NSFWScreen() {
                 </View>
                 {!categories.length ? <Text style={{ color: colors.textMuted, marginTop: 12 }}>Este catálogo todavía no tiene categorías registradas.</Text> : null}
               </ScrollView> : null}
-              {hasActiveFilters && !loading ? <View style={styles.resultSummary}>
+              {hasActiveFilters && !loading && !searchLoading && !searchError ? <View style={styles.resultSummary}>
                 <Text style={{ color: colors.textMuted }}>{filteredItems.length} {filteredItems.length === 1 ? 'título' : 'títulos'}{category ? ` · ${category}` : ''}</Text>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Restablecer búsqueda y filtros" onPress={handleResetFilters}><Text style={{ color: colors.primary }}>Restablecer</Text></TouchableOpacity>
               </View> : null}
@@ -381,20 +403,20 @@ export default function NSFWScreen() {
               )}
 
               {/* Contenido principal: Carga / Error / Vacío / Hero + Filas */}
-              {loading ? (
+              {loading || searchLoading ? (
                 <View style={styles.stateContainer}>
                   <ActivityIndicator size="large" color={colors.primary} />
                   <Text style={[styles.stateSubtext, { color: colors.textMuted }]}>
-                    Cargando catálogo...
+                    {searchLoading ? 'Buscando en el catálogo…' : 'Cargando catálogo…'}
                   </Text>
                 </View>
-              ) : error ? (
+              ) : error || searchError ? (
                 <View style={[styles.stateCard, { backgroundColor: colors.card }]}>
                   <Ionicons name="alert-circle-outline" size={44} color={colors.primary} />
                   <Text style={[styles.stateTitle, { color: colors.text }]}>
                     Error al cargar
                   </Text>
-                  <Text style={[styles.stateSubtext, { color: colors.textMuted }]}>{error}</Text>
+                  <Text style={[styles.stateSubtext, { color: colors.textMuted }]}>{searchError || error}</Text>
                   <TouchableOpacity
                     accessibilityRole="button"
                     accessibilityLabel="Reintentar carga del catálogo"
@@ -403,7 +425,7 @@ export default function NSFWScreen() {
                       { backgroundColor: colors.primary },
                       isWeb && ({ cursor: 'pointer' } as any),
                     ]}
-                    onPress={() => loadContent()}
+                    onPress={retryContent}
                   >
                     <Ionicons name="refresh" size={18} color="#FFFFFF" />
                     <Text style={styles.primaryBtnText}>Reintentar</Text>
@@ -445,7 +467,7 @@ export default function NSFWScreen() {
                         { backgroundColor: colors.primary },
                         isWeb && ({ cursor: 'pointer' } as any),
                       ]}
-                      onPress={() => loadContent()}
+                      onPress={retryContent}
                     >
                       <Ionicons name="refresh" size={18} color="#FFFFFF" />
                       <Text style={styles.primaryBtnText}>Reintentar</Text>

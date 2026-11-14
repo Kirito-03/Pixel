@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Alert,
+  TouchableOpacity,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,7 +20,7 @@ import AnimeSeriesModalWrapper from '../components/AnimeSeriesModalWrapper';
 import Header from '../components/Header';
 import { ContinueWatchingCard, WatchListItem, SavedListItem } from '../components/MyListComponents';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { colors as staticColors } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ContentItem } from '../types';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useTheme } from '../contexts/ThemeContext';
@@ -38,6 +39,10 @@ export default function MyListScreen() {
   const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
+  const insets = useSafeAreaInsets();
+  const gutter = isSmallScreen ? 16 : 24;
+  const columns = width >= 1120 ? 3 : width >= 768 ? 2 : 1;
+  const cardWidth = (Math.min(width, 1168) - gutter * 2 - (columns - 1) * 16) / columns;
   const { currentProfile, adultContentEnabled } = useProfile();
   const { user } = useAuth();
   const { refreshMyList, removeFromMyList } = useMyList();
@@ -46,6 +51,9 @@ export default function MyListScreen() {
 
   const [items, setItems] = useState<SavedListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [kind, setKind] = useState('all');
+  const [alphabetical, setAlphabetical] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [loadedScope, setLoadedScope] = useState<string | null>(null);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -68,6 +76,7 @@ export default function MyListScreen() {
   const currentScope = `${user?.uid}:${currentProfile?.id}:${adultContentEnabled}`;
   const scopeRef = useRef(currentScope);
   scopeRef.current = currentScope;
+  useEffect(() => { setKind('all'); setAlphabetical(false); setConfirmVisible(false); setConfirmPayload(null); setModalVisible(false); setSelectedContent(null); }, [currentScope]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,6 +89,7 @@ export default function MyListScreen() {
     const request = ++listRequest.current;
     const scope = currentScope;
     setLoading(true);
+    setLoadError('');
     try {
       await refreshMyList();
 
@@ -97,7 +107,7 @@ export default function MyListScreen() {
         if (e.content_type === 'anime') metaMap.set(Number(e.content_id), e);
       }
       setMetaByAnimeId(metaMap);
-      if (entries.length === 0) { setItems([]); return; }
+      if (entries.length === 0) { setItems([]); setLoadedScope(scope); return; }
 
       const detailPromises = entries.map(async (entry) => {
         try {
@@ -141,6 +151,7 @@ export default function MyListScreen() {
     } catch (error) {
       if (request !== listRequest.current || scope !== scopeRef.current) return;
       console.error('[MyListScreen] Error loading My List:', error);
+      setLoadError('No pudimos cargar tus guardados. Comprueba la conexión e inténtalo de nuevo.');
       setItems([]);
       setContinueRows([]);
     } finally {
@@ -243,6 +254,17 @@ export default function MyListScreen() {
       return { row, item };
     });
   const allItems = loadedScope === currentScope ? items.filter(item => adultContentEnabled || (item.type !== 'h_anime' && !item.isAdult)) : [];
+  const matchesKind = (item: SavedListItem, value: string) => value === 'all' || (value === 'video' ? item.type === 'movie' || item.type === 'tv' : item.type === value);
+  const listFilters = [
+    { key: 'all', label: 'Todo' }, { key: 'anime', label: 'Anime' },
+    { key: 'manga', label: 'Manga' }, { key: 'h_anime', label: 'H Anime' }, { key: 'video', label: 'Películas y series' },
+  ].map(filter => ({ ...filter, count: allItems.filter(item => matchesKind(item, filter.key)).length }))
+    .filter(filter => filter.key === 'all' || filter.count > 0);
+  const visibleItems = useMemo(() => {
+    const filtered = allItems.filter(item => matchesKind(item, kind));
+    return alphabetical ? [...filtered].sort((a, b) => a.title.localeCompare(b.title, 'es')) : filtered;
+  }, [items, loadedScope, currentScope, kind, alphabetical]);
+
 
   if (loading) {
     return (
@@ -266,20 +288,28 @@ export default function MyListScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: Platform.OS === 'web' ? 96 : insets.top + 80, paddingBottom: Math.max(40, insets.bottom + 24), paddingHorizontal: gutter }]}
       >
-        {/* ── PAGE HEADER ── */}
+        <View style={styles.boundedContent}>
         <View style={styles.pageHeader}>
-          <Text style={[styles.pageTitle, { color: colors.text }]}>Mi Lista</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
-            {items.length} {items.length === 1 ? 'anime guardado' : 'animes guardados'}
-          </Text>
+          <View style={styles.headingCopy}>
+            <Text style={[styles.eyebrow, { color: colors.primary }]}>TU COLECCIÓN</Text>
+            <Text style={[styles.pageTitle, { color: colors.text, fontSize: isSmallScreen ? 32 : 44 }]}>Mi Lista</Text>
+            <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
+              Tus historias favoritas, listas para cuando quieras volver.
+            </Text>
+          </View>
+          <View style={[styles.collectionCount, { backgroundColor: colors.card }]}>
+            <Ionicons name="bookmark-outline" size={20} color={colors.primary} />
+            <Text style={[styles.countNumber, { color: colors.text }]}>{allItems.length}</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{allItems.length === 1 ? 'título guardado' : 'títulos guardados'}</Text>
+          </View>
         </View>
 
         {/* ── CONTINUAR VIENDO ── */}
         {continueItems.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
+            <View style={[styles.sectionHeader, { justifyContent: 'flex-start' }]}>
               <Ionicons name="play-circle" size={20} color="#E50914" />
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Continuar viendo</Text>
             </View>
@@ -328,34 +358,47 @@ export default function MyListScreen() {
           </View>
         )}
 
-        {allItems.length === 0 ? (
-          /* ── EMPTY STATE ── */
-          <View style={styles.emptyState}>
-            <Ionicons name="bookmark-outline" size={64} color={theme === 'dark' ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.15)"} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Tu lista está vacía</Text>
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Agrega animes o mangas a tu lista para verlos más tarde
-            </Text>
-          </View>
-        ) : (
-          /* ── TODOS LOS CONTENIDOS ── */
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="list" size={20} color={colors.textMuted} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Todo tu contenido</Text>
-            </View>
+        <View style={styles.libraryToolbar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={{ flex: 1 }}>
+            {listFilters.map(filter => <TouchableOpacity key={filter.key} accessibilityRole="button" accessibilityLabel={`Mostrar ${filter.label}`}
+              accessibilityState={{ selected: kind === filter.key }} onPress={() => setKind(filter.key)}
+              style={[styles.filterButton, { backgroundColor: kind === filter.key ? colors.primary : colors.card }]}>
+              <Text style={{ color: kind === filter.key ? '#fff' : colors.textSecondary, fontWeight: '700', fontSize: 13 }}>{filter.label}</Text>
+              <Text style={{ color: kind === filter.key ? '#fff' : colors.textMuted, fontSize: 12 }}>{filter.count}</Text>
+            </TouchableOpacity>)}
+          </ScrollView>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={alphabetical ? 'Ordenar por más recientes' : 'Ordenar por título'}
+            onPress={() => setAlphabetical(value => !value)} style={[styles.sortButton, { backgroundColor: colors.card }]}>
+            <Ionicons name="swap-vertical-outline" size={18} color={colors.text} />
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{alphabetical ? 'A–Z' : 'Recientes'}</Text>
+          </TouchableOpacity>
+        </View>
 
-            <View style={isSmallScreen ? styles.listCol : styles.listGrid}>
-              {allItems.map((item) => (
+        {loadError ? <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+          <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
+          <Text accessibilityRole="alert" style={[styles.emptyText, { color: colors.textSecondary }]}>{loadError}</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar Mi Lista" onPress={loadMyList} style={[styles.emptyAction, { backgroundColor: colors.primary }]}><Text style={styles.emptyActionText}>Reintentar</Text></TouchableOpacity>
+        </View> : visibleItems.length === 0 ? <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+          <Ionicons name="bookmark-outline" size={42} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{allItems.length ? 'Sin guardados de este tipo' : 'Tu próxima historia empieza aquí'}</Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>{allItems.length ? 'Prueba otro filtro para ver tu colección.' : 'Guarda anime y manga desde sus detalles y encuéntralos aquí.'}</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={() => allItems.length ? setKind('all') : navigateByLabel('Inicio')} style={[styles.emptyAction, { backgroundColor: colors.primary }]}><Text style={styles.emptyActionText}>{allItems.length ? 'Ver todo' : 'Explorar catálogo'}</Text></TouchableOpacity>
+        </View> : <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Tus guardados</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{visibleItems.length} {visibleItems.length === 1 ? 'título' : 'títulos'}</Text>
+          </View>
+          <View style={styles.listGrid}>
+              {visibleItems.map((item) => (
                 (() => {
-                  const meta = metaByAnimeId.get(Number(item.id)) || metaByAnimeId.get(item.id as any);
+                  const meta = item.type === 'anime' ? metaByAnimeId.get(Number(item.id)) : undefined;
                   const currentEpisode = typeof meta?.episode_number === 'number' ? meta.episode_number : undefined;
                   const totalEpisodes = typeof meta?.total_episodes === 'number' ? meta.total_episodes : undefined;
                   const progress = Number(meta?.progress_percent ?? 0) / 100;
                   return (
                 <View
                   key={`${item.type}:${item.id}`}
-                  style={isSmallScreen ? { width: '100%' } : styles.listCell}
+                  style={{ width: cardWidth }}
                 >
                   <WatchListItem
                     item={item}
@@ -378,10 +421,10 @@ export default function MyListScreen() {
                   );
                 })()
               ))}
-            </View>
           </View>
-        )}
+        </View>}
 
+        </View>
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -428,13 +471,27 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A0A' },
   loadingView: { flex: 1, backgroundColor: '#0A0A0A', alignItems: 'center' },
   loadingText: { color: 'rgba(255,255,255,0.4)', marginTop: 16, fontSize: 14 },
-  scrollContent: { paddingTop: 80 },
+  scrollContent: { flexGrow: 1 },
+  boundedContent: { width: '100%', maxWidth: 1120, alignSelf: 'center' },
+  headingCopy: { flex: 1, minWidth: 180 },
+  eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 2, marginBottom: 10 },
+  collectionCount: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 14, alignSelf: 'flex-start' },
+  countNumber: { fontSize: 20, fontWeight: '800' },
+  libraryToolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28 },
+  filterRow: { flexDirection: 'row', gap: 8, paddingRight: 8 },
+  filterButton: { minHeight: 44, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sortButton: { minHeight: 44, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  emptyAction: { minHeight: 44, paddingHorizontal: 20, justifyContent: 'center' },
+  emptyActionText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   /* PAGE HEADER */
   pageHeader: {
-    paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 28,
+    paddingBottom: 32,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 20,
   },
   pageTitle: {
     color: '#FFFFFF',
@@ -450,14 +507,14 @@ const styles = StyleSheet.create({
 
   /* SECTION */
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 36,
+    marginBottom: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 16,
+    justifyContent: 'space-between',
   },
   sectionTitle: {
     color: '#FFFFFF',
@@ -473,15 +530,13 @@ const styles = StyleSheet.create({
   },
 
   /* ALL LIST */
-  listCol: { flexDirection: 'column' },
-  listGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  listCell: { flex: 1, minWidth: 320 },
+  listGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
 
   /* EMPTY */
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 40,
+    paddingVertical: 48,
+    paddingHorizontal: 24,
     gap: 16,
   },
   emptyTitle: {
