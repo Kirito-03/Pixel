@@ -248,11 +248,9 @@ const styles = StyleSheet.create({
   posterBox: {
     width: '100%',
     aspectRatio: 2 / 3,
-    borderRadius: 12,
+    borderRadius: 2,
     overflow: 'hidden',
     backgroundColor: '#1a1a22',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
     position: 'relative',
   },
   chapterPill: {
@@ -262,10 +260,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.78)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 2,
   },
   chapterPillText: {
     color: '#FFF',

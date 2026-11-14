@@ -91,11 +91,9 @@ export default function MyListScreen() {
     if (!currentProfile) return;
     const request = ++listRequest.current;
     const scope = currentScope;
-    setLoading(true);
+    if (items.length === 0) setLoading(true);
     setLoadError('');
     try {
-      await refreshMyList();
-
       // Playback progress is optional: its endpoint must not hide saved favorites when unavailable.
       continueWatchingApi.get(currentProfile.id).then(rows => {
         if (request === listRequest.current && scope === scopeRef.current) setContinueRows(rows);

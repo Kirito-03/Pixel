@@ -268,14 +268,14 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, progress, r
   </TouchableOpacity>;
 }
 const wlStyles = StyleSheet.create({
-  card: { width: '100%', borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
+  card: { width: '100%', borderRadius: 2, overflow: 'hidden' },
   thumb: { width: '100%', aspectRatio: 2 / 3, backgroundColor: '#18181f', position: 'relative', justifyContent: 'center', alignItems: 'center' },
   fallbackBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  badge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  info: { padding: 11, gap: 4, minHeight: 68, justifyContent: 'space-between' },
+  badge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 2 },
+  info: { padding: 10, gap: 4, minHeight: 64, justifyContent: 'space-between' },
   type: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8, color: '#fff' },
   title: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
   meta: { fontSize: 11, fontWeight: '600' },
   progressOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  remove: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
+  remove: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.68)', alignItems: 'center', justifyContent: 'center' },
 });

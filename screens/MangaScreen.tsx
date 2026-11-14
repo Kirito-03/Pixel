@@ -9,14 +9,13 @@ import {
   ActivityIndicator,
   TextInput,
   TouchableOpacity,
-  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../components/Header';
+import CatalogHero, { CatalogHeroItem } from '../components/CatalogHero';
 import { MangaCard, MangaRankingItem, MangaFilterChips, MangaFilter, MangaItemUI } from '../components/MangaComponents';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { mangaApi, Manga } from '../services/mangaApi';
@@ -25,17 +24,17 @@ export default function MangaScreen() {
   const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
+  const isWeb = Platform.OS === 'web';
   const insets = useSafeAreaInsets();
-  const headerHeight = Platform.OS === 'web' ? 90 : (56 + insets.top);
+  const headerHeight = isWeb ? 90 : (56 + insets.top);
   const navigation = useNavigation<any>();
   const { navigateByLabel } = useTabNavigation();
 
-  const gutter = isSmallScreen ? 16 : width >= 1200 ? 32 : 24;
-  const gap = isSmallScreen ? 12 : 16;
+  const gutter = isSmallScreen ? 16 : 40;
+  const gap = isSmallScreen ? 10 : 14;
   const columns =
     width >= 1360 ? 6 : width >= 1100 ? 5 : width >= 820 ? 4 : width >= 560 ? 3 : 2;
-  const containerWidth = Math.min(width, 1440);
-  const cardWidth = Math.floor((containerWidth - gutter * 2 - (columns - 1) * gap) / columns);
+  const cardWidth = Math.floor((width - gutter * 2 - (columns - 1) * gap) / columns);
 
   const [activeFilter, setActiveFilter] = useState<MangaFilter>('Todos');
   const [search, setSearch] = useState('');
@@ -90,7 +89,7 @@ export default function MangaScreen() {
             search: q || undefined,
             order: 'updated',
           }),
-          mangaApi.popular({ limit: 6 }).catch(() => ({ items: [] })),
+          mangaApi.popular({ limit: 5 }).catch(() => ({ items: [] })),
         ]);
         if (cancelled) return;
         const rows = (list.items || list.data || []) as Manga[];
@@ -142,7 +141,20 @@ export default function MangaScreen() {
   };
 
   const mapped = useMemo(() => items.map(toUI), [items]);
-  const featured = !search.trim() && activeFilter === 'Todos' && popular.length > 0 ? popular[0] : null;
+  const heroItems: CatalogHeroItem[] = useMemo(
+    () =>
+      popular.slice(0, 5).map((p) => ({
+        key: p.id,
+        title: p.title,
+        poster: p.cover_url || undefined,
+        description:
+          p.description ||
+          'Explora los capítulos disponibles y continúa tu lectura al instante.',
+      })),
+    [popular]
+  );
+
+  const showHero = !search.trim() && activeFilter === 'Todos' && heroItems.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -153,137 +165,140 @@ export default function MangaScreen() {
         onSearchPress={() => navigateByLabel('Buscar')}
         onNavPress={navigateByLabel}
       />
-      <View style={{ height: headerHeight }} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingHorizontal: gutter, paddingBottom: Math.max(48, insets.bottom + 24) },
+          { paddingTop: showHero ? 0 : headerHeight, paddingBottom: Math.max(48, insets.bottom + 24) },
         ]}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.boundedContent}>
-          {/* ── HERO DESTACADO ── */}
-          {featured ? (
-            <TouchableOpacity
-              activeOpacity={0.92}
-              onPress={() => navigation.navigate('MangaDetail', { id: featured.id })}
-              style={[
-                styles.heroCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-                },
-              ]}
-            >
-              {featured.cover_url ? (
-                <Image
-                  source={{ uri: featured.cover_url }}
-                  style={styles.heroBackdrop}
-                  resizeMode="cover"
-                  blurRadius={Platform.OS === 'web' ? 18 : 12}
-                />
-              ) : null}
-              <LinearGradient
-                colors={['rgba(10,10,14,0.68)', 'rgba(10,10,14,0.92)', '#0A0A0E']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <View style={[styles.heroInner, isSmallScreen && styles.heroInnerMobile]}>
-                {featured.cover_url ? (
-                  <Image
-                    source={{ uri: featured.cover_url }}
-                    style={[styles.heroCover, isSmallScreen && styles.heroCoverMobile]}
-                    resizeMode="cover"
-                  />
-                ) : null}
-                <View style={styles.heroCopy}>
-                  <View style={styles.heroBadgeRow}>
-                    <View style={styles.heroTopPill}>
-                      <Ionicons name="flame" size={12} color="#FFF" />
-                      <Text style={styles.heroTopPillText}>TOP #1 DESTACADO</Text>
-                    </View>
-                    <View style={styles.heroMetaPill}>
-                      <Ionicons name="star" size={12} color="#FFD700" />
-                      <Text style={styles.heroMetaPillText}>{stableRating(featured.id).toFixed(1)}</Text>
-                    </View>
-                    {featured.chapter_count ? (
-                      <View style={styles.heroMetaPill}>
-                        <Text style={styles.heroMetaPillText}>{featured.chapter_count} caps.</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={[styles.heroTitle, isSmallScreen && { fontSize: 22, lineHeight: 28 }]} numberOfLines={2}>
-                    {featured.title}
-                  </Text>
-                  <Text style={styles.heroDesc} numberOfLines={isSmallScreen ? 2 : 3}>
-                    {featured.description || 'Explora los capítulos disponibles en alta calidad desde MangaDex y sigue tu lectura al instante.'}
-                  </Text>
-                  <View style={styles.heroActions}>
-                    <TouchableOpacity
-                      style={styles.heroPrimaryBtn}
-                      onPress={() => navigation.navigate('MangaDetail', { id: featured.id })}
-                    >
-                      <Ionicons name="book" size={16} color="#FFF" />
-                      <Text style={styles.heroPrimaryBtnText}>Leer ahora</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ) : null}
+        {showHero ? (
+          <CatalogHero
+            eyebrow="MANGA  ·  DESTACADOS"
+            items={heroItems}
+            onOpen={(id) => navigation.navigate('MangaDetail', { id })}
+          />
+        ) : null}
 
-          {/* ── HEADER + BUSCADOR ── */}
-          <View style={styles.toolbarHeader}>
-            <View>
-              <Text style={[styles.superTitle, { color: colors.primary }]}>BIBLIOTECA MANGADEX</Text>
-              <Text style={[styles.mainTitle, { color: colors.text, fontSize: isSmallScreen ? 28 : 36 }]}>
-                Manga
-              </Text>
+        <View style={[styles.mainContent, { paddingHorizontal: gutter, paddingTop: showHero ? 20 : 12 }]}>
+          {/* ── CABECERA Y BUSCADOR ── */}
+          <View
+            style={[
+              styles.topSection,
+              {
+                flexDirection: isSmallScreen ? 'column' : 'row',
+                alignItems: isSmallScreen ? 'stretch' : 'center',
+                gap: 16,
+              },
+            ]}
+          >
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, { color: colors.text }]}>MANGA</Text>
+              <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.badgeText}>LECTURA</Text>
+              </View>
             </View>
+
             <View
               style={[
-                styles.searchWrapper,
+                styles.searchBox,
                 {
                   backgroundColor: colors.card,
-                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                  width: isSmallScreen ? '100%' : 360,
+                  width: isSmallScreen ? '100%' : 380,
                 },
               ]}
             >
-              <Ionicons name="search" size={18} color={colors.textMuted || '#888'} style={{ marginLeft: 14, marginRight: 10 }} />
+              <Ionicons name="search" size={18} color={colors.textMuted || '#888'} />
               <TextInput
-                style={[
-                  styles.searchInput,
-                  { color: colors.text },
-                  Platform.OS === 'web'
-                    ? ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any)
-                    : {},
-                ]}
-                placeholder="Buscar manga por título..."
+                accessibilityLabel="Buscar manga"
+                placeholder="Buscar en esta sección…"
                 placeholderTextColor={colors.textMuted || '#777'}
                 value={search}
                 onChangeText={setSearch}
+                style={[
+                  styles.searchInput,
+                  { color: colors.text },
+                  isWeb ? ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any) : {},
+                ]}
+                returnKeyType="search"
               />
               {search ? (
-                <TouchableOpacity onPress={() => setSearch('')} style={{ paddingHorizontal: 12 }}>
-                  <Ionicons name="close-circle" size={18} color={colors.textMuted || '#777'} />
+                <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
+                  <Ionicons name="close" size={18} color={colors.text} />
                 </TouchableOpacity>
-              ) : loading ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 14 }} />
               ) : null}
             </View>
+          </View>
+
+          {/* ── FILTROS ── */}
+          <View style={styles.filtersRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+              <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
+            </ScrollView>
+            <Text style={[styles.resultsCount, { color: colors.textMuted }]}>
+              {mapped.length} {mapped.length === 1 ? 'título' : 'títulos'}
+            </Text>
+          </View>
+
+          {/* ── RECIÉN ACTUALIZADOS (GRID) ── */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionBar} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recién actualizados</Text>
+            </View>
+
+            {loading ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : mapped.length === 0 ? (
+              <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+                <Ionicons name="book-outline" size={42} color={colors.textMuted} />
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                  No encontramos mangas para este filtro.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={[styles.catalogGrid, { gap }]}>
+                  {mapped.map((it) => (
+                    <View key={it.id} style={{ width: cardWidth }}>
+                      <MangaCard
+                        item={it}
+                        onPress={() => navigation.navigate('MangaDetail', { id: it.id })}
+                      />
+                    </View>
+                  ))}
+                </View>
+
+                {hasMore ? (
+                  <TouchableOpacity
+                    style={[styles.loadMoreBtn, { backgroundColor: colors.card }]}
+                    onPress={loadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <>
+                        <Text style={[styles.loadMoreText, { color: colors.text }]}>Cargar más</Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.text} />
+                      </>
+                    )}
+                  </TouchableOpacity>
+                ) : null}
+              </>
+            )}
           </View>
 
           {/* ── POPULARES (RANKING) ── */}
           {!search.trim() && popular.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleRow}>
-                  <Ionicons name="trending-up" size={20} color={colors.primary} />
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Populares de la semana</Text>
-                </View>
+                <View style={styles.sectionBar} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Populares</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rankingScroll}>
                 {popular.map((p, idx) => (
@@ -307,57 +322,6 @@ export default function MangaScreen() {
               </ScrollView>
             </View>
           )}
-
-          {/* ── FILTROS Y CATÁLOGO ── */}
-          <View style={styles.section}>
-            <View style={[styles.filtersWrapper, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-                <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
-              </ScrollView>
-              <Text style={[styles.resultsCount, { color: colors.textMuted }]}>{mapped.length} títulos</Text>
-            </View>
-
-            {loading ? (
-              <View style={styles.loaderContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : mapped.length === 0 ? (
-              <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-                <Ionicons name="book-outline" size={44} color={colors.textMuted} />
-                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No encontramos mangas para este filtro.</Text>
-              </View>
-            ) : (
-              <>
-                <View style={[styles.catalogGrid, { gap }]}>
-                  {mapped.map((it) => (
-                    <View key={it.id} style={{ width: cardWidth }}>
-                      <MangaCard
-                        item={it}
-                        onPress={() => navigation.navigate('MangaDetail', { id: it.id })}
-                      />
-                    </View>
-                  ))}
-                </View>
-
-                {hasMore ? (
-                  <TouchableOpacity
-                    style={[styles.loadMoreBtn, { backgroundColor: colors.card, borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)' }]}
-                    onPress={loadMore}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <>
-                        <Text style={[styles.loadMoreText, { color: colors.text }]}>Cargar más mangas</Text>
-                        <Ionicons name="chevron-down" size={16} color={colors.text} />
-                      </>
-                    )}
-                  </TouchableOpacity>
-                ) : null}
-              </>
-            )}
-          </View>
         </View>
       </ScrollView>
     </View>
@@ -366,135 +330,58 @@ export default function MangaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingTop: 16, flexGrow: 1 },
-  boundedContent: { width: '100%', maxWidth: 1440, alignSelf: 'center' },
+  scrollContent: { flexGrow: 1 },
+  mainContent: { width: '100%' },
 
-  heroCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    marginBottom: 28,
-    position: 'relative',
-  },
-  heroBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.45,
-  },
-  heroInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 24,
-    gap: 24,
-  },
-  heroInnerMobile: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 14,
-  },
-  heroCover: {
-    width: 132,
-    aspectRatio: 2 / 3,
-    borderRadius: 10,
-    backgroundColor: '#1a1a22',
-  },
-  heroCoverMobile: {
-    width: 92,
-  },
-  heroCopy: { flex: 1, gap: 10 },
-  heroBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  heroTopPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#E50914',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  heroTopPillText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  heroMetaPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  heroMetaPillText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
-  heroTitle: { color: '#FFF', fontSize: 28, fontWeight: '900', lineHeight: 34 },
-  heroDesc: { color: 'rgba(255,255,255,0.72)', fontSize: 13, lineHeight: 20 },
-  heroActions: { flexDirection: 'row', gap: 12, marginTop: 4 },
-  heroPrimaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#E50914',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  heroPrimaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 13 },
-
-  toolbarHeader: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  topSection: {
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    gap: 16,
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  superTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 2.4, marginBottom: 4 },
-  mainTitle: { fontWeight: '900', letterSpacing: -0.6 },
-  searchWrapper: {
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  title: { fontSize: 28, fontWeight: '900', letterSpacing: 0.4 },
+  badge: { paddingHorizontal: 7, paddingVertical: 3 },
+  badgeText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+
+  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    height: 46,
+    paddingHorizontal: 14,
+    height: 44,
+    gap: 10,
   },
-  searchInput: { flex: 1, fontSize: 14, fontWeight: '500', height: '100%' },
+  searchInput: { flex: 1, fontSize: 14, height: '100%' },
 
-  section: { marginBottom: 32 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitle: { fontSize: 19, fontWeight: '800', letterSpacing: -0.2 },
-  rankingScroll: { gap: 12, paddingRight: 8 },
-
-  filtersWrapper: {
+  filtersRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    borderBottomWidth: 1,
-    paddingBottom: 12,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   resultsCount: { fontSize: 12, fontWeight: '600' },
 
+  section: { marginBottom: 36 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  sectionBar: { width: 3, height: 18, backgroundColor: '#E50914' },
+  sectionTitle: { fontSize: 19, fontWeight: '800', letterSpacing: -0.2 },
+
   catalogGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  rankingScroll: { gap: 12, paddingRight: 8 },
+
   loadMoreBtn: {
-    marginTop: 28,
+    marginTop: 24,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
   },
   loadMoreText: { fontSize: 13, fontWeight: '700' },
 
   emptyState: {
     alignItems: 'center',
     paddingVertical: 56,
-    borderRadius: 14,
     gap: 12,
   },
   emptyText: { fontSize: 14 },
