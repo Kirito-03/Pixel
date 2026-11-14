@@ -2,9 +2,14 @@ import { backendClient } from './backendClient';
 import { getCurrentBaseURL } from './db/networkClient';
 
 function normalizeCover<T extends { cover_url?: string | null }>(manga: T): T {
-  if (!manga || !manga.cover_url?.startsWith('/api/manga-cover?')) return manga;
-  // Absolute URL also works in native Image; version avoids the previous cached HTML response.
-  return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}${manga.cover_url}&v=2` };
+  if (!manga || !manga.cover_url) return manga;
+  if (manga.cover_url.startsWith('/api/manga-cover?')) {
+    return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}${manga.cover_url}&v=2` };
+  }
+  if (manga.cover_url.includes('dragontranslation.org')) {
+    return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}/api/proxy/manga-image?url=${encodeURIComponent(manga.cover_url)}` };
+  }
+  return manga;
 }
 
 function normalizeList(data: any) {
@@ -87,6 +92,17 @@ export const mangaApi = {
 
   async chapterPages(chapterId: string) {
     const { data } = await backendClient.get(`/api/manga/chapter/${encodeURIComponent(chapterId)}/pages`);
+    if (data && Array.isArray(data.pages)) {
+      data.pages = data.pages.map((p: string) => {
+        if (p.startsWith('/')) {
+          return `${getCurrentBaseURL().replace(/\/$/, '')}${p}`;
+        }
+        if (p.includes('dragontranslation.org')) {
+          return `${getCurrentBaseURL().replace(/\/$/, '')}/api/proxy/manga-image?url=${encodeURIComponent(p)}`;
+        }
+        return p;
+      });
+    }
     return data as MangaChapterPages;
   },
 };

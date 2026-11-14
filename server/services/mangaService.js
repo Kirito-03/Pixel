@@ -858,7 +858,8 @@ export async function getChapterPages(pool, chapterUrl) {
     $('.reading-content img, .wp-manga-chapter-img').each((_, el) => {
        const src = $(el).attr('data-src') || $(el).attr('src') || $(el).attr('data-lazy-src');
        if (src && !pages.includes(src.trim()) && !src.includes('logo') && !src.includes('icon')) {
-         pages.push(src.trim());
+         const clean = src.trim();
+         pages.push(`/api/proxy/manga-image?url=${encodeURIComponent(clean)}`);
        }
     });
     

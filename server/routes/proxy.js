@@ -165,4 +165,37 @@ router.get('/manga-cover', async (req, res) => {
   }
 });
 
+// Proxy de imágenes para DragonTranslation y Manga (evita bloqueo por hotlinking o Cloudflare)
+router.get('/manga-image', async (req, res) => {
+  const { url } = req.query;
+  let target;
+  try { target = new URL(typeof url === 'string' ? url : ''); } catch {}
+  if (!target || target.protocol !== 'https:' || target.hostname !== 'dragontranslation.org' || target.username || target.password || (target.port && target.port !== '443')) {
+    return res.status(400).send('URL inválida o no permitida');
+  }
+
+  try {
+    const response = await axios.get(target.href, {
+      responseType: 'arraybuffer',
+      headers: {
+        'Referer': 'https://dragontranslation.org/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      },
+      maxRedirects: 2,
+      maxContentLength: 15 * 1024 * 1024,
+      timeout: 15000
+    });
+    const body = Buffer.from(response.data);
+    const mime = String(response.headers['content-type'] || 'image/jpeg').split(';')[0].toLowerCase();
+    res.set('Content-Type', mime);
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Cache-Control', 'public, max-age=604800'); // Cachear por 7 días
+    res.send(body);
+  } catch (error) {
+    console.error('Error proxy manga image:', error.message);
+    res.set('Cache-Control', 'no-store').status(502).send('Error obteniendo imagen de manga');
+  }
+});
+
 export default router;
