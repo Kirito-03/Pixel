@@ -99,3 +99,6 @@ __pycache__/
 
 # Version the Pixel Termux boot script
 !tools/termux/start-pixel.sh
+
+# Published Android binaries and per-release manifests are deployment artifacts
+server/releases/android/

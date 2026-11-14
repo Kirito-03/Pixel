@@ -64,6 +64,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
   const loadCurrentProfile = async (): Promise<Profile | null> => {
     try {
       console.log('ProfileContext: Loading current profile...');
+      await Storage.ready();
       const profile = Storage.getObject<Profile>('currentProfile');
       if (profile) {
         console.log('ProfileContext: Parsed profile ID:', profile?.id, 'Name:', profile?.name);

@@ -41,7 +41,7 @@ class AdminAuthService {
             }
             return { success: false, error: 'Respuesta inválida del servidor' };
         } catch (error: any) {
-            console.error('Firebase Admin Login Error:', error);
+            console.error('Firebase Admin Login Error:', error?.response?.status || 'network');
             const msg = error.response?.data?.message || error.message || 'Error de autenticación';
             return { success: false, error: msg };
         }

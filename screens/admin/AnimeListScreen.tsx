@@ -13,6 +13,7 @@ import {
     Image,
     Modal,
     Alert,
+    useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +22,17 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../../types/navigation';
 import { AdminShell } from '../../components/admin/AdminShell';
+import { AdminHeader } from '../../components/admin/AdminHeader';
 import { adminColors } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
 
 export default function AnimeListScreen() {
     const navigation = useNavigation<NavigationProp>();
+    const { width } = useWindowDimensions();
+    const isNarrow = width < 640;
+    const isCompact = width < 480;
+
     const [animeList, setAnimeList] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -163,42 +169,43 @@ export default function AnimeListScreen() {
         <Pressable
             style={({ hovered }: any) => [
                 styles.row,
-                hovered && styles.rowHovered
+                isNarrow && styles.rowStacked,
+                hovered && styles.rowHovered,
             ]}
             onPress={() => navigation.navigate('EpisodeManager', { animeId: item.id, animeTitle: item.title })}
         >
-            <View style={styles.thumbWrap}>
-                {item.poster_url ? (
-                    <Image source={{ uri: item.poster_url }} style={styles.thumb} resizeMode="cover" />
-                ) : (
-                    <View style={styles.thumbFallback}>
-                        <Ionicons name="image-outline" size={18} color="#666666" />
-                    </View>
-                )}
-            </View>
+            <View style={styles.rowTop}>
+                <View style={styles.thumbWrap}>
+                    {item.poster_url ? (
+                        <Image source={{ uri: item.poster_url }} style={styles.thumb} resizeMode="cover" />
+                    ) : (
+                        <View style={styles.thumbFallback}>
+                            <Ionicons name="image-outline" size={18} color={adminColors.textSecondary} />
+                        </View>
+                    )}
+                </View>
 
-            <View style={styles.main}>
-                <View style={styles.titleRow}>
-                    <Text style={styles.title} numberOfLines={1}>#{item.id} - {item.title}</Text>
-                    <View style={[styles.badge, getStatusBadgeStyle(item.status)]}>
-                        <Text style={[styles.badgeText, getStatusTextStyle(item.status)]}>{item.status || 'Unknown'}</Text>
+                <View style={styles.main}>
+                    <View style={styles.titleRow}>
+                        <Text style={styles.title} numberOfLines={1}>#{item.id} · {item.title}</Text>
+                        <View style={[styles.badge, getStatusBadgeStyle(item.status)]}>
+                            <Text style={[styles.badgeText, getStatusTextStyle(item.status)]}>{item.status || 'Unknown'}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.metaRow}>
+                        <Text style={styles.metaText} numberOfLines={1}>{getEpisodeLabel(item)}</Text>
+                        {!!formatGenres(item.genres) && <Text style={styles.metaDot}>•</Text>}
+                        {!!formatGenres(item.genres) && <Text style={styles.metaText} numberOfLines={1}>{formatGenres(item.genres)}</Text>}
+                        {!!item.created_at && <Text style={styles.metaDot}>•</Text>}
+                        {!!item.created_at && <Text style={styles.metaMuted} numberOfLines={1}>{formatCreatedAt(item.created_at)}</Text>}
                     </View>
                 </View>
-                <View style={styles.metaRow}>
-                    <Text style={styles.metaText} numberOfLines={1}>{getEpisodeLabel(item)}</Text>
-                    {!!formatGenres(item.genres) && <Text style={styles.metaDot}>•</Text>}
-                    {!!formatGenres(item.genres) && <Text style={styles.metaText} numberOfLines={1}>{formatGenres(item.genres)}</Text>}
-                    {!!item.created_at && <Text style={styles.metaDot}>•</Text>}
-                    {!!item.created_at && <Text style={styles.metaMuted} numberOfLines={1}>{formatCreatedAt(item.created_at)}</Text>}
-                </View>
             </View>
 
-            <View style={styles.actionGroup}>
+            <View style={[styles.actionGroup, isNarrow && styles.actionGroupStacked]}>
                 <TouchableOpacity
                     style={[styles.actionPill, styles.actionPrimary]}
-                    onPress={() => {
-                        navigation.navigate('EpisodeManager', { animeId: item.id, animeTitle: item.title });
-                    }}
+                    onPress={() => navigation.navigate('EpisodeManager', { animeId: item.id, animeTitle: item.title })}
                 >
                     <Ionicons name="albums-outline" size={16} color="#FFFFFF" />
                     <Text style={styles.actionPrimaryText}>Episodios</Text>
@@ -206,27 +213,24 @@ export default function AnimeListScreen() {
 
                 <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={() => {
-                        navigation.navigate('AnimeForm', { mode: 'edit', animeId: item.id });
-                    }}
+                    onPress={() => navigation.navigate('AnimeForm', { mode: 'edit', animeId: item.id })}
+                    accessibilityLabel="Editar anime"
                 >
-                    <Ionicons name="pencil" size={18} color={adminColors.textSecondary} />
+                    <Ionicons name="pencil" size={18} color={adminColors.text} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={() => {
-                        openDetails(item);
-                    }}
+                    onPress={() => openDetails(item)}
+                    accessibilityLabel="Ver detalle"
                 >
-                    <Ionicons name="eye-outline" size={18} color={adminColors.textSecondary} />
+                    <Ionicons name="eye-outline" size={18} color={adminColors.text} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={() => {
-                        confirmDelete(item);
-                    }}
+                    onPress={() => confirmDelete(item)}
+                    accessibilityLabel="Eliminar anime"
                 >
                     <Ionicons name="trash-outline" size={18} color={adminColors.primary} />
                 </TouchableOpacity>
@@ -237,64 +241,59 @@ export default function AnimeListScreen() {
     return (
         <AdminShell activeKey="anime">
             <SafeAreaView style={styles.container} edges={['top']}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        {Platform.OS !== 'web' && (
-                            <TouchableOpacity
-                                onPress={() => navigation.goBack()}
-                                style={styles.backButton}
-                            >
-                                <Ionicons name="arrow-back" size={24} color={adminColors.text} />
+                <AdminHeader
+                    title="Catálogo"
+                    subtitle="Gestiona series, fichas y episodios"
+                    onBack={() => navigation.goBack()}
+                    rightSlot={
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={() => navigation.navigate('AnimeForm', { mode: 'create' })}
+                        >
+                            <Ionicons name="add" size={18} color="#FFFFFF" />
+                            <Text style={styles.addButtonText}>Nuevo</Text>
+                        </TouchableOpacity>
+                    }
+                />
+
+                {/* Controles de búsqueda y filtro */}
+                <View style={[styles.controlsWrap, isCompact && styles.controlsWrapCompact]}>
+                    <View style={styles.searchContainer}>
+                        <Ionicons name="search" size={18} color={adminColors.textSecondary} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Buscar anime por título..."
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholderTextColor={adminColors.textSecondary}
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
+                                <Ionicons name="close-circle" size={20} color={adminColors.textSecondary} />
                             </TouchableOpacity>
                         )}
-                        <Text style={styles.headerTitle}>Biblioteca de Anime</Text>
                     </View>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={() => navigation.navigate('AnimeForm', { mode: 'create' })}
-                    >
-                        <Ionicons name="add" size={20} color="#FFFFFF" />
-                        <Text style={styles.addButtonText}>Nuevo Anime</Text>
-                    </TouchableOpacity>
-                </View>
 
-                {/* Search */}
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color={adminColors.textSecondary} style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Buscar anime..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholderTextColor={adminColors.textSecondary}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color={adminColors.textSecondary} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                <View style={styles.filtersRow}>
-                    {(
-                        [
-                            { key: 'all', label: 'Todos' },
-                            { key: 'Airing', label: 'Airing' },
-                            { key: 'Finished', label: 'Finished' },
-                            { key: 'Upcoming', label: 'Upcoming' },
-                        ] as const
-                    ).map((f) => (
-                        <TouchableOpacity
-                            key={f.key}
-                            style={[styles.filterChip, statusFilter === f.key && styles.filterChipActive]}
-                            onPress={() => setStatusFilter(f.key)}
-                        >
-                            <Text style={[styles.filterChipText, statusFilter === f.key && styles.filterChipTextActive]}>
-                                {f.label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                    <View style={styles.filtersRow}>
+                        {(
+                            [
+                                { key: 'all', label: 'Todos' },
+                                { key: 'Airing', label: 'Airing' },
+                                { key: 'Finished', label: 'Finished' },
+                                { key: 'Upcoming', label: 'Upcoming' },
+                            ] as const
+                        ).map((f) => (
+                            <TouchableOpacity
+                                key={f.key}
+                                style={[styles.filterChip, statusFilter === f.key && styles.filterChipActive]}
+                                onPress={() => setStatusFilter(f.key)}
+                            >
+                                <Text style={[styles.filterChipText, statusFilter === f.key && styles.filterChipTextActive]}>
+                                    {f.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
 
                 {/* List */}
@@ -304,7 +303,7 @@ export default function AnimeListScreen() {
                     </View>
                 ) : animeList.length === 0 ? (
                     <View style={styles.centerContainer}>
-                        <Ionicons name="film-outline" size={64} color={adminColors.textSecondary} />
+                        <Ionicons name="film-outline" size={52} color={adminColors.textSecondary} />
                         <Text style={styles.emptyTitle}>
                             {searchQuery || statusFilter !== 'all' ? 'No se encontraron resultados' : 'No hay animes registrados todavía'}
                         </Text>
@@ -327,7 +326,7 @@ export default function AnimeListScreen() {
                         data={animeList}
                         renderItem={renderAnimeItem}
                         keyExtractor={(item) => item.id.toString()}
-                        contentContainerStyle={styles.listContent}
+                        contentContainerStyle={[styles.listContent, isCompact && styles.listContentCompact]}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
@@ -363,7 +362,7 @@ export default function AnimeListScreen() {
                                             <Image source={{ uri: selectedAnime.poster_url }} style={styles.detailThumb} resizeMode="cover" />
                                         ) : (
                                             <View style={styles.thumbFallback}>
-                                                <Ionicons name="image-outline" size={18} color="#666666" />
+                                                <Ionicons name="image-outline" size={18} color={adminColors.textSecondary} />
                                             </View>
                                         )}
                                     </View>
@@ -393,7 +392,7 @@ export default function AnimeListScreen() {
 
                                 <View style={styles.modalActions}>
                                     <TouchableOpacity
-                                        style={[styles.actionPill, styles.actionPrimary, styles.modalActionPrimary]}
+                                        style={[styles.actionPill, styles.actionPrimary, styles.modalActionBtn]}
                                         onPress={() => {
                                             const a = selectedAnime;
                                             setDetailsVisible(false);
@@ -405,7 +404,7 @@ export default function AnimeListScreen() {
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
-                                        style={[styles.actionPill, styles.modalActionSecondary]}
+                                        style={[styles.actionPill, styles.modalActionSecondary, styles.modalActionBtn]}
                                         onPress={() => {
                                             const a = selectedAnime;
                                             setDetailsVisible(false);
@@ -427,18 +426,18 @@ export default function AnimeListScreen() {
 
 function getStatusBadgeStyle(status: string) {
     switch (status) {
-        case 'Airing': return { backgroundColor: 'rgba(46, 204, 113, 0.15)' };
-        case 'Finished': return { backgroundColor: 'rgba(52, 152, 219, 0.15)' };
-        case 'Upcoming': return { backgroundColor: 'rgba(241, 196, 15, 0.15)' };
+        case 'Airing': return { backgroundColor: 'rgba(22, 163, 74, 0.12)' };
+        case 'Finished': return { backgroundColor: 'rgba(37, 99, 235, 0.12)' };
+        case 'Upcoming': return { backgroundColor: 'rgba(202, 138, 4, 0.14)' };
         default: return { backgroundColor: 'rgba(25, 23, 27, 0.08)' };
     }
 }
 
 function getStatusTextStyle(status: string) {
     switch (status) {
-        case 'Airing': return { color: '#2ecc71' };
-        case 'Finished': return { color: '#3498db' };
-        case 'Upcoming': return { color: '#f1c40f' };
+        case 'Airing': return { color: '#15803d' };
+        case 'Finished': return { color: '#1d4ed8' };
+        case 'Upcoming': return { color: '#a16207' };
         default: return { color: adminColors.textSecondary };
     }
 }
@@ -448,104 +447,69 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: adminColors.background,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 24,
-        paddingBottom: 16,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    backButton: {
-        padding: 4,
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: adminColors.text,
-        letterSpacing: -0.5,
-    },
     addButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: adminColors.primary,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
+        paddingHorizontal: 14,
+        minHeight: 44,
+        borderRadius: 4,
         gap: 6,
     },
     addButtonText: {
         color: '#FFFFFF',
-        fontWeight: '600',
-        fontSize: 14,
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    controlsWrap: {
+        width: '100%',
+        maxWidth: 1160,
+        alignSelf: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 14,
+        paddingBottom: 10,
+        gap: 10,
+    },
+    controlsWrapCompact: {
+        paddingHorizontal: 12,
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 10,
         backgroundColor: adminColors.surface,
-        marginHorizontal: 24,
-        marginBottom: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 8,
+        paddingHorizontal: 14,
+        minHeight: 46,
+        borderRadius: 4,
         borderWidth: 1,
         borderColor: adminColors.border,
     },
-    searchIcon: {
-        marginRight: 10,
-    },
     searchInput: {
         flex: 1,
-        fontSize: 15,
+        minWidth: 0,
+        fontSize: 14,
         color: adminColors.text,
     },
-    centerContainer: {
-        flex: 1,
-        justifyContent: 'center',
+    clearBtn: {
+        width: 36,
+        height: 36,
         alignItems: 'center',
-        padding: 32,
-    },
-    emptyText: {
-        fontSize: 15,
-        color: adminColors.textSecondary,
-        marginTop: 16,
-        textAlign: 'center',
-    },
-    emptyButton: {
-        marginTop: 24,
-        backgroundColor: adminColors.primary,
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 12,
-    },
-    emptyButtonText: {
-        color: '#FFFFFF',
-        fontSize: 15,
-        fontWeight: '600',
-    },
-    listContent: {
-        paddingHorizontal: 24,
-        paddingBottom: 24,
-        gap: 10,
+        justifyContent: 'center',
     },
     filtersRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
-        paddingHorizontal: 24,
-        paddingBottom: 16,
+        gap: 8,
     },
     filterChip: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        minHeight: 44,
+        paddingHorizontal: 14,
         borderRadius: 999,
         backgroundColor: adminColors.surface,
         borderWidth: 1,
         borderColor: adminColors.border,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     filterChipActive: {
         backgroundColor: 'rgba(117, 2, 15, 0.08)',
@@ -558,31 +522,82 @@ const styles = StyleSheet.create({
     },
     filterChipTextActive: {
         color: adminColors.primary,
+        fontWeight: '700',
+    },
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 32,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        color: adminColors.text,
+        fontWeight: '700',
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    emptyText: {
+        fontSize: 14,
+        color: adminColors.textSecondary,
+        marginTop: 8,
+        textAlign: 'center',
+    },
+    emptyButton: {
+        marginTop: 20,
+        backgroundColor: adminColors.primary,
+        paddingHorizontal: 22,
+        minHeight: 46,
+        justifyContent: 'center',
+        borderRadius: 4,
+    },
+    emptyButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    listContent: {
+        width: '100%',
+        maxWidth: 1160,
+        alignSelf: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 6,
+        paddingBottom: 28,
+        gap: 10,
+    },
+    listContentCompact: {
+        paddingHorizontal: 12,
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
         backgroundColor: adminColors.surface,
-        paddingVertical: 12,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: adminColors.border,
+        padding: 12,
+        borderRadius: 4,
+    },
+    rowStacked: {
+        flexDirection: 'column',
+        alignItems: 'stretch',
     },
     rowHovered: {
-        borderColor: 'rgba(117, 2, 15, 0.20)',
-        backgroundColor: 'rgba(117, 2, 15, 0.06)',
-        transform: [{ translateY: -2 }],
+        backgroundColor: 'rgba(117, 2, 15, 0.03)',
+    },
+    rowTop: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     thumbWrap: {
         width: 44,
-        height: 64,
-        borderRadius: 6,
+        height: 62,
+        borderRadius: 8,
         overflow: 'hidden',
         backgroundColor: adminColors.background,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-        marginRight: 12,
+        flexShrink: 0,
     },
     thumb: {
         width: '100%',
@@ -597,24 +612,25 @@ const styles = StyleSheet.create({
     },
     main: {
         flex: 1,
+        minWidth: 0,
     },
     titleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        marginBottom: 6,
+        gap: 8,
+        marginBottom: 4,
     },
     title: {
         flex: 1,
+        minWidth: 0,
         fontSize: 15,
         fontWeight: '700',
         color: adminColors.text,
-        letterSpacing: -0.2,
     },
     badge: {
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 4,
+        borderRadius: 6,
     },
     badgeText: {
         fontSize: 11,
@@ -625,75 +641,67 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 6,
     },
     metaText: {
-        fontSize: 13,
+        fontSize: 12,
         color: adminColors.textSecondary,
     },
     metaMuted: {
-        fontSize: 13,
+        fontSize: 12,
         color: adminColors.textSecondary,
     },
     metaDot: {
         color: 'rgba(25, 23, 27, 0.25)',
         fontSize: 12,
-        marginHorizontal: 2,
     },
     actionGroup: {
         flexDirection: 'row',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: 8,
+    },
+    actionGroupStacked: {
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: adminColors.border,
     },
     actionPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        paddingVertical: 8,
-        paddingHorizontal: 10,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-        backgroundColor: adminColors.background,
+        gap: 6,
+        minHeight: 44,
+        paddingHorizontal: 14,
+        borderRadius: 4,
     },
     actionPrimary: {
         backgroundColor: adminColors.primary,
-        borderColor: adminColors.primary,
     },
     actionPrimaryText: {
         color: '#FFFFFF',
         fontSize: 13,
-        fontWeight: '800',
-        letterSpacing: -0.2,
+        fontWeight: '700',
     },
     iconButton: {
-        padding: 8,
-        borderRadius: 10,
+        width: 44,
+        height: 44,
+        borderRadius: 4,
         backgroundColor: adminColors.background,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-    },
-    emptyTitle: {
-        fontSize: 16,
-        color: adminColors.text,
-        fontWeight: '700',
-        marginTop: 16,
-        textAlign: 'center',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.82)',
+        backgroundColor: 'rgba(0,0,0,0.72)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 24,
+        padding: 16,
     },
     modalCard: {
         width: '100%',
-        maxWidth: 820,
+        maxWidth: 720,
         backgroundColor: adminColors.surface,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: adminColors.border,
+        borderRadius: 4,
         overflow: 'hidden',
     },
     modalHeader: {
@@ -701,7 +709,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: adminColors.border,
     },
@@ -713,18 +721,16 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     modalClose: {
-        width: 34,
-        height: 34,
-        borderRadius: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 4,
         backgroundColor: adminColors.background,
-        borderWidth: 1,
-        borderColor: adminColors.border,
         justifyContent: 'center',
         alignItems: 'center',
     },
     banner: {
         width: '100%',
-        height: 160,
+        height: 150,
         backgroundColor: adminColors.background,
     },
     modalBody: {
@@ -736,13 +742,11 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     detailThumbWrap: {
-        width: 92,
-        height: 130,
-        borderRadius: 10,
+        width: 84,
+        height: 120,
+        borderRadius: 8,
         overflow: 'hidden',
         backgroundColor: adminColors.background,
-        borderWidth: 1,
-        borderColor: adminColors.border,
     },
     detailThumb: {
         width: '100%',
@@ -750,6 +754,7 @@ const styles = StyleSheet.create({
     },
     detailMain: {
         flex: 1,
+        minWidth: 0,
         justifyContent: 'center',
         gap: 8,
     },
@@ -764,8 +769,6 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 999,
         backgroundColor: adminColors.background,
-        borderWidth: 1,
-        borderColor: adminColors.border,
     },
     softBadgeText: {
         color: adminColors.textSecondary,
@@ -790,23 +793,18 @@ const styles = StyleSheet.create({
     modalActions: {
         flexDirection: 'row',
         gap: 10,
-        marginTop: 14,
+        marginTop: 16,
         flexWrap: 'wrap',
     },
-    modalActionPrimary: {
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+    modalActionBtn: {
+        paddingHorizontal: 16,
     },
     modalActionSecondary: {
         backgroundColor: adminColors.ink,
-        borderColor: adminColors.ink,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
     },
     modalActionSecondaryText: {
         color: '#FFFFFF',
         fontSize: 13,
-        fontWeight: '800',
-        letterSpacing: -0.2,
+        fontWeight: '700',
     },
 });

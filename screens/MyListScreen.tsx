@@ -415,7 +415,7 @@ export default function MyListScreen() {
                     removing={removingKey === `${item.type}:${item.id}`}
                     onPress={() => {
                       if (item.type === 'manga') {
-                        navigation.navigate('MangaDetail', { id: item.id });
+                        navigation.navigate('Manga', { screen: 'MangaDetail', params: { id: String(item.id) } });
                       } else if (item.type === 'h_anime') {
                         navigation.navigate('Hentai', { slug: String(item.id) });
                       } else {

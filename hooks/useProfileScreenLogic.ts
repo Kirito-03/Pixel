@@ -24,7 +24,7 @@ export const useProfileScreenLogic = () => {
     const [imageError, setImageError] = useState(false); // Para manejar errores de carga
     const { currentProfile, setCurrentProfile, clearCurrentProfile, adultContentEnabled, setAdultContentEnabled } = useProfile();
     const { logout, user } = useAuth();
-    const { checkAdminStatus } = useAdmin();
+    const { checkAdminStatus, isAdmin: hasAdminSession } = useAdmin();
     const fileInputRef = useRef<any>(null);
 
     const { width } = useWindowDimensions();
@@ -278,7 +278,7 @@ export const useProfileScreenLogic = () => {
 
     const handleAdminLongPress = async () => {
         try {
-            const isAdmin = await checkAdminStatus();
+            const isAdmin = hasAdminSession || await checkAdminStatus();
             if (isAdmin) {
                 if (Platform.OS === 'android') {
                     Vibration.vibrate(12);
@@ -312,7 +312,7 @@ export const useProfileScreenLogic = () => {
 
     const handleAdminAccess = async () => {
         try {
-            const isAdmin = await checkAdminStatus();
+            const isAdmin = hasAdminSession || await checkAdminStatus();
             if (!isAdmin) return;
 
             const navigateToAdmin = (attempt: number) => {

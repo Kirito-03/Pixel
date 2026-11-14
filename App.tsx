@@ -11,6 +11,7 @@ import { ProfileProvider } from './contexts/ProfileContext';
 import { MyListProvider } from './contexts/MyListContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { AppUpdateProvider } from './contexts/AppUpdateContext';
 import { AdminProvider } from './contexts/AdminContext';
 
 function ThemedStatusBar() {
@@ -29,6 +30,7 @@ export default function App() {
   return (
     <SafeAreaProvider style={{ flex: 1 }}>
       <ThemeProvider>
+        <AppUpdateProvider>
         <AuthProvider>
           <AdminProvider>
             <ProfileProvider>
@@ -39,6 +41,7 @@ export default function App() {
             </ProfileProvider>
           </AdminProvider>
         </AuthProvider>
+        </AppUpdateProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -12,6 +12,7 @@ import {
     FlatList,
     Image,
     Platform,
+    useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../../types/navigation';
 import { AdminShell } from '../../components/admin/AdminShell';
+import { AdminHeader } from '../../components/admin/AdminHeader';
 import { adminColors } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
@@ -28,7 +30,9 @@ type AnimeFormRouteProp = RouteProp<AdminStackParamList, 'AnimeForm'>;
 export default function AnimeFormScreen() {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute<AnimeFormRouteProp>();
-    const { mode, animeId } = route.params;
+    const { mode, animeId } = route.params || { mode: 'create' };
+    const { width } = useWindowDimensions();
+    const isCompact = width < 480;
 
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -133,8 +137,7 @@ export default function AnimeFormScreen() {
             };
 
             setTmdbFetchedData(parsedData);
-            
-            // Auto-check only empty fields
+
             setSelectedFields({
                 title: !formData.title.trim(),
                 title_english: !formData.title_english.trim(),
@@ -172,7 +175,7 @@ export default function AnimeFormScreen() {
         if (selectedFields.rating) updatedData.rating = tmdbFetchedData.rating;
         if (selectedFields.release_date) updatedData.release_date = tmdbFetchedData.release_date;
         if (selectedFields.status) updatedData.status = tmdbFetchedData.status;
-        
+
         updatedData.tmdb_id = tmdbFetchedData.tmdb_id;
 
         setFormData(updatedData);
@@ -181,22 +184,22 @@ export default function AnimeFormScreen() {
         Alert.alert('Éxito', 'Campos seleccionados importados desde TMDB');
     };
 
-    const CheckboxItem = ({ label, field }: { label: string, field: string }) => (
-        <TouchableOpacity 
-            style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8, gap: 10 }} 
+    const CheckboxItem = ({ label, field }: { label: string; field: string }) => (
+        <TouchableOpacity
+            style={styles.checkboxRow}
             onPress={() => setSelectedFields(prev => ({ ...prev, [field]: !prev[field] }))}
         >
-            <Ionicons 
-                name={selectedFields[field] ? 'checkbox' : 'square-outline'} 
-                size={24} 
-                color={selectedFields[field] ? adminColors.primary : adminColors.border} 
+            <Ionicons
+                name={selectedFields[field] ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={selectedFields[field] ? adminColors.primary : adminColors.textSecondary}
             />
-            <Text style={{ color: adminColors.text, fontSize: 15, fontWeight: '500' }}>{label}</Text>
-            {tmdbFetchedData?.[field] && (
-                <Text style={{ color: adminColors.textSecondary, fontSize: 12, flex: 1 }} numberOfLines={1}>
+            <Text style={styles.checkboxLabel}>{label}</Text>
+            {tmdbFetchedData?.[field] ? (
+                <Text style={styles.checkboxPreview} numberOfLines={1}>
                     ({tmdbFetchedData[field]})
                 </Text>
-            )}
+            ) : null}
         </TouchableOpacity>
     );
 
@@ -246,9 +249,11 @@ export default function AnimeFormScreen() {
         }
     };
 
+    const activeNavKey = mode === 'create' ? 'create' : 'anime';
+
     if (isLoading) {
         return (
-            <AdminShell activeKey="anime">
+            <AdminShell activeKey={activeNavKey}>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={adminColors.primary} />
                 </View>
@@ -257,33 +262,26 @@ export default function AnimeFormScreen() {
     }
 
     return (
-        <AdminShell activeKey="anime">
+        <AdminShell activeKey={activeNavKey}>
             <SafeAreaView style={styles.container} edges={['top']}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        {Platform.OS !== 'web' && (
-                            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                                <Ionicons name="arrow-back" size={24} color={adminColors.text} />
-                            </TouchableOpacity>
-                        )}
-                        <Text style={styles.headerTitle}>
-                            {mode === 'create' ? 'Agregar Anime' : 'Editar Anime'}
-                        </Text>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.tmdbButton}
-                        onPress={() => setShowTMDBSearch(true)}
-                    >
-                        <Ionicons name="search" size={20} color="#FFFFFF" />
-                        <Text style={styles.tmdbButtonText}>Buscar en TMDB</Text>
-                    </TouchableOpacity>
-                </View>
+                <AdminHeader
+                    title={mode === 'create' ? 'Nuevo Anime' : 'Editar Anime'}
+                    subtitle={mode === 'edit' && animeId ? `ID #${animeId}` : 'Ficha y metadatos'}
+                    onBack={() => navigation.goBack()}
+                    rightSlot={
+                        <TouchableOpacity
+                            style={styles.tmdbButton}
+                            onPress={() => setShowTMDBSearch(true)}
+                        >
+                            <Ionicons name="search" size={18} color="#FFFFFF" />
+                            <Text style={styles.tmdbButtonText}>TMDB</Text>
+                        </TouchableOpacity>
+                    }
+                />
 
-                <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-                    <View style={styles.formCard}>
-                        {/* Image Previews */}
-                        {(formData.poster_url || formData.banner_url) && (
+                <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, isCompact && styles.contentContainerCompact]}>
+                    <View style={styles.formBlock}>
+                        {(formData.poster_url || formData.banner_url) ? (
                             <View style={styles.previewContainer}>
                                 {formData.banner_url ? (
                                     <Image source={{ uri: formData.banner_url }} style={styles.bannerPreview} resizeMode="cover" />
@@ -292,10 +290,9 @@ export default function AnimeFormScreen() {
                                     <Image source={{ uri: formData.poster_url }} style={styles.posterPreview} resizeMode="cover" />
                                 ) : null}
                             </View>
-                        )}
+                        ) : null}
 
-                        {/* Title */}
-                        <Text style={styles.sectionTitle}>Información Básica</Text>
+                        <Text style={styles.sectionTitle}>Información básica</Text>
 
                         <Text style={styles.label}>Título *</Text>
                         <TextInput
@@ -335,7 +332,8 @@ export default function AnimeFormScreen() {
                             numberOfLines={4}
                         />
 
-                        {/* URLs */}
+                        <View style={styles.divider} />
+
                         <Text style={styles.sectionTitle}>Imágenes</Text>
 
                         <Text style={styles.label}>URL del Poster</Text>
@@ -356,7 +354,8 @@ export default function AnimeFormScreen() {
                             placeholderTextColor={adminColors.textSecondary}
                         />
 
-                        {/* Details */}
+                        <View style={styles.divider} />
+
                         <Text style={styles.sectionTitle}>Detalles</Text>
 
                         <Text style={styles.label}>Géneros (separados por coma)</Text>
@@ -408,26 +407,30 @@ export default function AnimeFormScreen() {
                             </View>
                         </View>
 
-                        <Text style={styles.label}>Fecha de estreno</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={formData.release_date}
-                            onChangeText={(text) => setFormData({ ...formData, release_date: text })}
-                            placeholder="2024-01-01"
-                            placeholderTextColor={adminColors.textSecondary}
-                        />
+                        <View style={styles.row}>
+                            <View style={styles.rowItem}>
+                                <Text style={styles.label}>Fecha de estreno</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={formData.release_date}
+                                    onChangeText={(text) => setFormData({ ...formData, release_date: text })}
+                                    placeholder="2024-01-01"
+                                    placeholderTextColor={adminColors.textSecondary}
+                                />
+                            </View>
+                            <View style={styles.rowItem}>
+                                <Text style={styles.label}>TMDB ID</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={formData.tmdb_id}
+                                    onChangeText={(text) => setFormData({ ...formData, tmdb_id: text })}
+                                    placeholder="ID de TMDB"
+                                    placeholderTextColor={adminColors.textSecondary}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                        </View>
 
-                        <Text style={styles.label}>TMDB ID</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={formData.tmdb_id}
-                            onChangeText={(text) => setFormData({ ...formData, tmdb_id: text })}
-                            placeholder="ID de TMDB"
-                            placeholderTextColor={adminColors.textSecondary}
-                            keyboardType="numeric"
-                        />
-
-                        {/* Save Button */}
                         <TouchableOpacity
                             style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
                             onPress={handleSave}
@@ -451,8 +454,8 @@ export default function AnimeFormScreen() {
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Buscar en TMDB</Text>
-                            <TouchableOpacity onPress={() => setShowTMDBSearch(false)}>
-                                <Ionicons name="close" size={24} color={adminColors.text} />
+                            <TouchableOpacity onPress={() => setShowTMDBSearch(false)} style={styles.modalCloseBtn}>
+                                <Ionicons name="close" size={22} color={adminColors.text} />
                             </TouchableOpacity>
                         </View>
 
@@ -519,15 +522,15 @@ export default function AnimeFormScreen() {
                     <View style={[styles.modalContainer, { maxHeight: '90%' }]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>¿Qué campos importar?</Text>
-                            <TouchableOpacity onPress={() => setTmdbSelectionModalVisible(false)}>
-                                <Ionicons name="close" size={24} color={adminColors.text} />
+                            <TouchableOpacity onPress={() => setTmdbSelectionModalVisible(false)} style={styles.modalCloseBtn}>
+                                <Ionicons name="close" size={22} color={adminColors.text} />
                             </TouchableOpacity>
                         </View>
-                        <Text style={{ color: adminColors.textSecondary, marginBottom: 15, fontSize: 13 }}>
-                            Los campos que ya tenías llenos están desmarcados por defecto para no sobrescribirlos. Marca los que desees reemplazar.
+                        <Text style={styles.modalSubtitle}>
+                            Los campos que ya tenías llenos están desmarcados por defecto para no sobrescribirlos.
                         </Text>
-                        
-                        <ScrollView style={{ marginBottom: 20 }}>
+
+                        <ScrollView style={{ marginBottom: 16 }}>
                             <CheckboxItem label="Título" field="title" />
                             <CheckboxItem label="Título en Inglés" field="title_english" />
                             <CheckboxItem label="Descripción" field="description" />
@@ -540,8 +543,8 @@ export default function AnimeFormScreen() {
                             <CheckboxItem label="Estado de Emisión" field="status" />
                         </ScrollView>
 
-                        <TouchableOpacity style={[styles.searchButton, { paddingVertical: 14 }]} onPress={applyTMDBSelection}>
-                            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Aplicar Selección</Text>
+                        <TouchableOpacity style={styles.saveButton} onPress={applyTMDBSelection}>
+                            <Text style={styles.saveButtonText}>Aplicar Selección</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -560,44 +563,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: adminColors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: adminColors.border,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    backButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: adminColors.background,
-        borderWidth: 1,
-        borderColor: adminColors.border,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: adminColors.text,
-    },
     tmdbButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
         backgroundColor: '#032541',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 10,
+        paddingHorizontal: 14,
+        minHeight: 44,
+        borderRadius: 4,
     },
     tmdbButtonText: {
         color: '#FFFFFF',
@@ -608,15 +581,20 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     contentContainer: {
-        padding: 16,
+        padding: 20,
         paddingBottom: 40,
     },
-    formCard: {
+    contentContainerCompact: {
+        padding: 12,
+        paddingBottom: 28,
+    },
+    formBlock: {
+        width: '100%',
+        maxWidth: 760,
+        alignSelf: 'center',
         backgroundColor: adminColors.surface,
-        borderRadius: 14,
+        borderRadius: 4,
         padding: 16,
-        borderWidth: 1,
-        borderColor: adminColors.border,
     },
     previewContainer: {
         flexDirection: 'row',
@@ -627,19 +605,27 @@ const styles = StyleSheet.create({
     bannerPreview: {
         flex: 1,
         height: 100,
-        borderRadius: 10,
+        borderRadius: 4,
+        backgroundColor: adminColors.background,
     },
     posterPreview: {
         width: 70,
         height: 100,
-        borderRadius: 10,
+        borderRadius: 4,
+        backgroundColor: adminColors.background,
     },
     sectionTitle: {
-        fontSize: 14,
-        fontWeight: '900',
-        color: adminColors.text,
-        marginTop: 16,
-        marginBottom: 10,
+        fontSize: 13,
+        fontWeight: '800',
+        color: adminColors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        marginBottom: 8,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: adminColors.border,
+        marginVertical: 18,
     },
     label: {
         fontSize: 12,
@@ -652,8 +638,10 @@ const styles = StyleSheet.create({
         backgroundColor: adminColors.background,
         borderWidth: 1,
         borderColor: adminColors.border,
-        borderRadius: 10,
-        padding: 12,
+        borderRadius: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        minHeight: 44,
         color: adminColors.text,
         fontSize: 14,
     },
@@ -668,12 +656,14 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     statusChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        minHeight: 44,
+        paddingHorizontal: 14,
         borderRadius: 999,
         borderWidth: 1,
         borderColor: adminColors.border,
-        backgroundColor: adminColors.surface,
+        backgroundColor: adminColors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     statusChipActive: {
         backgroundColor: adminColors.primary,
@@ -689,16 +679,19 @@ const styles = StyleSheet.create({
     },
     row: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 12,
     },
     rowItem: {
         flex: 1,
+        minWidth: 140,
     },
     saveButton: {
-        marginTop: 24,
+        marginTop: 20,
         backgroundColor: adminColors.primary,
-        borderRadius: 12,
-        paddingVertical: 14,
+        borderRadius: 4,
+        minHeight: 48,
+        justifyContent: 'center',
         alignItems: 'center',
     },
     saveButtonDisabled: {
@@ -706,32 +699,48 @@ const styles = StyleSheet.create({
     },
     saveButtonText: {
         color: '#fff',
-        fontWeight: '900',
-        fontSize: 16,
+        fontWeight: '800',
+        fontSize: 15,
     },
-    // Modal styles
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'flex-end',
+        alignItems: 'center',
     },
     modalContainer: {
+        width: '100%',
+        maxWidth: 680,
         backgroundColor: adminColors.surface,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: '80%',
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
+        maxHeight: '82%',
         padding: 16,
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     modalTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '800',
         color: adminColors.text,
+    },
+    modalSubtitle: {
+        color: adminColors.textSecondary,
+        marginBottom: 12,
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    modalCloseBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 4,
+        backgroundColor: adminColors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     searchRow: {
         flexDirection: 'row',
@@ -740,29 +749,35 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
+        minWidth: 0,
     },
     searchButton: {
         backgroundColor: adminColors.primary,
-        paddingHorizontal: 16,
-        borderRadius: 10,
+        minWidth: 48,
+        minHeight: 44,
+        paddingHorizontal: 14,
+        borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
     },
     tmdbResultItem: {
         flexDirection: 'row',
         gap: 12,
-        padding: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        minHeight: 56,
         borderBottomWidth: 1,
         borderBottomColor: adminColors.border,
         alignItems: 'center',
     },
     tmdbResultImage: {
-        width: 46,
-        height: 70,
+        width: 44,
+        height: 66,
         borderRadius: 6,
     },
     tmdbResultInfo: {
         flex: 1,
+        minWidth: 0,
     },
     tmdbResultTitle: {
         fontWeight: '700',
@@ -773,5 +788,22 @@ const styles = StyleSheet.create({
         color: adminColors.textSecondary,
         fontSize: 12,
         marginTop: 4,
+    },
+    checkboxRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: 44,
+        paddingVertical: 6,
+        gap: 10,
+    },
+    checkboxLabel: {
+        color: adminColors.text,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    checkboxPreview: {
+        color: adminColors.textSecondary,
+        fontSize: 12,
+        flex: 1,
     },
 });

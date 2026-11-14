@@ -31,3 +31,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-14-android-manga-metadatos]]: APK Android con ajustes de tráiler/pausa/Inicio, Manga rediseñado, tarjetas grandes y metadata antigua cacheada.
 
 - [[2026-11-14-trailers-capitulos-progreso]]: sonido del tráiler, límites YouTube, regreso/siguiente capítulo y progreso por perfil en Mi Lista.
+
+- [[2026-11-14-perfil-admin-actualizaciones]]: Perfil unificado, tema persistente, manga de Mi Lista, administración adaptable y avisos de APK 1.0.3.

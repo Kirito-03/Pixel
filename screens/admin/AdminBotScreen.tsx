@@ -1,3 +1,4 @@
+import { useAdminLayout } from '../../hooks/useAdminLayout';
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View,
@@ -7,13 +8,15 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Platform
+  Platform,
+  useWindowDimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { useNavigation } from '@react-navigation/native'
 import { AdminShell } from '../../components/admin/AdminShell'
+import { AdminHeader } from '../../components/admin/AdminHeader'
 import { adminApiService } from '../../services/adminApiService'
-import { darkColors, typography } from '../../theme'
+import { adminColors } from '../../theme'
 
 interface BotJob {
   id: string
@@ -27,11 +30,11 @@ interface BotJob {
   finishedAt: string | null
 }
 
-function TerminalLog({ jobs }: { jobs: BotJob[] }) {
-  const scrollViewRef = useRef<ScrollView>(null);
-  const activeJobs = jobs.filter(j => j.status === 'running')
-  const finishedJobs = jobs.filter(j => j.status !== 'running')
-  
+function TerminalLog({ jobs, connection }: { jobs: BotJob[]; connection: string }) {
+  const scrollViewRef = useRef<ScrollView>(null)
+  const activeJobs = jobs.filter((j) => j.status === 'running')
+  const finishedJobs = jobs.filter((j) => j.status !== 'running')
+
   return (
     <View style={styles.terminalContainer}>
       <View style={styles.terminalHeader}>
@@ -40,68 +43,59 @@ function TerminalLog({ jobs }: { jobs: BotJob[] }) {
           <View style={[styles.terminalDot, { backgroundColor: '#FFBD2E' }]} />
           <View style={[styles.terminalDot, { backgroundColor: '#27C93F' }]} />
         </View>
-        <Text style={styles.terminalTitle}>pixel_scraper.exe</Text>
+        <Text style={styles.terminalTitle}>Registro del Bot</Text>
       </View>
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.terminalBody}
-      >
-        <Text style={styles.terminalText}>[System] Conectado al motor de scraping...</Text>
+      <ScrollView ref={scrollViewRef} style={styles.terminalBody} nestedScrollEnabled>
+        <Text style={styles.terminalText}>{connection}</Text>
 
-        {activeJobs.length > 0 && (
-          <View style={styles.terminalRow}>
-            <Text style={styles.terminalBlink}>_</Text>
-          </View>
-        )}
-
-        {activeJobs.map(job => (
+        {activeJobs.map((job) => (
           <View key={job.id} style={styles.terminalRow}>
             <Text style={styles.terminalTime}>[{new Date().toLocaleTimeString()}]</Text>
             <Text style={styles.terminalActive}>
-              {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - {job.progress.message}... {job.progress.total > 0 ? `(${job.progress.current}/${job.progress.total})` : ''}
+              {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - {job.progress.message}...{' '}
+              {job.progress.total > 0 ? `(${job.progress.current}/${job.progress.total})` : ''}
             </Text>
           </View>
         ))}
-        
-        {finishedJobs.map(job => (
+
+        {finishedJobs.map((job) => (
           <View key={job.id} style={styles.terminalRow}>
-            <Text style={styles.terminalTime}>[{new Date(job.finishedAt || job.startedAt).toLocaleTimeString()}]</Text>
+            <Text style={styles.terminalTime}>
+              [{new Date(job.finishedAt || job.startedAt).toLocaleTimeString()}]
+            </Text>
             {job.status === 'done' ? (
               <Text style={styles.terminalSuccess}>
-                {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - {
-                  job.type === 'metadata' 
-                    ? `${job.result?.updated || 0} campos actualizados` 
-                    : `${job.result?.inserted || 0} insertados, ${job.result?.updated || 0} act.`
-                }
+                {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} -{' '}
+                {job.type === 'metadata'
+                  ? `${job.result?.updated || 0} campos actualizados`
+                  : `${job.result?.inserted || 0} insertados, ${job.result?.updated || 0} act.`}
               </Text>
             ) : (
               <Text style={styles.terminalError}>
-                {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - ERROR: {job.errors?.[0] || 'Desconocido'}
+                {job.type === 'metadata' ? '[META]' : '[SCRAPE]'} ID {job.animeId} - ERROR:{' '}
+                {job.errors?.[0] || 'Desconocido'}
               </Text>
             )}
           </View>
         ))}
-
       </ScrollView>
     </View>
   )
 }
 
-function StatCard({ title, value, icon, color }: any) {
+function StatTile({ title, value, accent }: { title: string; value: number; accent: string }) {
   return (
-    <View style={styles.statCard}>
-      <View style={[styles.statIconBox, { backgroundColor: color + '15', borderColor: color + '30' }]}>
-        <Ionicons name={icon} size={20} color={color} />
-      </View>
-      <View>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statTitle}>{title}</Text>
-      </View>
+    <View style={styles.statTile}>
+      <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
+      <Text style={styles.statTitle}>{title}</Text>
     </View>
   )
 }
 
 export default function AdminBotScreen() {
+  const navigation = useNavigation()
+  const { width, isWide, isCompact } = useAdminLayout()
+
   const [animeId, setAnimeId] = useState('')
   const [jkSlug, setJkSlug] = useState('')
   const [av1Slug, setAv1Slug] = useState('')
@@ -113,10 +107,10 @@ export default function AdminBotScreen() {
   const [fixStartId, setFixStartId] = useState('')
   const [fixEndId, setFixEndId] = useState('')
   const [jobs, setJobs] = useState<BotJob[]>([])
+  const [connection, setConnection] = useState('Consultando el estado del bot…')
   const [loading, setLoading] = useState<string | null>(null)
-  
+
   const [previewData, setPreviewData] = useState<any>(null)
-  const [previewAv1Data, setPreviewAv1Data] = useState<any>(null)
   const [slugResult, setSlugResult] = useState<string | null | undefined>(undefined)
   const [slugAv1Result, setSlugAv1Result] = useState<string | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
@@ -126,7 +120,9 @@ export default function AdminBotScreen() {
     try {
       const res = await adminApiService.axiosInstance.get('/api/admin/bot/status')
       setJobs(res.data.jobs || [])
+      setConnection('Estado del bot actualizado.')
     } catch {
+      setConnection('No se pudo consultar el estado. Se reintentará automáticamente.')
       // silencioso
     }
   }, [])
@@ -177,14 +173,14 @@ export default function AdminBotScreen() {
           season: parseInt(season) || 1,
         })
         setAnimeId(String(res.data.animeId))
-        setSuccessMsg(`Anime Creado (ID: ${res.data.animeId}) y Jobs iniciados!`)
+        setSuccessMsg(`Anime creado (ID: ${res.data.animeId}) y jobs iniciados`)
       } else if (action === 'syncAiring') {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/sync-airing')
         setSuccessMsg(res.data.message)
       } else if (action === 'fixImages') {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/fix-missing-images', {
           startId: fixStartId || undefined,
-          endId: fixEndId || undefined
+          endId: fixEndId || undefined,
         })
         setSuccessMsg(res.data.message)
         setFixStartId('')
@@ -199,10 +195,6 @@ export default function AdminBotScreen() {
         const res = await adminApiService.axiosInstance.post('/api/admin/bot/preview-anilist', { title: previewTitle })
         setPreviewData(res.data.data || null)
         if (!res.data.ok) setError(res.data.message)
-      } else if (action === 'previewAv1') {
-        const res = await adminApiService.axiosInstance.post('/api/admin/bot/preview-av1', { slug: previewTitle })
-        setPreviewAv1Data(res.data.data || null)
-        if (!res.data.ok) setError(res.data.message)
       }
       setAnimeId('')
       setJkSlug('')
@@ -215,164 +207,150 @@ export default function AdminBotScreen() {
     }
   }
 
-  const activeJobs = jobs.filter(j => j.status === 'running')
-  const doneJobs = jobs.filter(j => j.status === 'done')
-  const errorJobs = jobs.filter(j => j.status === 'error')
+  const activeJobs = jobs.filter((j) => j.status === 'running')
+  const doneJobs = jobs.filter((j) => j.status === 'done')
+  const errorJobs = jobs.filter((j) => j.status === 'error')
 
   return (
     <AdminShell activeKey="bot">
       <SafeAreaView style={styles.container} edges={['top']}>
-        {/* Header - Netflix Style */}
-        <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <Ionicons name="star" size={24} color="#FF0000" />
-          </View>
-          <View>
-            <Text style={styles.headerTitle}>Bot Inteligente</Text>
-            <Text style={styles.headerSub}>Motor de Scraping & Metadatos</Text>
-          </View>
-        </View>
+        <AdminHeader
+          title="Bot Inteligente"
+          subtitle="Motor de scraping y metadatos"
+          onBack={() => (navigation as any).goBack()}
+        />
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.maxWidthContainer}>
-            
-            {/* Estadísticas */}
+        <ScrollView contentContainerStyle={[styles.scrollContent, isCompact && styles.scrollContentCompact]}>
+          <View style={styles.pageInner}>
+            {/* Resumen */}
             <View style={styles.statsRow}>
-              <StatCard title="En Progreso" value={activeJobs.length} icon="sync-outline" color="#3b82f6" />
-              <StatCard title="Completados" value={doneJobs.length} icon="checkmark-done-outline" color="#22c55e" />
-              <StatCard title="Errores" value={errorJobs.length} icon="warning-outline" color="#ef4444" />
+              <StatTile title="En progreso" value={activeJobs.length} accent="#2563eb" />
+              <StatTile title="Completados" value={doneJobs.length} accent="#16a34a" />
+              <StatTile title="Errores" value={errorJobs.length} accent={adminColors.primary} />
             </View>
 
-            <View style={styles.mainGrid}>
-              
+            <View style={[styles.mainGrid, isWide && styles.mainGridWide]}>
               {/* Columna Izquierda: Controles */}
-              <View style={styles.leftCol}>
-                
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Ionicons name="settings" size={18} color={darkColors.primary} />
-                    <Text style={styles.cardTitle}>Configuración Manual</Text>
+              <View style={[styles.col, isWide && styles.leftCol]}>
+                {/* Scraping manual */}
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionTitle}>Configuración manual</Text>
+
+                  <View style={styles.formRow}>
+                    <View style={styles.fieldSmall}>
+                      <Text style={styles.label}>ID del Anime *</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={animeId}
+                        onChangeText={setAnimeId}
+                        placeholder="Ej: 42"
+                        placeholderTextColor={adminColors.textSecondary}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={styles.fieldWide}>
+                      <Text style={styles.label}>Fuente</Text>
+                      <View style={styles.sourceRow}>
+                        {(['auto', 'jkanime', 'animeav1'] as const).map((s) => (
+                          <TouchableOpacity
+                            key={s}
+                            style={[styles.sourceBtn, source === s && styles.sourceBtnActive]}
+                            onPress={() => setSource(s)}
+                          >
+                            <Text style={[styles.sourceBtnText, source === s && styles.sourceBtnTextActive]}>
+                              {s === 'auto' ? 'Auto' : s === 'jkanime' ? 'JKAnime' : 'AV1'}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
                   </View>
-                  
-                  <View style={styles.formGrid}>
-                    <View style={styles.formRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>ID del Anime *</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={animeId}
-                          onChangeText={setAnimeId}
-                          placeholder="Ej: 42"
-                          placeholderTextColor={darkColors.textGray}
-                          keyboardType="numeric"
-                        />
-                      </View>
-                      <View style={{ flex: 2 }}>
-                        <Text style={styles.label}>Fuente</Text>
-                        <View style={styles.sourceRow}>
-                          {(['auto', 'jkanime', 'animeav1'] as const).map((s) => (
-                            <TouchableOpacity
-                              key={s}
-                              style={[styles.sourceBtn, source === s && styles.sourceBtnActive]}
-                              onPress={() => setSource(s)}
-                            >
-                              <Text style={[styles.sourceBtnText, source === s && styles.sourceBtnTextActive]}>
-                                {s === 'auto' ? 'Auto' : s === 'jkanime' ? 'JKAnime' : 'AV1'}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                    </View>
 
-                    <View style={styles.formRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Slug JKAnime (Opc.)</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={jkSlug}
-                          onChangeText={setJkSlug}
-                          placeholder="Ej: naruto"
-                          placeholderTextColor={darkColors.textGray}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Slug AV1 (Opc.)</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={av1Slug}
-                          onChangeText={setAv1Slug}
-                          placeholder="Ej: naruto-shippuden"
-                          placeholderTextColor={darkColors.textGray}
-                        />
-                      </View>
+                  <View style={styles.formRow}>
+                    <View style={styles.fieldHalf}>
+                      <Text style={styles.label}>Slug JKAnime (Opc.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={jkSlug}
+                        onChangeText={setJkSlug}
+                        placeholder="Ej: naruto"
+                        placeholderTextColor={adminColors.textSecondary}
+                      />
                     </View>
+                    <View style={styles.fieldHalf}>
+                      <Text style={styles.label}>Slug AV1 (Opc.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={av1Slug}
+                        onChangeText={setAv1Slug}
+                        placeholder="Ej: naruto-shippuden"
+                        placeholderTextColor={adminColors.textSecondary}
+                      />
+                    </View>
+                  </View>
 
-                    <View style={styles.formRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Desde Ep.</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={fromEp}
-                          onChangeText={setFromEp}
-                          keyboardType="numeric"
-                          placeholder="1"
-                          placeholderTextColor={darkColors.textGray}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Hasta Ep.</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={toEp}
-                          onChangeText={setToEp}
-                          keyboardType="numeric"
-                          placeholder="Auto"
-                          placeholderTextColor={darkColors.textGray}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Temporada</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={season}
-                          onChangeText={setSeason}
-                          keyboardType="numeric"
-                          placeholder="1"
-                          placeholderTextColor={darkColors.textGray}
-                        />
-                      </View>
+                  <View style={styles.formRow}>
+                    <View style={styles.fieldThird}>
+                      <Text style={styles.label}>Desde Ep.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={fromEp}
+                        onChangeText={setFromEp}
+                        keyboardType="numeric"
+                        placeholder="1"
+                        placeholderTextColor={adminColors.textSecondary}
+                      />
+                    </View>
+                    <View style={styles.fieldThird}>
+                      <Text style={styles.label}>Hasta Ep.</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={toEp}
+                        onChangeText={setToEp}
+                        keyboardType="numeric"
+                        placeholder="Auto"
+                        placeholderTextColor={adminColors.textSecondary}
+                      />
+                    </View>
+                    <View style={styles.fieldThird}>
+                      <Text style={styles.label}>Temporada</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={season}
+                        onChangeText={setSeason}
+                        keyboardType="numeric"
+                        placeholder="1"
+                        placeholderTextColor={adminColors.textSecondary}
+                      />
                     </View>
                   </View>
 
                   {!!error && <Text style={styles.errorText}>{error}</Text>}
                   {!!successMsg && <Text style={styles.successText}>{successMsg}</Text>}
 
-                  <View style={styles.actionGrid}>
+                  <View style={styles.actionRow}>
                     <TouchableOpacity
                       style={[styles.btn, styles.btnSecondary, !animeId && styles.btnDisabled]}
                       onPress={() => handleAction('metadata')}
                       disabled={!animeId || !!loading}
                     >
                       {loading === 'metadata' ? (
-                        <ActivityIndicator size="small" color={darkColors.text} />
+                        <ActivityIndicator size="small" color={adminColors.text} />
                       ) : (
                         <Text style={styles.btnSecondaryText}>Solo Meta</Text>
                       )}
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       style={[styles.btn, styles.btnSecondary, !animeId && styles.btnDisabled]}
                       onPress={() => handleAction('scrape')}
                       disabled={!animeId || !!loading}
                     >
                       {loading === 'scrape' ? (
-                        <ActivityIndicator size="small" color={darkColors.text} />
+                        <ActivityIndicator size="small" color={adminColors.text} />
                       ) : (
                         <Text style={styles.btnSecondaryText}>Solo Episodios</Text>
                       )}
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       style={[styles.btn, styles.btnPrimary, !animeId && styles.btnDisabled]}
                       onPress={() => handleAction('both')}
@@ -387,81 +365,15 @@ export default function AdminBotScreen() {
                   </View>
                 </View>
 
-                {/* Acciones Masivas */}
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Ionicons name="rocket" size={18} color={darkColors.primary} />
-                    <Text style={styles.cardTitle}>Acciones Masivas</Text>
-                  </View>
-                  <Text style={styles.cardDesc}>
-                    Ejecuta trabajos masivos como sincronización de episodios en emisión o 
-                    recuperación automática de portadas faltantes.
-                  </Text>
-                  
-                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.label}>Desde ID (Opc.)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={fixStartId}
-                        onChangeText={setFixStartId}
-                        placeholder="Ej: 903"
-                        placeholderTextColor={darkColors.textGray}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.label}>Hasta ID (Opc.)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={fixEndId}
-                        onChangeText={setFixEndId}
-                        placeholder="Ej: 1064"
-                        placeholderTextColor={darkColors.textGray}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                  </View>
-
-                  <View style={{ gap: 12, marginTop: 12 }}>
-                    <TouchableOpacity
-                      style={[styles.btn, styles.btnPrimary]}
-                      onPress={() => handleAction('syncAiring')}
-                      disabled={!!loading}
-                    >
-                      {loading === 'syncAiring' ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={styles.btnPrimaryText}>Sincronizar Emisiones Actuales</Text>
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.btn, styles.btnSecondary]}
-                      onPress={() => handleAction('fixImages')}
-                      disabled={!!loading}
-                    >
-                      {loading === 'fixImages' ? (
-                        <ActivityIndicator size="small" color={darkColors.text} />
-                      ) : (
-                        <Text style={styles.btnSecondaryText}>Corregir Imágenes Faltantes</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Herramientas Rápidas */}
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Ionicons name="search" size={18} color={darkColors.primary} />
-                    <Text style={styles.cardTitle}>Buscador y Pruebas</Text>
-                  </View>
+                {/* Buscador y Pruebas */}
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionTitle}>Buscador y creación rápida</Text>
                   <TextInput
                     style={styles.input}
                     value={previewTitle}
                     onChangeText={setPreviewTitle}
                     placeholder="Título del anime..."
-                    placeholderTextColor={darkColors.textGray}
+                    placeholderTextColor={adminColors.textSecondary}
                   />
 
                   <View style={styles.toolGrid}>
@@ -490,22 +402,22 @@ export default function AdminBotScreen() {
 
                   {slugResult !== undefined && (
                     <Text style={styles.resultLine}>
-                      JK: <Text style={{ color: slugResult ? '#22c55e' : '#ef4444' }}>{slugResult || 'No'}</Text>
+                      JK: <Text style={{ color: slugResult ? '#16a34a' : adminColors.primary }}>{slugResult || 'No'}</Text>
                     </Text>
                   )}
                   {slugAv1Result !== undefined && (
                     <Text style={styles.resultLine}>
-                      AV1: <Text style={{ color: slugAv1Result ? '#22c55e' : '#ef4444' }}>{slugAv1Result || 'No'}</Text>
+                      AV1: <Text style={{ color: slugAv1Result ? '#16a34a' : adminColors.primary }}>{slugAv1Result || 'No'}</Text>
                     </Text>
                   )}
                   {previewData && (
                     <View style={styles.previewBox}>
-                      <Text style={styles.previewText}>Title: {previewData.title}</Text>
+                      <Text style={styles.previewText}>Título: {previewData.title}</Text>
                       <Text style={styles.previewText}>Rating: {previewData.rating}</Text>
-                      <Text style={styles.previewText}>Eps: {previewData.total_episodes}</Text>
+                      <Text style={styles.previewText}>Episodios: {previewData.total_episodes}</Text>
                     </View>
                   )}
-                  
+
                   <TouchableOpacity
                     style={[styles.btn, styles.btnPrimary, { marginTop: 12 }, !previewTitle && styles.btnDisabled]}
                     onPress={() => handleAction('createAndScrape')}
@@ -514,20 +426,75 @@ export default function AdminBotScreen() {
                     {loading === 'createAndScrape' ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <Text style={styles.btnPrimaryText}>Crear & Scrapear (Desde Título)</Text>
+                      <Text style={styles.btnPrimaryText}>Crear y scrapear desde título</Text>
                     )}
                   </TouchableOpacity>
                 </View>
 
+                {/* Acciones Masivas */}
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionTitle}>Acciones masivas</Text>
+                  <Text style={styles.sectionDesc}>
+                    Sincroniza episodios en emisión o recupera portadas faltantes por rango de IDs.
+                  </Text>
+
+                  <View style={[styles.formRow, { marginTop: 12 }]}>
+                    <View style={styles.fieldHalf}>
+                      <Text style={styles.label}>Desde ID (Opc.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={fixStartId}
+                        onChangeText={setFixStartId}
+                        placeholder="Ej: 903"
+                        placeholderTextColor={adminColors.textSecondary}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={styles.fieldHalf}>
+                      <Text style={styles.label}>Hasta ID (Opc.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={fixEndId}
+                        onChangeText={setFixEndId}
+                        placeholder="Ej: 1064"
+                        placeholderTextColor={adminColors.textSecondary}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnPrimary]}
+                      onPress={() => handleAction('syncAiring')}
+                      disabled={!!loading}
+                    >
+                      {loading === 'syncAiring' ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.btnPrimaryText}>Sincronizar emisiones</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnSecondary]}
+                      onPress={() => handleAction('fixImages')}
+                      disabled={!!loading}
+                    >
+                      {loading === 'fixImages' ? (
+                        <ActivityIndicator size="small" color={adminColors.text} />
+                      ) : (
+                        <Text style={styles.btnSecondaryText}>Corregir portadas</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
 
               {/* Columna Derecha: Consola */}
-              <View style={styles.rightCol}>
-                <TerminalLog jobs={jobs} />
+              <View style={[styles.col, isWide && styles.rightCol]}>
+                <TerminalLog jobs={jobs} connection={connection} />
               </View>
-
             </View>
-
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -536,239 +503,304 @@ export default function AdminBotScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: darkColors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    backgroundColor: '#0a0a0a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
+  container: {
+    flex: 1,
+    backgroundColor: adminColors.background,
   },
-  headerIcon: {
-    width: 48, height: 48, borderRadius: 0,
-    backgroundColor: '#FF0000' + '20',
-    borderWidth: 1, borderColor: '#FF0000',
-    justifyContent: 'center', alignItems: 'center',
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 36,
   },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: darkColors.text, letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, color: darkColors.textGray, marginTop: 4 },
-  scrollContent: { padding: 24, paddingBottom: 40 },
-  maxWidthContainer: {
+  scrollContentCompact: {
+    padding: 12,
+    paddingBottom: 28,
+  },
+  pageInner: {
     width: '100%',
-    maxWidth: '100%', // El usuario dijo que había mucho espacio libre a los lados
-    marginHorizontal: 'auto',
+    maxWidth: 1160,
     alignSelf: 'center',
+    gap: 16,
   },
-  
   statsRow: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 24,
     flexWrap: 'wrap',
+    gap: 10,
   },
-  statCard: {
+  statTile: {
     flex: 1,
-    minWidth: 200,
-    backgroundColor: darkColors.card,
-    borderWidth: 1,
-    borderColor: '#222',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  statIconBox: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
+    minWidth: 100,
+    backgroundColor: adminColors.surface,
+    borderRadius: 4,
+    padding: 14,
   },
   statValue: {
     fontSize: 24,
-    fontWeight: '900',
-    color: darkColors.text,
+    fontWeight: '800',
   },
   statTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: darkColors.textGray,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: adminColors.textSecondary,
+    marginTop: 4,
   },
-
   mainGrid: {
-    flexDirection: Platform.OS === 'web' && (window as any).innerWidth > 900 ? 'row' : 'column',
-    gap: 24,
+    gap: 16,
   },
-  leftCol: {
-    flex: 1.2, // Darle un poco más de espacio a los forms si es necesario, o al revés
+  mainGridWide: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 20,
   },
+  col: {
+    width: '100%',
+    gap: 16,
+  },
+  leftCol: {
+    flex: 1.15,
+    minWidth: 0,
+  },
   rightCol: {
-    flex: 1.8, // Para que el terminal (creaper) sea ancho
-    minHeight: 500,
+    flex: 1,
+    minWidth: 0,
   },
-
-  card: {
-    backgroundColor: darkColors.card,
-    borderWidth: 1,
-    borderColor: '#222',
-    padding: 24,
-    borderRadius: 0, // Cuadrado puro
+  sectionBlock: {
+    backgroundColor: adminColors.surface,
+    borderRadius: 4,
+    padding: 16,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
-    paddingBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: darkColors.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  cardDesc: {
+  sectionTitle: {
     fontSize: 13,
-    color: darkColors.textGray,
-    lineHeight: 20,
+    fontWeight: '800',
+    color: adminColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 12,
   },
-
-  formGrid: {
-    gap: 12,
+  sectionDesc: {
+    fontSize: 13,
+    color: adminColors.textSecondary,
+    lineHeight: 19,
   },
   formRow: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 10,
   },
-  label: { 
-    fontSize: 12, 
-    fontWeight: '600', 
-    color: darkColors.textGray, 
+  fieldSmall: {
+    flex: 1,
+    minWidth: 110,
+  },
+  fieldWide: {
+    flex: 2,
+    minWidth: 200,
+  },
+  fieldHalf: {
+    flex: 1,
+    minWidth: 140,
+  },
+  fieldThird: {
+    flex: 1,
+    minWidth: 96,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: adminColors.textSecondary,
     marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#0a0a0a', 
+    backgroundColor: adminColors.background,
     borderWidth: 1,
-    borderColor: '#333',
-    padding: 14, // Inputs un poco más grandes
-    color: darkColors.text, 
+    borderColor: adminColors.border,
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 44,
+    color: adminColors.text,
     fontSize: 14,
-    borderRadius: 0, // Cuadrado puro
   },
-  
-  sourceRow: { flexDirection: 'row', gap: 6 },
+  sourceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   sourceBtn: {
-    flex: 1, paddingVertical: 14, paddingHorizontal: 6,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0a0a0a', borderWidth: 1, borderColor: '#333',
-    borderRadius: 0,
-  },
-  sourceBtnActive: { backgroundColor: darkColors.primary + '20', borderColor: darkColors.primary },
-  sourceBtnText: { fontSize: 13, fontWeight: '700', color: darkColors.textGray },
-  sourceBtnTextActive: { color: darkColors.primary },
-
-  actionGrid: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  btn: {
-    flex: 1, paddingVertical: 18, paddingHorizontal: 12, // Botones muy grandes
-    alignItems: 'center', justifyContent: 'center',
-    borderRadius: 0, // Cuadrado puro
-  },
-  btnPrimary: { backgroundColor: darkColors.primary },
-  btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 14, textTransform: 'uppercase' },
-  btnSecondary: { backgroundColor: '#1f1f1f', borderWidth: 1, borderColor: '#333' },
-  btnSecondaryText: { color: darkColors.text, fontWeight: '700', fontSize: 14, textTransform: 'uppercase' },
-  btnDisabled: { opacity: 0.4 },
-  
-  errorText: { marginTop: 12, color: '#ef4444', fontWeight: '700', fontSize: 13 },
-  successText: { marginTop: 12, color: '#22c55e', fontWeight: '700', fontSize: 13 },
-
-  toolGrid: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  btnTool: {
-    flex: 1, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333',
-    paddingVertical: 8, alignItems: 'center', justifyContent: 'center'
-  },
-  btnToolText: { color: darkColors.textGray, fontSize: 12, fontWeight: '600' },
-  resultLine: { fontSize: 13, color: darkColors.textGray, marginTop: 8, fontWeight: '600' },
-  previewBox: { marginTop: 12, padding: 12, backgroundColor: '#0a0a0a', borderWidth: 1, borderColor: '#333' },
-  previewText: { color: darkColors.textGray, fontSize: 12, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined },
-
-  // Terminal Styles
-  terminalContainer: {
     flex: 1,
-    backgroundColor: '#050505',
+    minWidth: 68,
+    minHeight: 44,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: adminColors.background,
     borderWidth: 1,
-    borderColor: '#333',
-    height: 500,
-    maxHeight: 500, // Fijar la altura máxima
-    borderRadius: 0,
-    shadowColor: darkColors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
+    borderColor: adminColors.border,
+    borderRadius: 4,
+  },
+  sourceBtnActive: {
+    backgroundColor: 'rgba(117, 2, 15, 0.08)',
+    borderColor: adminColors.primary,
+  },
+  sourceBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: adminColors.textSecondary,
+  },
+  sourceBtnTextActive: {
+    color: adminColors.primary,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+  },
+  btn: {
+    flex: 1,
+    minWidth: 110,
+    minHeight: 46,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 4,
+  },
+  btnPrimary: {
+    backgroundColor: adminColors.primary,
+  },
+  btnPrimaryText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  btnSecondary: {
+    backgroundColor: adminColors.background,
+    borderWidth: 1,
+    borderColor: adminColors.border,
+  },
+  btnSecondaryText: {
+    color: adminColors.text,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  btnDisabled: {
+    opacity: 0.45,
+  },
+  errorText: {
+    marginTop: 10,
+    color: adminColors.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  successText: {
+    marginTop: 10,
+    color: '#16a34a',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  toolGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  btnTool: {
+    flex: 1,
+    minWidth: 96,
+    minHeight: 44,
+    backgroundColor: adminColors.background,
+    borderWidth: 1,
+    borderColor: adminColors.border,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  btnToolText: {
+    color: adminColors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  resultLine: {
+    fontSize: 13,
+    color: adminColors.textSecondary,
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  previewBox: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: adminColors.background,
+    borderRadius: 4,
+    gap: 3,
+  },
+  previewText: {
+    color: adminColors.text,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  terminalContainer: {
+    backgroundColor: adminColors.ink,
+    borderRadius: 4,
+    overflow: 'hidden',
+    height: 460,
   },
   terminalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
-    paddingHorizontal: 16,
+    backgroundColor: '#121014',
+    paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  terminalDots: { flexDirection: 'row', gap: 6, marginRight: 16 },
-  terminalDot: { width: 12, height: 12, borderRadius: 6 },
-  terminalTitle: { color: '#666', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  terminalDots: {
+    flexDirection: 'row',
+    gap: 6,
+    marginRight: 12,
+  },
+  terminalDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  terminalTitle: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   terminalBody: {
-    padding: 16,
+    padding: 14,
   },
   terminalText: {
-    color: '#666',
-    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
     fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
     marginBottom: 8,
   },
   terminalRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 5,
     flexWrap: 'wrap',
   },
   terminalTime: {
-    color: '#555',
-    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
     fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   },
   terminalSuccess: {
-    color: '#22c55e',
-    fontSize: 13,
+    color: '#4ade80',
+    fontSize: 12,
     fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   },
   terminalError: {
-    color: '#ef4444',
-    fontSize: 13,
+    color: '#f87171',
+    fontSize: 12,
     fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   },
   terminalActive: {
-    color: '#eab308',
-    fontSize: 13,
+    color: '#facc15',
+    fontSize: 12,
     fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   },
-  terminalBlink: {
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
-    opacity: 0.7,
-  }
 })

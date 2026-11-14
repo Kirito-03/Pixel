@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense } from 'react';
-import { NavigationContainer, type LinkingOptions, type NavigatorScreenParams } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme, type LinkingOptions, type NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -379,7 +379,7 @@ const linking: LinkingOptions<LinkRoutes> = {
 };
 
 export default function AppNavigator() {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const { user, isLoading } = useAuth();
   const { currentProfile, loadCurrentProfile } = useProfile();
   const { isAdmin } = useAdmin();
@@ -451,6 +451,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer
       linking={linking}
+      theme={{ ...(theme === 'dark' ? DarkTheme : DefaultTheme), colors: { ...(theme === 'dark' ? DarkTheme.colors : DefaultTheme.colors), background: colors.background, card: colors.card, text: colors.text, primary: colors.primary, border: colors.divider } }}
     >
       <RootStack.Navigator
         screenOptions={{

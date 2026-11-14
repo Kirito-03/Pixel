@@ -26,6 +26,7 @@ const newsApiKeyPreview = hasNewsApiKey
 console.log('[News] NEWSAPI_KEY:', newsApiKeyPreview);
 
 // ── Import routers existentes ──────────────────────────────────
+const { default: appReleaseRoutes } = await import('./routes/appRelease.js');
 const { default: authRoutes }             = await import('./routes/auth.js');
 const { default: adminRoutes }            = await import('./routes/admin.js');
 const { default: userRoutes }             = await import('./routes/user.js');
@@ -184,6 +185,7 @@ app.use('/auth', authLimiter, userAuthRoutes);
 // Admin auth (Google OAuth, Firebase, admin/me, admin/logout, admin/check)
 app.use('/auth', authLimiter, authRoutes);
 
+app.use('/api/app-release', appReleaseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/bot', botRoutes);
 app.use('/api/catalog', catalogRoutes);

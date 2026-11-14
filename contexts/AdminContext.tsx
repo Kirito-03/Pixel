@@ -83,13 +83,13 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
 
                 // Obtener ID Token de Firebase
                 console.log('[AdminContext] Getting Firebase ID Token...');
-                const idToken = await currentUser.getIdToken(true); // force refresh
+                const idToken = await currentUser.getIdToken(); // SDK refreshes only when necessary
                 console.log('[AdminContext] Got ID Token');
 
                 // Intentar login silencioso con backend
                 console.log('[AdminContext] Calling adminAuthService.loginWithFirebaseToken...');
                 const result = await adminAuthService.loginWithFirebaseToken(idToken);
-                console.log('[AdminContext] Result from backend:', result);
+                console.log('[AdminContext] Authentication result:', { success: result.success, authenticated: !!result.user });
 
                 if (result.success && result.token && result.user) {
                     if (!isAllowedAdminEmail(result.user.email) && result.user.role !== 'admin') {

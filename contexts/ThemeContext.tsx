@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useMemo, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { darkColors, lightColors, spacing as baseSpacing } from '../theme';
 
 type ThemeName = 'dark' | 'light';
@@ -16,8 +18,28 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeName>('dark');
 
-  const setTheme = (t: ThemeName) => setThemeState(t);
-  const toggleTheme = () => setThemeState(prev => (prev === 'dark' ? 'light' : 'dark'));
+  const revision = useRef(0);
+  useEffect(() => {
+    const started = revision.current;
+    let active = true;
+    AsyncStorage.getItem('pixel.theme').then(saved => {
+      if (active && revision.current === started && (saved === 'dark' || saved === 'light')) setThemeState(saved);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const setTheme = useCallback((t: ThemeName) => {
+    if (t !== 'dark' && t !== 'light') return;
+    revision.current += 1;
+    setThemeState(t);
+    void AsyncStorage.setItem('pixel.theme', t).catch(() => {});
+  }, []);
+  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.style.colorScheme = theme;
+      document.documentElement.style.backgroundColor = theme === 'dark' ? darkColors.background : lightColors.background;
+    }
+  }, [theme]);
 
   const colors = useMemo(() => (theme === 'dark' ? darkColors : lightColors), [theme]);
   const spacing = baseSpacing;
