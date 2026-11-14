@@ -1,132 +1,92 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useProfile } from './ProfileContext';
-import { myListApi } from '../services/myListApi';
+import { useAuth } from './AuthContext';
+import { myListApi, MyListContentType } from '../services/myListApi';
 
 interface MyListContextType {
-  // Guardamos claves compuestas con el tipo para evitar colisiones entre TMDB y AniList
   myListItems: Set<string>;
-  isInMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => boolean;
-  addToMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => Promise<void>;
-  removeFromMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => Promise<void>;
-  toggleMyList: (contentId: string | number, contentType?: 'movie' | 'tv' | 'anime' | 'manga') => Promise<void>;
+  isInMyList: (id: string | number, type?: MyListContentType) => boolean;
+  isUpdatingMyList: (id: string | number, type?: MyListContentType) => boolean;
+  addToMyList: (id: string | number, type?: MyListContentType) => Promise<void>;
+  removeFromMyList: (id: string | number, type?: MyListContentType) => Promise<void>;
+  toggleMyList: (id: string | number, type?: MyListContentType) => Promise<void>;
   refreshMyList: () => Promise<void>;
   loading: boolean;
 }
-
 const MyListContext = createContext<MyListContextType | undefined>(undefined);
+const EMPTY = new Set<string>();
 
-interface MyListProviderProps {
-  children: ReactNode;
-}
-
-export const MyListProvider: React.FC<MyListProviderProps> = ({ children }) => {
-  const { currentProfile } = useProfile();
-  const [myListItems, setMyListItems] = useState<Set<string>>(new Set());
+export function MyListProvider({ children }: { children: ReactNode }) {
+  const { currentProfile, adultContentEnabled } = useProfile();
+  const profileId = currentProfile?.id ?? null;
+  const scope = `${profileId}:${adultContentEnabled}`;
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const [state, setState] = useState({ scope, items: EMPTY });
+  const itemsRef = useRef(state);
+  itemsRef.current = state;
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (currentProfile) {
-      refreshMyList();
-    } else if (!currentProfile) {
-      setMyListItems(new Set());
-    }
-  }, [currentProfile]);
+  const [pending, setPending] = useState(new Set<string>());
+  const operations = useRef(new Map<string, Promise<void>>());
+  const revision = useRef(0);
+  const reads = useRef(0);
+  const myListItems = state.scope === scope ? state.items : EMPTY;
 
   const refreshMyList = async () => {
-    if (!currentProfile) return;
-
+    const request = ++reads.current;
+    if (!profileId) { setState({ scope, items: EMPTY }); setLoading(false); return; }
+    const started = revision.current;
     setLoading(true);
     try {
-      const entries = await myListApi.getMyList(currentProfile.id);
-      const keyed = new Set<string>(
-        entries.map((entry: { content_id: string | number; content_type: 'movie' | 'tv' | 'anime' | 'manga' }) => {
-          const type = entry.content_type;
-          return `${type}:${entry.content_id}`;
-        })
-      );
-      setMyListItems(keyed);
-    } catch (error) {
-      setMyListItems(new Set<string>());
+      const entries = await myListApi.getMyList(profileId, { includeAdult: adultContentEnabled });
+      if (currentScope.current !== scope || request !== reads.current || revision.current !== started) return;
+      setState({ scope, items: new Set(entries.map(entry => `${entry.content_type}:${entry.content_id}`)) });
     } finally {
-      setLoading(false);
+      if (currentScope.current === scope && request === reads.current) setLoading(false);
     }
   };
+  useEffect(() => { refreshMyList().catch(() => {}); }, [scope]);
 
-  const isInMyList = (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie'): boolean => {
-    const key = `${contentType}:${contentId}`;
-    return myListItems.has(key);
-  };
-
-  const addToMyList = async (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie') => {
-    if (!currentProfile) {
-      throw new Error('No hay perfil seleccionado');
-    }
-
-    try {
-      await myListApi.add(currentProfile.id, contentId, contentType);
-      const key = `${contentType}:${contentId}`;
-      setMyListItems((prev) => new Set<string>([...prev, key]));
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const removeFromMyList = async (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie') => {
-    if (!currentProfile) {
-      throw new Error('No hay perfil seleccionado');
-    }
-
-    try {
-      await myListApi.remove(currentProfile.id, contentId, contentType);
-      setMyListItems((prev) => {
-        const next = new Set(prev);
-        next.delete(`${contentType}:${contentId}`);
-        return next;
+  const isInMyList = (id: string | number, type: MyListContentType = 'movie') => myListItems.has(`${type}:${id}`);
+  const isUpdatingMyList = (id: string | number, type: MyListContentType = 'movie') => pending.has(`${scope}:${type}:${id}`);
+  const mutate = (id: string | number, type: MyListContentType, action: 'add' | 'remove' | 'toggle'): Promise<void> => {
+    if (!profileId) return Promise.reject(new Error('Selecciona un perfil antes de guardar títulos'));
+    if (type === 'h_anime' && !adultContentEnabled) return Promise.reject(new Error('Esta sección está deshabilitada en tu perfil'));
+    const key = `${type}:${id}`;
+    const operationKey = `${scope}:${key}`;
+    const existing = operations.current.get(operationKey);
+    if (existing) return existing;
+    const saved = itemsRef.current.scope === scope && itemsRef.current.items.has(key);
+    const adding = action === 'add' || (action === 'toggle' && !saved);
+    revision.current += 1;
+    setPending(previous => new Set([...previous, operationKey]));
+    const operation = Promise.resolve().then(async () => {
+      if (adding) await myListApi.add(profileId, id, type);
+      else await myListApi.remove(profileId, id, type);
+      if (currentScope.current !== scope) return;
+      setState(previous => {
+        const items = new Set(previous.scope === scope ? previous.items : []);
+        if (adding) items.add(key); else items.delete(key);
+        return { scope, items };
       });
-    } catch (error) {
-      throw error;
-    }
+    }).finally(() => {
+      revision.current += 1;
+      operations.current.delete(operationKey);
+      setPending(previous => { const next = new Set(previous); next.delete(operationKey); return next; });
+    });
+    operations.current.set(operationKey, operation);
+    return operation;
   };
-
-  const toggleMyList = async (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie') => {
-    if (!currentProfile) {
-      throw new Error('Selecciona un perfil antes de guardar títulos');
-    }
-
-    const isCurrentlyInList = isInMyList(contentId, contentType);
-
-    try {
-      if (isCurrentlyInList) {
-        await removeFromMyList(contentId, contentType);
-      } else {
-        await addToMyList(contentId, contentType);
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
   const value: MyListContextType = {
-    myListItems,
-    isInMyList,
-    addToMyList,
-    removeFromMyList,
-    toggleMyList,
-    refreshMyList,
-    loading,
+    myListItems, isInMyList, isUpdatingMyList, loading, refreshMyList,
+    addToMyList: (id, type = 'movie') => mutate(id, type, 'add'),
+    removeFromMyList: (id, type = 'movie') => mutate(id, type, 'remove'),
+    toggleMyList: (id, type = 'movie') => mutate(id, type, 'toggle'),
   };
-
-  return (
-    <MyListContext.Provider value={value}>
-      {children}
-    </MyListContext.Provider>
-  );
-};
-
-export const useMyList = (): MyListContextType => {
-  const context = useContext(MyListContext);
-  if (context === undefined) {
-    throw new Error('useMyList must be used within a MyListProvider');
-  }
-  return context;
-};
+  return <MyListContext.Provider value={value}>{children}</MyListContext.Provider>;
+}
+export function useMyList(): MyListContextType {
+  const value = useContext(MyListContext);
+  if (!value) throw new Error('useMyList must be used within a MyListProvider');
+  return value;
+}

@@ -41,9 +41,9 @@ service cloud.firestore {
                    entry.added_at is timestamp &&
                    ((entry.content_type in ['movie','tv','anime'] &&
                      entry.content_id is int && entry.content_id > 0) ||
-                    (entry.content_type == 'manga' && entry.content_id is string &&
+                    (entry.content_type in ['manga','h_anime'] && entry.content_id is string &&
                      entry.content_id.size() > 0 && entry.content_id.size() <= 128 &&
-                     entry.content_id.matches('^[a-zA-Z0-9_-]+$')));
+                     entry.content_id.matches('^[a-zA-Z0-9._-]+$')));
           }
           allow create, update: if isOwner(uid) &&
             exists(/databases/$(database)/documents/profiles/$(uid)/profiles/$(profileId)) &&

@@ -12,6 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../contexts/ProfileContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useMyList } from '../contexts/MyListContext';
 import MovieModal from '../components/MovieModal';
 import AnimeSeriesModalWrapper from '../components/AnimeSeriesModalWrapper';
@@ -38,6 +39,7 @@ export default function MyListScreen() {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const { currentProfile, adultContentEnabled } = useProfile();
+  const { user } = useAuth();
   const { refreshMyList, removeFromMyList } = useMyList();
   const { navigateByLabel } = useTabNavigation();
   const navigation = useNavigation<any>();
@@ -62,8 +64,8 @@ export default function MyListScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (currentProfile) loadMyList();
-    }, [currentProfile])
+      if (currentProfile && user?.uid) loadMyList();
+    }, [currentProfile, user?.uid])
   );
 
   const loadMyList = async () => {
@@ -99,10 +101,9 @@ export default function MyListScreen() {
               source: 'anilist',
             } as ContentItem;
           }
-          if (entry.content_type !== 'anime') return null;
           return {
             id: Number(entry.content_id),
-            type: 'anime',
+            type: entry.content_type === 'movie' || entry.content_type === 'tv' ? entry.content_type : 'anime',
             title: entry.anime_title || `Anime #${entry.content_id}`,
             overview: '',
             poster_path: normalizeImagePath(entry.poster_url),
@@ -124,6 +125,7 @@ export default function MyListScreen() {
       }
       setItems(validItems);
     } catch (error) {
+      console.error('[MyListScreen] Error loading My List:', error);
       setItems([]);
       setContinueRows([]);
     } finally {
