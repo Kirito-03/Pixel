@@ -1,8 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import * as cheerio from 'cheerio';
-import { fetchHtmlWithCloak, upsertManga, getMangaChapters } from './mangaService.js';
+import { scrapeMangaList, getMangaDetail, getMangaChapters } from './mangaService.js';
 
 const BASE_URL = 'https://dragontranslation.org';
 const MANGA_MEMORY_FILE = path.join(os.tmpdir(), 'manga_bot_memory.json');
@@ -46,40 +45,15 @@ async function scrapeCatalogPage(page = 1) {
   console.log(`[MangaBot] Scrapeando página de catálogo (${page}): ${url}`);
   
   try {
-    const html = await fetchHtmlWithCloak(url, '.acard');
-    const $ = cheerio.load(html);
-    const items = [];
-
-    $('.acard').each((i, el) => {
-      const link = $(el).attr('href');
-      if (!link) return;
-
-      const match = link.match(/\/manga\/([^\/]+)\/?/);
-      if (!match) return;
-      const slug = match[1];
-
-      const title = $(el).find('.ac-t').text().trim();
-      let cover_url = $(el).find('.ac-cover').attr('src') || $(el).find('.ac-cover').attr('data-src');
-      if (cover_url && cover_url.includes(' ')) cover_url = cover_url.split(' ')[0];
-
-      const statusText = $(el).find('.ac-status').text().trim().toLowerCase();
-      let status = 'En emisión';
-      if (statusText.includes('complet') || statusText.includes('finaliz')) status = 'Finalizado';
-      else if (statusText.includes('hiatus')) status = 'Hiatus';
-      else if (statusText.includes('cancel')) status = 'Cancelado';
-
-      const latest_chapter = $(el).find('.ac-ch').text().replace(/cap[ií]tulo/gi, '').trim() || null;
-      const chapter_count = parseInt(latest_chapter, 10) || 0;
-
-      items.push({
-        slug,
-        title,
-        cover_url,
-        status,
-        latest_chapter,
-        chapter_count,
-      });
-    });
+    const list = await scrapeMangaList(url);
+    const items = list.map(m => ({
+      slug: m.id,
+      title: m.title,
+      cover_url: m.cover_url,
+      status: m.status === 'ongoing' ? 'En emisión' : 'Finalizado',
+      latest_chapter: m.latest_chapter,
+      chapter_count: m.chapter_count
+    }));
 
     console.log(`[MangaBot] Página ${page}: ${items.length} títulos encontrados.`);
     return items;
@@ -97,60 +71,18 @@ export async function syncMangaItem(pool, itemOrSlug) {
   const initial = typeof itemOrSlug === 'object' ? itemOrSlug : null;
 
   try {
-    const url = `${BASE_URL}/manga/${slug}/`;
-    const html = await fetchHtmlWithCloak(url, '.htitle');
-    const $ = cheerio.load(html);
-
-    const title = $('.htitle').text().trim() || initial?.title;
+    const detail = await getMangaDetail(pool, slug);
+    const title = detail?.title || initial?.title;
     if (!title) {
       console.log(`[MangaBot] Manga ${slug} no válido (Sin título).`);
       return { ok: false, slug };
     }
 
-    let cover_url = $('.hposter img').attr('src') || $('.hposter img').attr('data-src') || initial?.cover_url || null;
-    if (cover_url && cover_url.includes(' ')) cover_url = cover_url.split(' ')[0];
-
-    const description = $('.syn p').text().trim() || '';
-
-    const tags = [];
-    $('.hchips--genres .chip').each((_, el) => {
-      const tag = $(el).text().trim();
-      if (tag) tags.push(tag);
-    });
-
-    let status = initial?.status || 'En emisión';
-    $('.sir').each((_, el) => {
-      if ($(el).find('.l').text().includes('Estado')) {
-        const s = $(el).find('.v').text().toLowerCase();
-        if (s.includes('completed') || s.includes('completado') || s.includes('finalizado')) status = 'Finalizado';
-        else if (s.includes('hiatus')) status = 'Hiatus';
-        else if (s.includes('cancel')) status = 'Cancelado';
-        else status = 'En emisión';
-      }
-    });
-
-    const mapped = {
-      id: slug,
-      title,
-      description,
-      cover_url,
-      status,
-      tags,
-      content_rating: 'safe',
-      year: null,
-      chapter_count: initial?.chapter_count || 0,
-      latest_chapter: initial?.latest_chapter || null,
-      author: '',
-      artist: '',
-      updated_at: new Date().toISOString()
-    };
-
-    await upsertManga(pool, mapped);
-
     // Refrescar y cachear capítulos en manga_chapters_cache
     const chaptersData = await getMangaChapters(pool, slug, { forceRefresh: true });
     const chaptersCount = chaptersData?.chapters?.length || 0;
 
+    console.log(`[MangaBot] ✓ Sincronizado ${title} (${chaptersCount} capítulos)`);
     return { ok: true, slug, title, chaptersCount };
   } catch (err) {
     console.error(`[MangaBot] Error procesando manga ${slug}:`, err.message);
