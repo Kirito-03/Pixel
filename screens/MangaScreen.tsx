@@ -94,7 +94,7 @@ export default function MangaScreen() {
   }, [activeFilter, search, isSmallScreen]);
 
   // 8 columnas en pantallas grandes para evitar el espacio negro
-  const columns = isSmallScreen ? 2 : 8;
+  const columns = Math.max(2, Math.min(8, Math.floor((width - 40) / 180)));
   const mapped = useMemo(() => items.map(toUI), [items]);
   const chunks: typeof mapped[] = [];
   for (let i = 0; i < mapped.length; i += columns) {
@@ -121,7 +121,7 @@ export default function MangaScreen() {
           <Text style={[styles.mainTitle, { color: colors.text }]}>
             MANG<Text style={{color: '#E50914'}}>A</Text>
           </Text>
-          
+
           <View style={[styles.searchWrapper, { backgroundColor: colors.card, borderColor: theme === 'dark' ? '#222' : 'rgba(0,0,0,0.1)' }]}>
             <View style={styles.searchRedLine} />
             <Ionicons name="search" size={20} color={colors.textMuted || "#444"} style={{marginLeft: 16, marginRight: 12}} />

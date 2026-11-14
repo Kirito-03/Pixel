@@ -25,8 +25,8 @@ passport.use(new GoogleStrategy({
             const result = await pool.query(
                 `INSERT INTO usuarios (email, password_hash, role)
                  VALUES ($1, $2, $3)
-                 ON CONFLICT (email) 
-                 DO UPDATE SET 
+                 ON CONFLICT (email)
+                 DO UPDATE SET
                    email = EXCLUDED.email,
                    role = CASE WHEN EXCLUDED.role = 'admin' THEN 'admin' ELSE usuarios.role END
                  RETURNING id, email, role`,
@@ -201,8 +201,8 @@ router.post('/admin/firebase-login', async (req, res) => {
         const result = await pool.query(
             `INSERT INTO usuarios (email, password_hash, role)
              VALUES ($1, $2, $3)
-             ON CONFLICT (email) 
-             DO UPDATE SET 
+             ON CONFLICT (email)
+             DO UPDATE SET
                email = EXCLUDED.email,
                role = CASE WHEN EXCLUDED.role = 'admin' THEN 'admin' ELSE usuarios.role END
              RETURNING id, email, role`,

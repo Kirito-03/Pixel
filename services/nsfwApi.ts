@@ -18,12 +18,11 @@ export const nsfwApi = {
             const params = new URLSearchParams();
             if (search) params.append('search', search);
             if (status) params.append('status', status);
-            
+
             const response = await backendClient.get(`/api/nsfw/latest?${params.toString()}`);
             return response.data;
         } catch (error) {
-            console.error('Error fetching NSFW:', error);
-            return [];
+            throw new Error('No se pudo consultar el catálogo.');
         }
     },
     getDetails: async (slug: string): Promise<NSFWAnime | null> => {
@@ -31,8 +30,7 @@ export const nsfwApi = {
             const response = await backendClient.get(`/api/nsfw/details/${slug}`);
             return response.data;
         } catch (error) {
-            console.error('Error fetching NSFW details:', error);
-            return null;
+            throw new Error('No se pudo consultar el detalle.');
         }
     },
     getServers: async (slug: string, episode: number): Promise<{server: string, url: string}[]> => {
@@ -40,8 +38,7 @@ export const nsfwApi = {
             const response = await backendClient.get(`/api/nsfw/servers/${slug}/${episode}`);
             return response.data;
         } catch (error) {
-            console.error('Error fetching NSFW servers:', error);
-            return [];
+            throw new Error('No se pudieron consultar los servidores.');
         }
     }
 };

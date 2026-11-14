@@ -1,10 +1,13 @@
+import { authenticateToken } from '../middleware/auth.js';
+import { requireOwnUser, requireProfileOwner } from '../middleware/ownership.js';
 import express from 'express';
 import pool from '../db.js';
 
 const router = express.Router();
+router.use(authenticateToken);
 
 // Profiles: list
-router.get('/', async (req, res) => {
+router.get('/', requireOwnUser(r => r.query.userId), async (req, res) => {
   const userId = Number(req.query.userId);
   if (!userId) return res.status(400).json({ message: 'userId requerido' });
   try {
@@ -16,7 +19,7 @@ router.get('/', async (req, res) => {
 });
 
 // Profiles: create (and ensure "Mi lista" + "Descargas")
-router.post('/', async (req, res) => {
+router.post('/', requireOwnUser(r => r.body?.usuario_id), async (req, res) => {
   const { usuario_id, name, avatar_url } = req.body || {};
   if (!usuario_id || !name || !avatar_url) return res.status(400).json({ message: 'Datos de perfil incompletos' });
   try {
@@ -38,7 +41,7 @@ router.post('/', async (req, res) => {
 });
 
 // Profiles: update
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireProfileOwner(r => r.params.id), async (req, res) => {
   const id = Number(req.params.id);
   const { name, avatar_url } = req.body || {};
   if (!id) return res.status(400).json({ message: 'id requerido' });
@@ -74,7 +77,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Profiles: delete
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireProfileOwner(r => r.params.id), async (req, res) => {
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ message: 'id requerido' });
   try {

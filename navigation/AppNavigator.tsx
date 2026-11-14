@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions, type NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,7 +84,7 @@ function HomeNavigator() {
 
 function AdminNavigator() {
   const content = (
-    <AdminStack.Navigator 
+    <AdminStack.Navigator
       initialRouteName="AdminDashboard"
       screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'fade' : 'default' }}
     >
@@ -251,7 +251,7 @@ function MainTabs({ route }: { route: any }) {
           tabBarLabel: 'En Emisión',
         }}
       />
-      
+
       {adultContentEnabled && (
         <Tab.Screen
           name="Hentai"
@@ -265,7 +265,7 @@ function MainTabs({ route }: { route: any }) {
           }}
         />
       )}
-      
+
       <Tab.Screen
         name="Manga"
         component={MangaNavigator}
@@ -306,8 +306,31 @@ function MainTabs({ route }: { route: any }) {
   );
 }
 
-const linking = {
-  prefixes: ['https://pixelnosekai.art', 'pixelnosekai://'],
+type LinkRoutes = {
+  Ingreso: undefined;
+  Registro: undefined;
+  SeleccionPerfil: undefined;
+  Apariencia: undefined;
+  Descargas: undefined;
+  Principal: NavigatorScreenParams<{
+    Inicio: undefined;
+    Buscar: undefined;
+    Emisión: undefined;
+    Hentai: undefined;
+    MiLista: undefined;
+    Perfil: undefined;
+    Noticias: NavigatorScreenParams<{ NoticiasHome: undefined; NewsDetail: { id: string } }>;
+    Manga: NavigatorScreenParams<{
+      MangaHome: undefined;
+      MangaDetail: { id: string };
+      MangaReader: { id: string; chapterId: string };
+    }>;
+  }>;
+  Admin: NavigatorScreenParams<Record<'AdminLogin' | 'AdminDashboard' | 'AdminImport' | 'AnimeList' | 'AnimeForm' | 'EpisodeManager' | 'AdminBot', undefined>>;
+};
+
+const linking: LinkingOptions<LinkRoutes> = {
+  prefixes: ['https://pixelnosekai.com', 'pixelnosekai://'],
   config: {
     screens: {
       Ingreso: 'login',
@@ -333,6 +356,7 @@ const linking = {
               MangaReader: 'read/:id/:chapterId'
             }
           },
+          Hentai: { path: 'h-anime', alias: ['Hentai'] },
           MiLista: 'mylist',
           Perfil: 'profile',
         },
@@ -379,7 +403,7 @@ export default function AppNavigator() {
 
       // 1. If we have a restored state, prioritize it!
       if (initialState) {
-        // If user is logged out but state is for internal screens, React Nav might handle it 
+        // If user is logged out but state is for internal screens, React Nav might handle it
         // by resetting to restricted screens, or we should verify user.
         // For now, assuming if user exists, state is valid.
         // BUT due to layout changes (moving screens to tabs), old state might crash.
@@ -409,7 +433,7 @@ export default function AppNavigator() {
         // Si no hay perfil, ir a selección de perfil
         setInitialRoute('SeleccionPerfil');
       }
-      
+
       // Ocultar la pantalla de carga (Splash Screen) nativa explícitamente
       try {
         await SplashScreen.hideAsync();

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
+import { Alert, ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,6 +31,8 @@ export default function MangaDetailScreen() {
   const isSmallScreen = width < 768;
 
   const [loading, setLoading] = useState(true);
+  const [savingList, setSavingList] = useState(false);
+  const [listError, setListError] = useState('');
   const [manga, setManga] = useState<Manga | null>(null);
   const [chapters, setChapters] = useState<MangaChapter[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
@@ -64,9 +66,10 @@ export default function MangaDetailScreen() {
         setSpanishAvailableChapters(Number(c.spanishAvailableChapters || 0));
         setSelectedLanguage(c.selectedLanguage || preferredLanguage);
         setUsedFallbackToEnglish(c.usedFallbackToEnglish === true);
-        const notice = c.noSpanishMessage
-          ? c.noSpanishMessage
-          : (c.usedFallbackToEnglish ? 'Mostrando capítulos en inglés por falta de traducción en español' : '');
+        const showingEnglishFallback = preferredLanguage !== 'en' && c.selectedLanguage === 'en';
+        const notice = c.usedFallbackToEnglish || showingEnglishFallback
+          ? 'Sin capítulos en español: mostrando los disponibles en inglés.'
+          : (c.noSpanishMessage || '');
         setLanguageNotice(notice);
         setImageError(false);
       } catch {
@@ -94,13 +97,14 @@ export default function MangaDetailScreen() {
     return t.slice(0, 12);
   }, [manga?.tags]);
 
-  const openChapter = async (chapter: MangaChapter, index: number) => {
+  const openChapter = async (chapter: MangaChapter, _index?: number) => {
+    const lang = selectedLanguage || preferredLanguage || 'es';
     navigation.navigate('MangaReader', {
       id,
       mangaId: id,
       chapterId: encodeURIComponent(chapter.id),
-      chapters,
-      currentIndex: index,
+      language: lang,
+      selectedLanguage: lang,
       mangaTitle: manga?.title || 'Manga',
     });
   };
@@ -147,7 +151,7 @@ export default function MangaDetailScreen() {
                 style={StyleSheet.absoluteFillObject}
               />
             </View>
-            
+
             <SafeAreaView edges={['top', 'left', 'right']}>
               <View style={styles.topBar}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
@@ -170,7 +174,7 @@ export default function MangaDetailScreen() {
 
               <View style={[styles.infoContainer, isSmallScreen && styles.infoMobile]}>
                 <Text style={styles.title}>{manga.title}</Text>
-                
+
                 <View style={styles.metaRow}>
                   {manga.status ? (
                     <Text style={styles.metaText}>{String(manga.status).toUpperCase()}</Text>
@@ -199,7 +203,7 @@ export default function MangaDetailScreen() {
                   </View>
                 )}
 
-                <Text style={styles.excerpt}>{manga.description || fallbackDescription(manga.title)}</Text>
+                <Text style={[styles.excerpt, { maxWidth: 720 }]}>{manga.description || fallbackDescription(manga.title)}</Text>
 
                 <View style={styles.actions}>
                   <TouchableOpacity
@@ -207,62 +211,77 @@ export default function MangaDetailScreen() {
                       if (!chapters.length) return;
                       openChapter(chapters[0], 0);
                     }}
+                    accessibilityRole="button" accessibilityLabel="Leer manga"
                     style={[styles.primaryBtn, !chapters.length && styles.btnDisabled]}
                     activeOpacity={0.9}
                     disabled={!chapters.length}
                   >
                     <Ionicons name="play" size={18} color="#000" />
-                    <Text style={styles.primaryText}>Leer ahora</Text>
+                    <Text style={styles.primaryText}>{chapters.length ? 'Leer ahora' : 'Sin capítulos'}</Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.secondaryBtn} 
-                    onPress={() => toggleMyList(id, 'manga')}
+
+                  <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    accessibilityRole="button" accessibilityLabel={isInMyList(id, 'manga') ? 'Quitar manga de Mi Lista' : 'Añadir manga a Mi Lista'} disabled={savingList}
+                    onPress={async () => {
+                      setListError('');
+                      setSavingList(true);
+                      try { await toggleMyList(id, 'manga'); }
+                      catch (error) {
+                        console.error('Manga Mi Lista:', error instanceof Error ? error.message : 'No se pudo guardar');
+                        setListError('No se pudo guardar. Comprueba tu sesión y el perfil seleccionado.');
+                      }
+                      finally { setSavingList(false); }
+                    }}
                   >
                     <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color="#fff" />
-                    <Text style={styles.secondaryText}>Mi lista</Text>
+                    <Text style={styles.secondaryText}>{savingList ? 'Guardando…' : isInMyList(id, 'manga') ? 'En mi lista' : 'Mi lista'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.iconBtn}>
-                    <Ionicons name="heart-outline" size={20} color="#fff" />
-                  </TouchableOpacity>
+
                 </View>
+                {listError ? <Text accessibilityRole="alert" style={{ color: '#ff9090', marginTop: 12 }}>{listError}</Text> : null}
               </View>
             </View>
 
             <View style={[styles.chaptersSection, isSmallScreen ? styles.chaptersSectionMobile : styles.chaptersSectionWeb]}>
               <View style={styles.chaptersHeader}>
                 <Text style={styles.sectionTitle}>Capítulos</Text>
-                
+
                 <View style={styles.languageControls}>
                   <TouchableOpacity
+                    accessibilityRole="button" accessibilityLabel="Capítulos en español"
+                    accessibilityState={{ selected: selectedLanguage === 'es' || selectedLanguage === 'es-la' }}
                     activeOpacity={0.9}
                     onPress={() => setPreferredLanguage('es')}
-                    style={[styles.langChip, preferredLanguage === 'es' && styles.langChipActive]}
+                    style={[styles.langChip, selectedLanguage?.startsWith('es') && styles.langChipActive]}
                   >
-                    <Text style={[styles.langChipText, preferredLanguage === 'es' && styles.langChipTextActive]}>ES</Text>
+                    <Text style={[styles.langChipText, selectedLanguage?.startsWith('es') && styles.langChipTextActive]}>ES</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
+                    accessibilityRole="button" accessibilityLabel="Capítulos en inglés"
+                    accessibilityState={{ selected: selectedLanguage === 'en' }}
                     activeOpacity={0.9}
                     onPress={() => setPreferredLanguage('en')}
-                    style={[styles.langChip, preferredLanguage === 'en' && styles.langChipActive]}
+                    style={[styles.langChip, selectedLanguage === 'en' && styles.langChipActive]}
                   >
-                    <Text style={[styles.langChipText, preferredLanguage === 'en' && styles.langChipTextActive]}>EN</Text>
+                    <Text style={[styles.langChipText, selectedLanguage === 'en' && styles.langChipTextActive]}>EN</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-              
+
               {languageNotice ? (
                 <Text style={styles.availabilityNote}>{languageNotice}</Text>
               ) : null}
 
-              <View style={styles.chaptersList}>
+              <View style={[styles.chaptersList, { flexDirection: 'row', flexWrap: 'wrap' }]}>
                 {chapters.length === 0 ? (
-                  <Text style={styles.noChaptersText}>No hay capítulos disponibles.</Text>
+                  <Text style={[styles.noChaptersText, { width: '100%' }]}>No hay capítulos disponibles.</Text>
                 ) : (
                   chapters.map((chap, idx) => (
                     <TouchableOpacity
                       key={chap.id}
-                      style={styles.chapterCard}
+                      accessibilityRole="button" accessibilityLabel={`Leer capítulo ${chap.chapter}`}
+                      style={[styles.chapterCard, { width: isSmallScreen ? '100%' : '49%' }]}
                       activeOpacity={0.8}
                       onPress={() => openChapter(chap, idx)}
                     >
@@ -274,7 +293,7 @@ export default function MangaDetailScreen() {
                           {chap.title || `Capítulo ${chap.chapter}`}
                         </Text>
                         <Text style={styles.chapterDate}>
-                          {chap.publishAt ? formatDate(chap.publishAt) : 'Sin fecha'}
+                          {chap.publish_at ? formatDate(chap.publish_at) : 'Sin fecha'}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
@@ -314,7 +333,7 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100, gap: 12 },
   emptyTitle: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '600' },
-  
+
   contentWrap: {
     position: 'relative',
     flex: 1,
@@ -344,7 +363,7 @@ const styles = StyleSheet.create({
   heroContentWeb: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    maxWidth: 1100,
+    maxWidth: 1000,
     alignSelf: 'center',
     width: '100%',
   },
@@ -442,6 +461,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   actions: {
+    maxWidth: 520,
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -494,14 +515,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
-  
+
   chaptersSection: {
     marginTop: 40,
     paddingHorizontal: 20,
     zIndex: 1,
   },
   chaptersSectionWeb: {
-    maxWidth: 1100,
+    maxWidth: 1000,
     alignSelf: 'center',
     width: '100%',
   },

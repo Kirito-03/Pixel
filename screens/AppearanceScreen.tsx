@@ -10,7 +10,7 @@ export default function AppearanceScreen() {
   const navigation = useNavigation();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Botón de cierre (X) en la esquina superior derecha */}
       <TouchableOpacity
         style={[
@@ -36,8 +36,8 @@ export default function AppearanceScreen() {
       </TouchableOpacity>
 
       <Text style={[styles.title, { color: colors.text }]}>Apariencia</Text>
-      <View style={[styles.item, { backgroundColor: colors.card }]}> 
-        <View style={styles.itemTextWrapper}> 
+      <View style={[styles.item, { backgroundColor: colors.card }]}>
+        <View style={styles.itemTextWrapper}>
           <Text style={[styles.itemTitle, { color: colors.text }]}>Modo oscuro</Text>
           <Text style={[styles.itemSubtitle, { color: colors.textGray }]}>Tema actual: {isDark ? 'Oscuro' : 'Claro'}</Text>
         </View>

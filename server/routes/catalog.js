@@ -31,7 +31,7 @@ router.get('/anime', async (req, res) => {
       where += ` AND franchise_key = $${i++}`;
       params.push(franchise);
     }
-    
+
     if (genre) {
       where += ` AND genres::text ILIKE $${i++}`;
       params.push(`%${genre}%`);
@@ -71,6 +71,9 @@ router.get('/anime', async (req, res) => {
         total_episodes,
         rating,
         release_date,
+        trailer_id,
+        trailer_site,
+        trailer_checked_at,
         created_at
       FROM anime_content
       ${where}
@@ -113,6 +116,9 @@ router.get('/anime/:id', async (req, res) => {
           total_episodes,
           rating,
           release_date,
+          trailer_id,
+          trailer_site,
+          trailer_checked_at,
           created_at
         FROM anime_content
         WHERE id = $1 AND is_active = true
@@ -220,6 +226,9 @@ router.get('/search', async (req, res) => {
         total_episodes,
         rating,
         release_date,
+        trailer_id,
+        trailer_site,
+        trailer_checked_at,
         created_at
       FROM anime_content
       ${where}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions, Alert, Platform, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList, MovieDetail, ContentItem, AnimeDetail } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -13,11 +13,12 @@ import { useMyList } from '../contexts/MyListContext';
 import { catalogService, CatalogAnime } from '../services/catalogService';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import ConsentModal from '../components/ConsentModal';
+import { isPublicCatalogItem } from '../utils/publicCatalog';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
 export default function HomeScreen({ navigation }: Props) {
-    const { currentProfile, adultContentEnabled } = useProfile();
+    const { currentProfile } = useProfile();
     const { addToMyList: addToMyListContext } = useMyList();
     const { navigateByLabel } = useTabNavigation();
     const { colors } = useTheme();
@@ -30,13 +31,14 @@ export default function HomeScreen({ navigation }: Props) {
     const [startFromEpisodeId, setStartFromEpisodeId] = useState<number | null>(null);
     const [startFromTimeSeconds, setStartFromTimeSeconds] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [blackHeader, setBlackHeader] = useState(false);
     const [contentFilter, setContentFilter] = useState<'all' | 'movies' | 'series' | 'anime'>('anime');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     const scrollViewRef = useRef<ScrollView>(null);
     const { height: screenHeight } = Dimensions.get('window');
-    
+
     // INFINITE SCROLL STATE
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const loadingMoreRef = useRef<boolean>(false);
@@ -71,6 +73,9 @@ export default function HomeScreen({ navigation }: Props) {
         release_date: anime.release_date || '',
         vote_average: typeof anime.rating === 'number' ? anime.rating : (parseFloat(anime.rating as unknown as string) || 0),
         source: 'anilist',
+        trailer_id: anime.trailer_id,
+        trailer_site: anime.trailer_site,
+        trailer_checked_at: anime.trailer_checked_at,
         genres: Array.isArray(anime.genres) ? anime.genres : [],
         status: anime.status || '',
     });
@@ -84,6 +89,7 @@ export default function HomeScreen({ navigation }: Props) {
                 english: anime.title_english || undefined,
                 native: anime.title_japanese || anime.title || 'Sin título',
             },
+            trailer: anime.trailer_id ? { id: anime.trailer_id, site: anime.trailer_site || 'youtube' } : undefined,
             description: anime.description || '',
             coverImage: {
                 large: anime.poster_url || '',
@@ -121,7 +127,7 @@ export default function HomeScreen({ navigation }: Props) {
         // Barajar aleatoriamente para que "Destacados" no sea idéntico a ninguna otra fila
         const shuffled = unique.sort(() => 0.5 - Math.random());
 
-        return shuffled.slice(0, 12); 
+        return shuffled.slice(0, 12);
     };
 
     useEffect(() => {
@@ -131,6 +137,7 @@ export default function HomeScreen({ navigation }: Props) {
     const loadContent = async () => {
         try {
             setLoading(true);
+            setLoadError(false);
             const sections = await catalogService.getHomeSections();
 
             const newContentSections: { [key: string]: ContentItem[] } = {
@@ -154,8 +161,13 @@ export default function HomeScreen({ navigation }: Props) {
                 newContentSections.upcoming
             );
             setFeaturedItems(featured);
+            const featuredIds = new Set(featured.map(item => item.id));
+            for (const key of Object.keys(newContentSections)) {
+                newContentSections[key] = newContentSections[key].filter((item, index, all) => !featuredIds.has(item.id) && all.findIndex(other => other.id === item.id) === index);
+            }
             setContentSections(newContentSections);
         } catch (error) {
+            setLoadError(true);
             console.error('Critical error loading content:', error);
             Alert.alert('Error', 'No se pudo cargar el contenido. Por favor, intente de nuevo más tarde.');
         } finally {
@@ -169,7 +181,7 @@ export default function HomeScreen({ navigation }: Props) {
             return;
         }
         try {
-            await addToMyListContext(contentId, 'movie');
+            await addToMyListContext(contentId, 'anime');
             Alert.alert('Éxito', 'Agregado a "Mi Lista".');
         } catch (error: any) {
             console.error('Error adding to my list:', error);
@@ -184,7 +196,7 @@ export default function HomeScreen({ navigation }: Props) {
     const handleScroll = (event: any) => {
         const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
         setBlackHeader(contentOffset.y > 10);
-        
+
         // Infinite scroll logic
         const paddingToBottom = 150;
         const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
@@ -228,10 +240,11 @@ export default function HomeScreen({ navigation }: Props) {
             for (let i = 0; i < batchSize; i++) {
                 const currentIndex = genreSequenceIndex + i;
                 if (currentIndex >= GENRE_POOL.length) break;
-                
+
                 const genre = GENRE_POOL[currentIndex];
                 const response = await catalogService.getAnimeList({ genre, limit: 15 });
-                const items = (response?.data || []).map(mapCatalogAnimeToContentItem);
+                const usedGenreIds = new Set([...extraRows, ...newExtraRows].flatMap(row => row.items.map(item => item.id)));
+                const items = (response?.data || []).map(mapCatalogAnimeToContentItem).filter(item => !usedGenreIds.has(item.id));
 
                 if (items.length > 0) {
                     const rowKey = `genre_${genre}`;
@@ -283,12 +296,7 @@ export default function HomeScreen({ navigation }: Props) {
             if (contentFilter === 'anime') return item.type === 'anime';
             return true;
         });
-        return byType.filter(item => {
-            if (item.type === 'anime' && !adultContentEnabled) {
-                return !item.isAdult;
-            }
-            return true;
-        });
+        return byType.filter(isPublicCatalogItem);
     };
 
     if (loading) {
@@ -473,8 +481,9 @@ export default function HomeScreen({ navigation }: Props) {
                     {/* Empty state */}
                     {!hasAnyContent && (
                         <View style={styles.emptyState}>
-                            <Text style={[styles.emptyTitle, { color: colors.text }]}>Aún no hay anime disponible</Text>
-                            <Text style={[styles.emptySubtitle, { color: colors.textMuted || 'rgba(255,255,255,0.5)' }]}>Agrega contenido desde el panel de administrador.</Text>
+                            <Text style={[styles.emptyTitle, { color: colors.text }]}>{loadError ? "No pudimos cargar el catálogo" : "Aún no hay anime disponible"}</Text>
+                            <Text style={[styles.emptySubtitle, { color: colors.textMuted || 'rgba(255,255,255,0.5)' }]}>{loadError ? "Comprueba tu conexión o vuelve a intentarlo en unos momentos." : "Agrega contenido desde el panel de administrador."}</Text>
+                            {loadError && <Pressable accessibilityRole="button" onPress={loadContent}><Text style={{ color: colors.primary, marginTop: 16 }}>Reintentar</Text></Pressable>}
                         </View>
                     )}
 

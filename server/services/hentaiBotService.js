@@ -1,7 +1,33 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import hentailaScraper from './hentailaScraper.js';
 
-let currentHentaiCatalogPage = 1;
+const HENTAI_MEMORY_FILE = path.join(os.tmpdir(), 'hentai_bot_memory.json');
 let isSyncingHentaiCatalog = false;
+
+function readLastHentaiPage() {
+    try {
+        if (fs.existsSync(HENTAI_MEMORY_FILE)) {
+            const data = JSON.parse(fs.readFileSync(HENTAI_MEMORY_FILE, 'utf8'));
+            if (Number.isInteger(data?.lastCatalogPage) && data.lastCatalogPage >= 1) {
+                return data.lastCatalogPage;
+            }
+        }
+    } catch {
+        // Fallback to page 1
+    }
+    return 1;
+}
+
+function saveLastHentaiPage(page) {
+    try {
+        fs.mkdirSync(path.dirname(HENTAI_MEMORY_FILE), { recursive: true });
+        fs.writeFileSync(HENTAI_MEMORY_FILE, JSON.stringify({ lastCatalogPage: page }));
+    } catch {
+        // Non-fatal
+    }
+}
 
 async function upsertEpisodesForHentai(pool, hentaiId, slug, episodesList) {
     const episodes = Array.isArray(episodesList) && episodesList.length > 0
@@ -114,13 +140,13 @@ export async function syncNextHentaiCatalogPage(pool) {
         return { ok: true, count: 0, skipped: true };
     }
     isSyncingHentaiCatalog = true;
-    const page = currentHentaiCatalogPage;
+    const page = readLastHentaiPage();
     console.log(`[HentaiBot] Sincronizando página ${page} del catálogo de Hentaila...`);
 
     try {
         const { items, totalPages } = await hentailaScraper.getCatalogPage(page);
         if (!items || items.length === 0) {
-            currentHentaiCatalogPage = 1;
+            saveLastHentaiPage(1);
             return { ok: false, page, count: 0 };
         }
 
@@ -132,8 +158,9 @@ export async function syncNextHentaiCatalogPage(pool) {
             episodesCount += episodesSynced;
         }
 
-        currentHentaiCatalogPage = page >= totalPages ? 1 : page + 1;
-        console.log(`[HentaiBot] Página ${page}/${totalPages} completada (${syncedCount} títulos, ${episodesCount} episodios). Próxima: ${currentHentaiCatalogPage}`);
+        const nextPage = page >= totalPages ? 1 : page + 1;
+        saveLastHentaiPage(nextPage);
+        console.log(`[HentaiBot] Página ${page}/${totalPages} completada (${syncedCount} títulos, ${episodesCount} episodios). Próxima: ${nextPage}`);
         return { ok: true, page, totalPages, count: syncedCount, episodesCount };
     } catch (error) {
         console.error(`[HentaiBot] Error sincronizando página ${page}:`, error.message);

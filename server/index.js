@@ -43,7 +43,8 @@ const HOST = process.env.HOST || '0.0.0.0';
   }
 
   // Arrancar servidor
-  pool.query("DELETE FROM manga_chapters_cache").then(() => console.log('Manga chapters cache cleared.')).catch(console.error);
+  // Preserve persisted chapter/page cache across backend restarts.
+  // Refresh only through the manga service TTL and explicit refresh actions.
 
   app.listen(PORT, HOST, () => {
     console.log(`Backend escuchando en http://${HOST}:${PORT}`);

@@ -12,11 +12,12 @@ import { findJkAnimeSlug, scrapeAnimeEpisodes } from './jkanimeScraper.js';
 import { findAnimeAv1Slug, scrapeAnimeAv1Episodes, getAnimeAv1PageData, scrapeAiringAnimesAv1 } from './animeav1Scraper.js';
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const MEMORY_FILE = '/tmp/bot_memory.json';
+const MEMORY_FILE = path.join(os.tmpdir(), 'bot_memory.json');
 
 // Estado en memoria del bot (jobs activos)
 const botJobs = new Map(); // jobId → { status, progress, errors, result }
@@ -109,7 +110,7 @@ async function runUpdateOngoingJob(job) {
 
     job.progress.total = animes.length;
     let processed = 0;
-    
+
     for (const anime of animes) {
       processed++;
       job.progress.current = processed;
@@ -194,7 +195,7 @@ async function runFixMissingImagesJob(job, startId, endId) {
   try {
     let query = `SELECT id, title FROM anime_content WHERE (poster_url IS NULL OR poster_url = '' OR banner_url IS NULL OR banner_url = '')`;
     const params = [];
-    
+
     if (startId && endId) {
       query += ` AND id >= $1 AND id <= $2`;
       params.push(startId, endId);
@@ -217,7 +218,7 @@ async function runFixMissingImagesJob(job, startId, endId) {
 
     job.progress.total = animes.length;
     let processed = 0;
-    
+
     for (const anime of animes) {
       processed++;
       job.progress.current = processed;
@@ -226,7 +227,7 @@ async function runFixMissingImagesJob(job, startId, endId) {
       try {
         const metaJob = createJob('metadata', anime.id);
         await runMetadataJob(metaJob, anime.id);
-        
+
         // Esperamos para no sobrecargar la API de AniList (1 peticion / 1.5s)
         await new Promise(r => setTimeout(r, 1500));
       } catch (err) {
@@ -274,7 +275,7 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
   try {
     const { scrapeFullCatalogAv1 } = await import('./animeav1Scraper.js');
     const slugs = await scrapeFullCatalogAv1(startPage, endPage);
-    
+
     if (!slugs || slugs.length === 0) {
       throw new Error('No se encontraron animes en el catálogo.');
     }
@@ -327,7 +328,7 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
             }
           } catch(e) {}
         }
-        
+
         titlesToCheck = [...new Set(titlesToCheck.filter(Boolean))];
         let animeId = null;
 
@@ -342,7 +343,7 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
             break;
           }
         }
-        
+
         if (animeId) {
           skipped++;
           continue; // Ya existe, lo saltamos para no sobrecargar
@@ -355,7 +356,7 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
         );
         animeId = insertResult.rows[0].id;
         newAnimes++;
-        
+
         // Ejecutar metadatos
         job.progress.message = `[NUEVO] Autocompletando metadatos de ${slug}...`;
         const metaJob = createJob('metadata', animeId);
@@ -439,7 +440,7 @@ async function runSyncAiringJob(job) {
             }
           } catch(e) {}
         }
-        
+
         titlesToCheck = [...new Set(titlesToCheck.filter(Boolean))];
         let animeId = null;
 
@@ -453,7 +454,7 @@ async function runSyncAiringJob(job) {
             break;
           }
         }
-        
+
         if (animeId) {
           updatedAnimes++;
         } else {
@@ -464,7 +465,7 @@ async function runSyncAiringJob(job) {
           );
           animeId = insertResult.rows[0].id;
           newAnimes++;
-          
+
           // 3. Ejecutar metadatos (esperar a que termine para tener los campos listos)
           job.progress.message = `Autocompletando metadatos de ${slug}...`;
           const metaJob = createJob('metadata', animeId);
@@ -500,7 +501,7 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
 
     // Obtener datos actuales del anime
     const animeResult = await pool.query(
-      'SELECT id, title, title_english, poster_url, description, genres, rating, total_episodes, release_date, status FROM anime_content WHERE id = $1',
+      'SELECT id, title, title_english, poster_url, description, genres, rating, total_episodes, release_date, status, trailer_id, trailer_site, trailer_checked_at FROM anime_content WHERE id = $1',
       [animeId]
     );
 
@@ -533,13 +534,13 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
         .replace(/Part \d+/i, '')
         .replace(/Movie( \d+)?/i, '')
         .trim();
-        
+
       // Si el título sigue siendo kilométrico (más de 6 palabras), MyAnimeList suele tirar 504 al buscarlo
       const words = cleanTitle.split(' ');
       if (words.length > 6) {
         cleanTitle = words.slice(0, 6).join(' ');
       }
-      
+
       metadata = await searchJikanMetadata(cleanTitle);
       if (metadata) {
         console.log(`[SmartBot] Fallback Jikan exitoso para "${searchStr}" -> "${metadata.title}"`);
@@ -599,6 +600,19 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
     if (metadata.status && (!anime.status || anime.status === 'Unknown')) {
       updates.push(`status = $${paramIndex++}`);
       values.push(metadata.status);
+    }
+
+    // Tráiler: guardar solo si no existe uno previo/manual y el proveedor devolvió YouTube válido
+    if (!anime.trailer_id) {
+      if (metadata.trailer_id && metadata.trailer_site === 'youtube') {
+        updates.push(`trailer_id = $${paramIndex++}`);
+        values.push(metadata.trailer_id);
+        updates.push(`trailer_site = $${paramIndex++}`);
+        values.push(metadata.trailer_site);
+      }
+      if (!anime.trailer_checked_at || (metadata.trailer_id && metadata.trailer_site === 'youtube')) {
+        updates.push(`trailer_checked_at = NOW()`);
+      }
     }
 
     if (updates.length === 0) {
@@ -705,7 +719,7 @@ async function runScrapeJob(job, animeId, options) {
       }
 
       if (source === 'animeav1' && episodes.length === 0) {
-        const reason = av1Slug ? `no se encontraron episodios para el slug "${av1Slug}"` : `no se encontró slug para "${anime.title}"`;        
+        const reason = av1Slug ? `no se encontraron episodios para el slug "${av1Slug}"` : `no se encontró slug para "${anime.title}"`;
         throw new Error(`AnimeAV1: ${reason}`);
       }
     }
@@ -750,7 +764,7 @@ async function runScrapeJob(job, animeId, options) {
 
     for (const ep of episodes) {
       const externalServersJson = JSON.stringify(ep.all_servers || []);
-      
+
       const existing = await pool.query(
         'SELECT id FROM anime_episodes WHERE anime_id = $1 AND episode_number = $2 AND season = $3',
         [animeId, ep.episode_number, season]
@@ -759,8 +773,8 @@ async function runScrapeJob(job, animeId, options) {
       if (existing.rows.length > 0) {
         const row = existing.rows[0];
         await pool.query(
-          `UPDATE anime_episodes 
-           SET video_url = $1, stream_url = $1, external_servers = $2, status = 'ready', storage_type = 'external', updated_at = NOW() 
+          `UPDATE anime_episodes
+           SET video_url = $1, stream_url = $1, external_servers = $2, status = 'ready', storage_type = 'external', updated_at = NOW()
            WHERE id = $3`,
           [ep.video_url, externalServersJson, row.id]
         );
@@ -812,10 +826,10 @@ export function listBotJobs() {
 
 export async function syncNextCatalogPage() {
   console.log('[Cron] Ejecutando scraper incremental de catálogo...');
-  
+
   let currentPage = 1;
   const MAX_PAGE = 120; // Ajustar si el catálogo crece más
-  
+
   try {
     if (fs.existsSync(MEMORY_FILE)) {
       const data = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
@@ -828,7 +842,7 @@ export async function syncNextCatalogPage() {
   }
 
   console.log(`[SmartBot] Scrapeando catálogo incremental: Página ${currentPage}`);
-  
+
   // Creamos un job en memoria falso para reutilizar runSyncAllCatalogJob
   const fakeJob = {
     id: `cron-catalog-${Date.now()}`,
@@ -840,7 +854,7 @@ export async function syncNextCatalogPage() {
     // Usamos runSyncAllCatalogJob pero solo para 1 página
     await runSyncAllCatalogJob(fakeJob, currentPage, currentPage);
     console.log(`[SmartBot] Página ${currentPage} escaneada exitosamente.`);
-    
+
     // Avanzar de página
     currentPage++;
     if (currentPage > MAX_PAGE) {

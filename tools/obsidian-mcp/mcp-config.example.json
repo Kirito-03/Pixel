@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "obsidian-brain": {
+      "command": "python3",
+      "args": [
+        "/home/arle/Documentos/Projects/pixel/tools/obsidian-mcp/server.py",
+        "--vault-root",
+        "/run/media/arle/Reze/Users/ASUS/My Documents/Projects/Pixel"
+      ]
+    }
+  }
+}

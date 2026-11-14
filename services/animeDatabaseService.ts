@@ -55,7 +55,7 @@ export class AnimeDatabaseService {
   private static m3uAnimeToDatabase(anime: M3UAnime): Partial<DatabaseAnime> {
     const totalSeasons = Math.max(...anime.episodes.map((ep: M3UEpisode) => ep.season));
     const totalEpisodes = anime.episodes.length;
-    
+
     return {
       title: anime.title,
       type: 'anime' as const,
@@ -94,11 +94,11 @@ export class AnimeDatabaseService {
       try {
         // Verificar si el anime ya existe
         const existingAnime = await this.getAnimeByTitle(anime.title);
-        
+
         if (existingAnime) {
           // Actualizar anime existente
           await this.updateAnime(existingAnime.id, this.m3uAnimeToDatabase(anime));
-          
+
           // Sincronizar episodios
           await this.syncEpisodes(existingAnime.id, anime.episodes);
         } else {
@@ -108,7 +108,7 @@ export class AnimeDatabaseService {
             await this.syncEpisodes(newAnime.id, anime.episodes);
           }
         }
-        
+
         success++;
       } catch (error) {
         console.error(`Error syncing anime ${anime.title}:`, error);
@@ -169,7 +169,7 @@ export class AnimeDatabaseService {
   static async getAnimeByTitle(title: string): Promise<DatabaseAnime | null> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes/search?title=${encodeURIComponent(title)}`);
-      
+
       if (!response.ok) {
         return null;
       }
@@ -188,7 +188,7 @@ export class AnimeDatabaseService {
   static async getAllAnimes(): Promise<DatabaseAnime[]> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -206,7 +206,7 @@ export class AnimeDatabaseService {
   static async getAnimeById(id: number): Promise<DatabaseAnime | null> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes/${id}`);
-      
+
       if (!response.ok) {
         return null;
       }
@@ -268,7 +268,7 @@ export class AnimeDatabaseService {
   static async getAnimeEpisodes(animeId: number): Promise<DatabaseEpisode[]> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes/${animeId}/episodes`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -286,7 +286,7 @@ export class AnimeDatabaseService {
   static async getSeasonEpisodes(animeId: number, season: number): Promise<DatabaseEpisode[]> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes/${animeId}/seasons/${season}/episodes`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -304,7 +304,7 @@ export class AnimeDatabaseService {
   static async getEpisode(animeId: number, season: number, episode: number): Promise<DatabaseEpisode | null> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes/${animeId}/seasons/${season}/episodes/${episode}`);
-      
+
       if (!response.ok) {
         return null;
       }
@@ -338,7 +338,7 @@ export class AnimeDatabaseService {
   static async searchAnimes(query: string): Promise<DatabaseAnime[]> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes/search?q=${encodeURIComponent(query)}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -356,7 +356,7 @@ export class AnimeDatabaseService {
   static async getAnimesByGenre(genre: string): Promise<DatabaseAnime[]> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/animes/genre/${encodeURIComponent(genre)}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

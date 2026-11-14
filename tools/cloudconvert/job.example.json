@@ -1,0 +1,21 @@
+{
+  "tag": "pixel-pilot-cloudconvert",
+  "tasks": {
+    "input-upload": {
+      "operation": "import/upload"
+    },
+    "video-convert": {
+      "operation": "convert",
+      "input": "input-upload",
+      "input_format": "mp4",
+      "output_format": "mp4",
+      "video_codec": "x264",
+      "width": 1280,
+      "height": 720
+    },
+    "output-download": {
+      "operation": "export/url",
+      "input": "video-convert"
+    }
+  }
+}

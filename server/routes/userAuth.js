@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import pool from '../db.js';
 
 const router = express.Router();
@@ -9,7 +9,7 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ message: 'email y password requeridos' });
-  if (String(password).length < 6) return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+  if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres y un máximo de 72 bytes' });
   try {
     const existsResult = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
     if (existsResult.rows.length) return res.status(409).json({ message: 'Email ya registrado' });
@@ -36,48 +36,33 @@ router.post('/login', async (req, res) => {
     const result = await pool.query('SELECT id, password_hash FROM usuarios WHERE email = $1', [email]);
     if (!result.rows.length) return res.status(401).json({ message: 'Credenciales inválidas' });
     const user = result.rows[0];
-    // Soportar migración: si el hash no empieza con $2, es texto plano legacy
-    const isHashed = String(user.password_hash).startsWith('$2');
-    const ok = isHashed
-      ? await bcrypt.compare(password, user.password_hash)
-      : password === user.password_hash;
-    if (!ok) return res.status(401).json({ message: 'Credenciales inválidas' });
-    // Si era plaintext legacy, actualizar a bcrypt ahora
-    if (!isHashed) {
-      const salt = await bcrypt.genSalt(10);
-      const hashed = await bcrypt.hash(password, salt);
-      await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [hashed, user.id]);
+    // OAuth placeholders and legacy plaintext must never authenticate as passwords.
+    if (!/^\$2[aby]\$/.test(String(user.password_hash))) {
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
-    res.json({ id: user.id, email });
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(401).json({ message: 'Credenciales inválidas' });
+    const token = jwt.sign({ id: user.id, email }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '24h' });
+    res.json({ id: user.id, email, token });
   } catch (e) {
     res.status(500).json({ message: 'Error al iniciar sesión', error: e.message });
   }
 });
 
-// Auth: forgot password (dev-friendly - returns token)
+// Recuperacion pendiente de integracion con entrega de correo segura.
 router.post('/forgot-password', async (req, res) => {
-  const { email } = req.body || {};
-  if (!email) return res.status(400).json({ message: 'email requerido' });
-  try {
-    const result = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
-    if (!result.rows.length) return res.status(404).json({ message: 'Usuario no encontrado' });
-    const userId = result.rows[0].id;
-    const token = crypto.randomBytes(24).toString('hex');
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await pool.query(
-      'INSERT INTO password_resets (usuario_id, token, expires_at) VALUES ($1, $2, $3)',
-      [userId, token, expiresAt]
-    );
-    res.json({ ok: true, token, expires_in_minutes: 30 });
-  } catch (e) {
-    res.status(500).json({ message: 'Error al generar token de recuperación', error: e.message });
-  }
+  // No entregar tokens de recuperacion a quien solo conoce el email.
+  return res.status(503).json({ message: 'Recuperacion temporalmente no disponible. Contacta al administrador.' });
+
 });
 
 // Auth: reset password using token
 router.post('/reset-password', async (req, res) => {
   const { email, token, new_password } = req.body || {};
   if (!email || !token || !new_password) return res.status(400).json({ message: 'email, token y new_password requeridos' });
+  if (typeof new_password !== 'string' || new_password.length < 8 || Buffer.byteLength(new_password, 'utf8') > 72) {
+    return res.status(400).json({ message: 'Usa una contrasena de al menos 8 caracteres y como maximo 72 bytes' });
+  }
   try {
     const usersResult = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
     if (!usersResult.rows.length) return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -88,7 +73,7 @@ router.post('/reset-password', async (req, res) => {
     );
     if (!tokensResult.rows.length) return res.status(400).json({ message: 'Token inválido o expirado' });
     const resetId = tokensResult.rows[0].id;
-    await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [new_password, userId]);
+    await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2', [await bcrypt.hash(new_password, 12), userId]);
     await pool.query('UPDATE password_resets SET used = true WHERE id = $1', [resetId]);
     res.json({ ok: true });
   } catch (e) {

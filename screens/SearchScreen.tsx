@@ -11,26 +11,30 @@ import { useProfile } from '../contexts/ProfileContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { catalogService } from '../services/catalogService';
 import { useTheme } from '../contexts/ThemeContext';
+import { universalSearch, animeSearchResult, type UniversalSearchResult } from '../services/universalSearch';
 
 export default function SearchScreen() {
   const { colors, theme } = useTheme();
   const navigation = useNavigation<any>();
   const { currentProfile } = useProfile();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ContentItem[]>([]);
-  const [suggestions, setSuggestions] = useState<ContentItem[]>([]);
+  const [results, setResults] = useState<UniversalSearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<UniversalSearchResult[]>([]);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recentQueries, setRecentQueries] = useState<string[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const typingTimer = useRef<any>(null);
-  const latestQueryRef = useRef<string>('');
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestRef = useRef(0);
+  const [searchError, setSearchError] = useState('');
+  const [searchNotice, setSearchNotice] = useState('');
+  const [retryIndex, setRetryIndex] = useState(0);
 
   const ALL_GENRES = [
-    'Action', 'Romance', 'Comedy', 'Sci-Fi', 
-    'Fantasy', 'Adventure', 'Drama', 'Sports', 
+    'Action', 'Romance', 'Comedy', 'Sci-Fi',
+    'Fantasy', 'Adventure', 'Drama', 'Sports',
     'Slice of Life', 'Horror', 'Mystery', 'Supernatural'
   ];
 
@@ -88,7 +92,10 @@ export default function SearchScreen() {
 
   const clearSearch = () => {
     setQuery('');
-    latestQueryRef.current = '';
+    searchRequestRef.current += 1;
+    setLoading(false);
+    setSearchError('');
+    setSearchNotice('');
     setSelectedGenre(null);
     setSuggestions([]);
     setResults([]);
@@ -98,89 +105,68 @@ export default function SearchScreen() {
     }
   };
 
-  const fetchSuggestions = async (text: string) => {
-    if (!text || text.trim().length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    try {
-      const localQuery = text;
-      const normalizedQuery = localQuery.trim().toLowerCase();
-      const all = (await catalogService.searchAnime(normalizedQuery)).map(mapCatalogAnimeToContentItem);
-      const seen = new Set<string>();
-      const unique = all.filter((item) => {
-        const titleKey = (item.title || '').toString().toLowerCase();
-        if (seen.has(titleKey)) return false;
-        seen.add(titleKey);
-        return true;
-      }).slice(0, 8);
-      if (latestQueryRef.current === localQuery) {
-        setSuggestions(unique);
-      }
-    } catch (error) {
-      setSuggestions([]);
-    }
-  };
-
-  const handleSearch = async (text: string) => {
-    setQuery(text);
-    setSelectedGenre(null);
-    latestQueryRef.current = text;
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => fetchSuggestions(text), 500);
-
-    if (text.length > 2) {
-      setLoading(true);
+  useEffect(() => {
+    if (selectedGenre) return;
+    const requestId = ++searchRequestRef.current;
+    const text = query.trim();
+    let active = true;
+    setSearchError('');
+    setSearchNotice('');
+    setSuggestions([]);
+    setResults([]);
+    if (text.length < 2) { setLoading(false); return; }
+    setLoading(true);
+    typingTimer.current = setTimeout(async () => {
       try {
-        const localQuery = text;
-        const normalizedQuery = localQuery.trim().toLowerCase();
-        const filtered = (await catalogService.searchAnime(normalizedQuery)).map(mapCatalogAnimeToContentItem);
-        if (latestQueryRef.current === localQuery) {
-          setResults(filtered);
-        }
+        const response = await universalSearch(text);
+        if (!active || searchRequestRef.current !== requestId) return;
+        setResults(response.items);
+        setSuggestions(response.items.slice(0, 8));
+        setSearchNotice(response.unavailable.length ? `No se pudo consultar ${response.unavailable.join(' y ')}. Mostrando los resultados disponibles.` : '');
       } catch (error) {
-        setResults([]);
+        if (!active || searchRequestRef.current !== requestId) return;
+        setSearchError(error instanceof Error ? error.message : 'No se pudo realizar la búsqueda.');
       } finally {
-        setLoading(false);
+        if (active && searchRequestRef.current === requestId) setLoading(false);
       }
-    } else {
-      setResults([]);
-    }
-  };
+    }, 350);
+    return () => { active = false; if (typingTimer.current) clearTimeout(typingTimer.current); };
+  }, [query, selectedGenre, currentProfile?.id, retryIndex]);
+
+  const handleSearch = (text: string) => { setSelectedGenre(null); setQuery(text); };
 
   const handleGenrePress = async (genre: string) => {
+    const requestId = ++searchRequestRef.current;
     setQuery('');
     setSelectedGenre(genre);
     setSuggestions([]);
+    setResults([]);
+    setSearchError('');
+    setSearchNotice('');
     setLoading(true);
     try {
       const response = await catalogService.getAnimeList({ genre, limit: 30 });
-      const filtered = (response?.data || []).map(mapCatalogAnimeToContentItem);
-      setResults(filtered);
-    } catch (error) {
-      setResults([]);
+      if (searchRequestRef.current === requestId) setResults((response?.data || []).map(animeSearchResult));
+    } catch {
+      if (searchRequestRef.current === requestId) setSearchError('No se pudieron consultar los animes de este género.');
     } finally {
-      setLoading(false);
+      if (searchRequestRef.current === requestId) setLoading(false);
     }
   };
 
-  const handleSuggestionPress = (item: ContentItem) => {
-    const text = item.title;
-    setQuery(text);
+  const handleResultPress = (item: UniversalSearchResult) => {
     setSuggestions([]);
-    handleSearch(text);
-    recordRecentSearch(text);
+    setIsFocused(false);
+    if (query.trim()) recordRecentSearch(query);
+    if (item.kind === 'manga') {
+      navigation.navigate('Manga', { screen: 'MangaDetail', params: { id: item.manga.id } });
+      return;
+    }
+    setSelectedContent(item.content);
+    setModalVisible(true);
   };
 
-  const handleMoviePress = (id: number | string) => {
-    const contentItem = results.find(item => String(item.id) === String(id));
-    if (contentItem) {
-      setSelectedContent(contentItem);
-      setModalVisible(true);
-    } else {
-      console.warn('Anime not found in results for id:', id);
-    }
-  };
+  const handleSuggestionPress = (item: UniversalSearchResult) => handleResultPress(item);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -223,14 +209,14 @@ export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';
   const hPad = isWeb ? 40 : 16;
-  const numCols = isWeb ? 5 : 3;
+  const numCols = width < 540 ? 2 : width < 900 ? 3 : 5;
   // Calculamos el ancho de cada tarjeta restando el padding horizontal y los gaps
   const gap = 15;
   const availableWidth = width - (hPad * 2);
   const totalGapSpace = gap * (numCols - 1);
   const cardWidth = (availableWidth - totalGapSpace) / numCols;
 
-  const inputSize = isWeb ? 36 : 24;
+  const inputSize = width >= 768 ? 36 : 24;
   // En Android: paddingTop = insets.top (altura status bar) + 12 extra
   const headerPaddingTop = isWeb ? 30 : insets.top + 12;
 
@@ -254,13 +240,14 @@ export default function SearchScreen() {
               </TouchableOpacity>
             </View>
           )}
-          
+
           {/* Giant Input */}
           <View style={styles.giantInputWrapper}>
             <Ionicons name="search" size={isWeb ? 32 : 22} color="#E50914" style={{ marginRight: isWeb ? 20 : 12 }} />
             <TextInput
               style={[styles.giantInput, { fontSize: inputSize, color: colors.text }, inputPlatformStyles as any]}
-              placeholder="Buscar anime..."
+              placeholder="Buscar anime y manga..."
+              accessibilityLabel="Buscar anime y manga"
               placeholderTextColor={colors.textMuted || '#555'}
               value={query}
               onChangeText={handleSearch}
@@ -283,13 +270,13 @@ export default function SearchScreen() {
             <ScrollView style={[styles.suggestionsDropdown, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#222' : '#ddd' }]} keyboardShouldPersistTaps="handled">
               {suggestions.map((item) => (
                 <TouchableOpacity
-                  key={item.id}
+                  key={item.key}
                   style={styles.suggestionItemRow}
                   onPress={() => handleSuggestionPress(item)}
                 >
                   <View style={styles.suggestionLeft}>
-                    {item.poster_path ? (
-                      <Image source={{ uri: item.poster_path }} style={styles.suggestionThumb} />
+                    {item.poster ? (
+                      <Image source={{ uri: item.poster }} style={styles.suggestionThumb} />
                     ) : (
                       <View style={styles.suggestionThumbFallback} />
                     )}
@@ -297,7 +284,7 @@ export default function SearchScreen() {
                     {renderHighlight(item.title, query)}
                   </View>
                   <View style={styles.suggestionBadge}>
-                    <Text style={styles.suggestionBadgeText}>ANIME</Text>
+                    <Text style={styles.suggestionBadgeText}>{item.kind === 'manga' ? 'MANGA' : 'ANIME'}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -314,23 +301,26 @@ export default function SearchScreen() {
       <FlatList
         data={results}
         numColumns={numCols}
-        key={isWeb ? 'web' : 'mobile'}
+        key={`search-${numCols}`}
         contentContainerStyle={[styles.mainContentScroll, { paddingHorizontal: hPad }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
+            {searchError ? <Text accessibilityRole="alert" style={{ color: '#ff8080', marginBottom: 16 }}>{searchError}</Text> : null}
+            {searchNotice ? <Text style={{ color: colors.textMuted, marginBottom: 16 }}>{searchNotice}</Text> : null}
+            {searchError || searchNotice ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar búsqueda" disabled={loading} onPress={() => selectedGenre ? handleGenrePress(selectedGenre) : setRetryIndex(value => value + 1)} style={{ paddingVertical: 12 }}><Text style={{ color: colors.primary }}>Reintentar</Text></TouchableOpacity> : null}
             {/* Sugerencias en Android - Dentro de la lista para que scrollee natural sin desbordarse */}
             {!isWeb && suggestions.length > 0 && (
               <View style={[styles.suggestionsNative, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#1a1a1a' : '#ddd', marginBottom: 20 }]}>
                 {suggestions.map((item) => (
                   <TouchableOpacity
-                    key={item.id}
+                    key={item.key}
                     style={styles.suggestionItemRow}
                     onPress={() => handleSuggestionPress(item)}
                   >
                     <View style={styles.suggestionLeft}>
-                      {item.poster_path ? (
-                        <Image source={{ uri: item.poster_path }} style={styles.suggestionThumb} />
+                      {item.poster ? (
+                        <Image source={{ uri: item.poster }} style={styles.suggestionThumb} />
                       ) : (
                         <View style={styles.suggestionThumbFallback} />
                       )}
@@ -338,7 +328,7 @@ export default function SearchScreen() {
                       {renderHighlight(item.title, query)}
                     </View>
                     <View style={styles.suggestionBadge}>
-                      <Text style={styles.suggestionBadgeText}>ANIME</Text>
+                      <Text style={styles.suggestionBadgeText}>{item.kind === 'manga' ? 'MANGA' : 'ANIME'}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -417,13 +407,15 @@ export default function SearchScreen() {
             )}
           </>
         }
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.key}
         renderItem={({ item }) => (
-          <MovieCard movie={item} onPress={() => handleMoviePress(item.id)} cardWidth={cardWidth} />
+          item.kind === 'anime'
+            ? <MovieCard movie={item.content} onPress={() => handleResultPress(item)} cardWidth={cardWidth} />
+            : <MangaSearchCard item={item} width={cardWidth} color={colors.text} onPress={() => handleResultPress(item)} />
         )}
         columnWrapperStyle={results.length > 0 ? { gap: 15, marginBottom: 20 } : undefined}
         ListEmptyComponent={
-          ((query.length > 2 || selectedGenre) && !loading && results.length === 0) ? (
+          ((query.trim().length >= 2 || selectedGenre) && !loading && !searchError && results.length === 0) ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={48} color={theme === 'dark' ? "#222" : "#ddd"} style={{ marginBottom: 16 }} />
               <Text style={[styles.emptyText, { color: colors.textMuted || '#444' }]}>No se encontraron resultados</Text>
@@ -441,19 +433,15 @@ export default function SearchScreen() {
   );
 }
 
-function mapCatalogAnimeToContentItem(anime: any): ContentItem {
-  return {
-    id: Number(anime.id),
-    type: 'anime',
-    title: anime.title || 'Sin título',
-    overview: anime.description || '',
-    poster_path: anime.poster_url || '',
-    backdrop_path: anime.banner_url || anime.poster_url || '',
-    release_date: anime.release_date || '',
-    vote_average: typeof anime.rating === 'number' ? anime.rating : 0,
-    source: 'anilist',
-    genres: Array.isArray(anime.genres) ? anime.genres : [],
-  };
+function MangaSearchCard({ item, width, color, onPress }: { item: Extract<UniversalSearchResult, { kind: 'manga' }>; width: number; color: string; onPress: () => void }) {
+  const [failed, setFailed] = useState(false);
+  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Leer detalles de ${item.title}`} onPress={onPress} style={{ width, marginBottom: 12 }}>
+    <View style={{ width, height: width * 1.5, backgroundColor: '#181818', justifyContent: 'center', alignItems: 'center' }}>
+      {item.poster && !failed ? <Image source={{ uri: item.poster }} onError={() => setFailed(true)} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Ionicons name="book-outline" size={32} color="#888" />}
+    </View>
+    <Text style={{ color: '#E50914', fontSize: 10, fontWeight: '700', marginTop: 8 }}>MANGA</Text>
+    <Text style={{ color, fontSize: 13, marginTop: 4 }} numberOfLines={2}>{item.title}</Text>
+  </TouchableOpacity>;
 }
 
 const styles = StyleSheet.create({

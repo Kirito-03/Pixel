@@ -33,7 +33,7 @@ export default function AiringScreen({ navigation }: any) {
   const headerHeight = isWeb ? 90 : (56 + insets.top);
   const gap = 12;
   const desiredItemWidth = width < 768 ? (width * 0.3) : 160;
-  const numColumns = Math.max(3, Math.floor((width - 40) / (desiredItemWidth + gap)));
+  const numColumns = Math.max(width < 420 ? 2 : 3, Math.floor((width - 40) / (desiredItemWidth + gap)));
   const itemWidth = (width - 40 - gap * (numColumns - 1)) / numColumns;
 
   const { navigateByLabel } = useTabNavigation();
@@ -41,12 +41,12 @@ export default function AiringScreen({ navigation }: any) {
   const [animes, setAnimes] = useState<CatalogAnime[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const currentDayStr = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date().getDay()];
   const [calendarDay, setCalendarDay] = useState<string>(currentDayStr);
   const [calendarData, setCalendarData] = useState<any[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
-  
+
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -62,13 +62,13 @@ export default function AiringScreen({ navigation }: any) {
     try {
       setCalendarLoading(true);
       setCalendarData([]); // Clear previous data immediately
-      
+
       // Llamamos al backend proxy para evitar CORS en web
       const baseURL = getCurrentBaseURL() || 'http://localhost:3001';
       const res = await axios.get(`${baseURL}/api/schedules?filter=${day}`);
-      
+
       const rawData = res.data?.data || [];
-      
+
       // Deduplicate by mal_id
       const uniqueItems: any[] = [];
       const seenMalIds = new Set<number>();
@@ -78,7 +78,7 @@ export default function AiringScreen({ navigation }: any) {
           uniqueItems.push(item);
         }
       }
-      
+
       setCalendarData(uniqueItems);
     } catch (err) {
       console.error('[AiringScreen] Error cargando calendario:', err);
@@ -222,8 +222,8 @@ export default function AiringScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header 
-        activeSection="Emisión" 
+      <Header
+        activeSection="Emisión"
         onNavPress={navigateByLabel}
         onSearchPress={() => navigateByLabel('Buscar')}
         onProfilePress={() => navigateByLabel('Perfil')}
@@ -239,16 +239,16 @@ export default function AiringScreen({ navigation }: any) {
         </View>
         <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>CALENDARIO DE EMISIÓN SEMANAL</Text>
       </View>
-      
+
       <View style={styles.tabsContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tabBtn, activeTab === 'local' && styles.tabBtnActive, { backgroundColor: activeTab === 'local' ? '#E50914' : (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') }]}
           onPress={() => setActiveTab('local')}
         >
           <Ionicons name="list" size={16} color={activeTab === 'local' ? '#fff' : (theme === 'dark' ? '#666' : '#999')} style={{ marginRight: 6 }} />
           <Text style={[styles.tabText, activeTab === 'local' && styles.tabTextActive]}>VER DISPONIBLES</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tabBtn, activeTab === 'calendar' && styles.tabBtnActiveCalendar, { backgroundColor: activeTab === 'calendar' ? '#E50914' : (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') }]}
           onPress={() => setActiveTab('calendar')}
         >
@@ -260,8 +260,8 @@ export default function AiringScreen({ navigation }: any) {
       {activeTab === 'calendar' && (
         <View style={[styles.daysContainer, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
           {DAYS.map(d => (
-            <TouchableOpacity 
-              key={d.id} 
+            <TouchableOpacity
+              key={d.id}
               style={[styles.dayBtn, calendarDay === d.id && styles.dayBtnActive]}
               onPress={() => {
                 setActiveTab('calendar');
@@ -274,13 +274,13 @@ export default function AiringScreen({ navigation }: any) {
           ))}
         </View>
       )}
-      
+
       {/* Indicador del Día / Sección Hoy */}
       <View style={styles.sectionHeaderBox}>
         <View style={styles.sectionHeaderDot} />
         <Text style={styles.sectionHeaderText}>
-          {activeTab === 'calendar' 
-            ? DAYS.find(d => d.id === calendarDay)?.label.toUpperCase() 
+          {activeTab === 'calendar'
+            ? DAYS.find(d => d.id === calendarDay)?.label.toUpperCase()
             : 'HOY'}
         </Text>
       </View>

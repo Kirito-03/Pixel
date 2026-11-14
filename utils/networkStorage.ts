@@ -36,6 +36,12 @@ export const loadNetworkConfig = async (): Promise<string | null> => {
     const configData = await AsyncStorage.getItem(NETWORK_CONFIG_KEY);
     if (configData) {
       const config: NetworkConfig = JSON.parse(configData);
+      // No reutilizar el dominio expirado al actualizar la aplicacion.
+      if (/^https?:\/\/pixelnosekai\.art(?::\d+)?\/?$/i.test(config.baseURL)) {
+        const migratedURL = 'https://pixelnosekai.com';
+        await saveNetworkConfig(migratedURL);
+        return migratedURL;
+      }
       // Verificar que la configuración no sea muy antigua (más de 7 días)
       const daysSinceUpdate = (Date.now() - config.lastUpdated) / (1000 * 60 * 60 * 24);
       if (daysSinceUpdate < 7) {

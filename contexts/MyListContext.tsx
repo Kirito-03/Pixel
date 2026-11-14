@@ -90,7 +90,7 @@ export const MyListProvider: React.FC<MyListProviderProps> = ({ children }) => {
 
   const toggleMyList = async (contentId: string | number, contentType: 'movie' | 'tv' | 'anime' | 'manga' = 'movie') => {
     if (!currentProfile) {
-      return;
+      throw new Error('Selecciona un perfil antes de guardar títulos');
     }
 
     const isCurrentlyInList = isInMyList(contentId, contentType);

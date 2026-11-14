@@ -62,3 +62,7 @@ La exportación web se verificó y publicó. El backend de producción sigue dev
   - Resultado: **0 errores** en `screens/NSFWScreen.tsx`, `components/HentaiComponents.tsx` y `components/HentaiSeriesModal.tsx`. (El proyecto presenta errores previos en otros módulos fuera del alcance de esta tarea).
 - **Plataforma Android**:
   - No se realizó ejecución ni validación real en dispositivo o emulador Android; los ajustes de layout y controles se basan en análisis estático, `useWindowDimensions()`, `useSafeAreaInsets()` y typecheck.
+
+## Nueva distribución y comprobación posterior
+
+Se retiró el buscador propio; la cabecera abre el buscador universal de anime/manga. Se agregó un destacado y filas horizontales de12registros deduplicados, con flechas de escritorio y desplazamiento táctil. La comprobación posterior de `/api/nsfw/latest?status=Todos` devuelve200 y43registros; este resultado actualiza el diagnóstico404anterior. No se cambian fuentes ni se importan vídeos en esta revisión.

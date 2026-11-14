@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   TouchableOpacity,
   Image,
@@ -13,6 +13,12 @@ import { Movie, TVShow, ContentItem } from '../types';
 import { getImageUrl } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, badgeStyles } from '../theme';
+import HoverLayer from './HoverLayer';
+import TrailerPreview from './TrailerPreview';
+import { catalogService } from '../services/catalogService';
+import { useMyList } from '../contexts/MyListContext';
+import { useProfile } from '../contexts/ProfileContext';
+import { Alert } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface Props {
@@ -26,6 +32,13 @@ interface Props {
 
 export default function MovieCard({ movie, onPress, isFirst = false, isLast = false, onHoverChange, cardWidth }: Props) {
   const { colors, theme } = useTheme();
+  const { isInMyList, toggleMyList } = useMyList();
+  const { currentProfile } = useProfile();
+  const [saving, setSaving] = useState(false);
+  const listType = ('source' in movie && movie.source === 'anilist') ? 'anime' : ('type' in movie ? movie.type : 'movie') as 'movie' | 'tv' | 'anime';
+  const saved = isInMyList(movie.id, listType);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewClosed, setPreviewClosed] = useState(false);
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
@@ -34,38 +47,106 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
 
   // Popup dimensions — más ancho como Netflix (aprox 2.2x)
   const POPUP_WIDTH = CARD_WIDTH * 2.2;
-  const POPUP_IMG_HEIGHT = CARD_HEIGHT * 0.75;
+  const POPUP_IMG_HEIGHT = Math.max(200, CARD_HEIGHT * 0.75);
 
-  // Hover con delay de 1.5 segundos
+  // Open after 500ms; background cards must not preview over an open dialog.
   const [hovered, setHovered] = useState(false);
+  const cardRef = useRef<View>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [anchor, setAnchor] = useState({ left: 0, top: 0 });
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [retryKey, setRetryKey] = useState(0);
+  const imageRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleImageError = () => {
-    // Reintentar si falla la imagen (hasta 20 veces) para asegurar que intente cargarla de nuevo.
-    if (retryKey < 20) {
-      setTimeout(() => {
+    // Avoid repeatedly downloading broken posters or duplicating retries for the popup.
+    if (retryKey < 2 && !imageRetryTimer.current) {
+      imageRetryTimer.current = setTimeout(() => {
+        imageRetryTimer.current = null;
         setRetryKey(prev => prev + 1);
       }, 2000);
     }
   };
 
   const handleMouseEnter = useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    if (!isWeb || isSmallScreen || hovered) return;
     hoverTimer.current = setTimeout(() => {
-      setHovered(true);
-      if (onHoverChange) onHoverChange(true);
-    }, 1500);
+      if (typeof document !== 'undefined') {
+        const element = cardRef.current as unknown as HTMLElement | null;
+        const dialog = document.querySelector('[aria-modal="true"]');
+        if (element?.closest('[aria-hidden="true"]') || (dialog && element && !dialog.contains(element))) return;
+      }
+      cardRef.current?.measureInWindow((x, y) => {
+        const popupHeight = POPUP_IMG_HEIGHT + 160;
+        setAnchor({
+          left: Math.max(56, Math.min(x - (POPUP_WIDTH - CARD_WIDTH) / 2, width - POPUP_WIDTH - 56)),
+          top: Math.max(8, Math.min(y - 60, (typeof window !== 'undefined' ? window.innerHeight : y + popupHeight) - popupHeight - 8)),
+        });
+        setHovered(true);
+        onHoverChange?.(true);
+      });
+    }, 500);
+  }, [isWeb, isSmallScreen, hovered, width, CARD_WIDTH, POPUP_WIDTH, POPUP_IMG_HEIGHT, onHoverChange]);
+
+  const closeHover = useCallback(() => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHovered(false);
+    onHoverChange?.(false);
   }, [onHoverChange]);
 
   const handleMouseLeave = useCallback(() => {
-    if (hoverTimer.current) {
-      clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-    setHovered(false);
-    if (onHoverChange) onHoverChange(false);
-  }, [onHoverChange]);
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(closeHover, 120);
+  }, [closeHover]);
+
+  useEffect(() => () => {
+    if (imageRetryTimer.current) clearTimeout(imageRetryTimer.current);
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+
+  useEffect(() => {
+    if (!isWeb || !hovered || typeof window === 'undefined') return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') closeHover(); };
+    window.addEventListener('scroll', closeHover, true);
+    window.addEventListener('resize', closeHover);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pixel:close-previews', closeHover);
+    return () => {
+      window.removeEventListener('scroll', closeHover, true);
+      window.removeEventListener('resize', closeHover);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pixel:close-previews', closeHover);
+    };
+  }, [isWeb, hovered, closeHover]);
+
+  useEffect(() => {
+    setPreviewId(null);
+    setPreviewClosed(false);
+    if (!hovered || listType !== 'anime') return;
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const hasTrailerMetadata = 'trailer_checked_at' in movie && movie.trailer_checked_at;
+        const detail = hasTrailerMetadata ? movie as ContentItem : await catalogService.getAnimeById(movie.id);
+        if (active && detail.trailer_site?.toLowerCase() === 'youtube' && detail.trailer_id && /^[A-Za-z0-9_-]{11}$/.test(detail.trailer_id)) setPreviewId(detail.trailer_id);
+      } catch { /* Poster remains if trailer metadata is unavailable. */ }
+    }, 4500); // Card opens after 500ms: trailer starts at >=5s total hover.
+    return () => { active = false; clearTimeout(timer); };
+  }, [hovered, movie.id, listType]);
+
+  const saveToList = async () => {
+    if (!currentProfile) { Alert.alert('Perfil requerido', 'Selecciona un perfil para guardar títulos.'); return; }
+    if (saving) return;
+    setSaving(true);
+    try { await toggleMyList(movie.id, listType); }
+    catch { Alert.alert('No se pudo guardar', 'Comprueba la conexión y los permisos de tu perfil.'); }
+    finally { setSaving(false); }
+  };
 
   const getImageSource = () => {
     let url = '';
@@ -78,7 +159,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
     } else {
       url = getImageUrl((movie as any).poster_path, 'w500');
     }
-    
+
     if (url && retryKey > 0) {
       return `${url}${url.includes('?') ? '&' : '?'}retry=${retryKey}`;
     }
@@ -130,6 +211,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
 
   return (
     <View
+      ref={cardRef}
       style={[
         {
           width: CARD_WIDTH,
@@ -152,7 +234,9 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
           overflow: 'hidden',
           backgroundColor: theme === 'dark' ? '#1a1a1a' : '#f0f0f0',
         }}
-        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Ver ${getTitle()}`}
+        onPress={() => { closeHover(); onPress(); }}
         activeOpacity={0.9}
       >
         <Image
@@ -165,22 +249,21 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
         {/* Badge EN EMISIÓN — solo para animes en emisión */}
         {isAiring() && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>NUEVO EPISODIO</Text>
+            <Text style={styles.badgeText}>EN EMISIÓN</Text>
           </View>
         )}
       </TouchableOpacity>
 
       {/* ── Popup flotante (fuera de la card) ── */}
       {isWeb && hovered && (
-        <View
+        <HoverLayer><View
           style={[
             styles.popup,
             {
               width: POPUP_WIDTH,
-              // Si es el primero, lo alineamos a la izquierda; si es el último, a la derecha; si no, al centro
-              left: isFirst ? 0 : isLast ? -(POPUP_WIDTH - CARD_WIDTH) : -(POPUP_WIDTH - CARD_WIDTH) / 2,
-              // Empezar 60px arriba de la card para que quede centrado verticalmente
-              top: -60,
+              position: 'fixed' as any,
+              left: anchor.left,
+              top: anchor.top,
               backgroundColor: theme === 'dark' ? '#141414' : '#ffffff',
             },
           ]}
@@ -191,7 +274,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
         >
           {/* Imagen del anime en grande */}
           <View style={{ width: '100%', height: POPUP_IMG_HEIGHT, overflow: 'hidden' as any }}>
-            <Image
+            {previewId && !previewClosed ? <TrailerPreview id={previewId} /> : <><Image
               source={{ uri: getImageSource() }}
               style={{ width: '100%', height: '100%' } as any}
               resizeMode="cover"
@@ -206,22 +289,23 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
             <View style={styles.popupTitleOverlay}>
                <Text style={[styles.popupTitleText, { color: theme === 'dark' ? '#fff' : '#000', textShadowColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>{getTitle()}</Text>
             </View>
-          </View>
+          </>}</View>
+          {previewId && !previewClosed && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar vista previa" onPress={() => setPreviewClosed(true)} style={{ padding: 8 }}><Text style={{ color: colors.text }}>Cerrar tráiler</Text></TouchableOpacity>}
 
           {/* Info debajo de la imagen (estilo Netflix) */}
           <View style={styles.popupInfo}>
-            
+
             {/* Fila de controles circulares */}
             <View style={styles.popupActionsRow}>
               <View style={styles.popupActionsLeft}>
-                <TouchableOpacity style={[styles.actionBtnPlay, { backgroundColor: theme === 'dark' ? '#fff' : '#000' }]} onPress={onPress}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver capítulos de ${getTitle()}`} style={[styles.actionBtnPlay, { backgroundColor: theme === 'dark' ? '#fff' : '#000' }]} onPress={() => { closeHover(); onPress(); }}>
                   <Ionicons name="play" size={20} color={theme === 'dark' ? '#000' : '#fff'} style={{ marginLeft: 3 }} />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
-                  <Ionicons name="add" size={22} color={colors.text} />
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={saved ? "Quitar de Mi Lista" : "Añadir a Mi Lista"} disabled={saving} onPress={saveToList} style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
+                  <Ionicons name={saved ? "checkmark" : "add"} size={22} color={colors.text} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]} onPress={onPress}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver detalles de ${getTitle()}`} style={[styles.actionBtnRound, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]} onPress={() => { closeHover(); onPress(); }}>
                 <Ionicons name="chevron-down" size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -229,13 +313,13 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
             {/* Fila de Meta: 13+ | 4 temporadas | HD */}
             <View style={styles.popupMetaNetflix}>
               <View style={[styles.netflixBadgeBorder, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
-                <Text style={[styles.netflixBadgeText, { color: colors.text }]}>13+</Text>
+                <Text style={[styles.netflixBadgeText, { color: colors.text }]}>{listType === 'anime' ? 'Anime' : 'Título'}</Text>
               </View>
               <Text style={[styles.netflixSeasonsText, { color: colors.text }]}>
                 {getEpisodesCount() || (getYear() ? `Año ${getYear()}` : 'Anime')}
               </Text>
               <View style={[styles.netflixBadgeBorder, { borderColor: theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }]}>
-                <Text style={[styles.netflixBadgeText, { color: colors.text }]}>HD</Text>
+                <Text style={[styles.netflixBadgeText, { color: colors.text }]}>Info</Text>
               </View>
             </View>
 
@@ -251,7 +335,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
               </View>
             )}
           </View>
-        </View>
+        </View></HoverLayer>
       )}
     </View>
   );
@@ -309,7 +393,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  
+
   // Controles
   popupActionsRow: {
     flexDirection: 'row',

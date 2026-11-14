@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { uploadFileToR2 } from './r2Service.js';
@@ -22,7 +23,7 @@ export async function downloadAndUploadEpisode(episodeId, videoUrl, animeSlug, e
 
 function handleMegaDownload(episodeId, videoUrl, animeSlug, episodeNumber) {
   return new Promise(async (resolve, reject) => {
-    const tmpDir = '/tmp';
+    const tmpDir = os.tmpdir();
     if (!fs.existsSync(tmpDir)) {
       fs.mkdirSync(tmpDir, { recursive: true });
     }
@@ -75,7 +76,7 @@ function handleMegaDownload(episodeId, videoUrl, animeSlug, episodeNumber) {
 function handleFfmpegDownload(episodeId, videoUrl, animeSlug, episodeNumber) {
   return new Promise((resolve, reject) => {
     // Usar el directorio /tmp (válido dentro del contenedor Docker de Linux)
-    const tmpDir = '/tmp';
+    const tmpDir = os.tmpdir();
     if (!fs.existsSync(tmpDir)) {
       fs.mkdirSync(tmpDir, { recursive: true });
     }

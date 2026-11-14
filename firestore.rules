@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+
+    function validProfileCreate() {
+      return request.resource.data.keys().hasAll(['name','avatar_url']) &&
+             request.resource.data.name is string &&
+             request.resource.data.name.size() > 0 &&
+             request.resource.data.avatar_url is string;
+    }
+    function validProfileUpdate() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly(['name','avatar_url','updated_at']) &&
+             (!request.resource.data.keys().hasOnly(['updated_at']) ||
+              (request.resource.data.name is string || request.resource.data.avatar_url is string));
+    }
+
+
+    match /profiles/{uid} {
+      allow read, write: if isOwner(uid);
+
+
+      match /profiles/{profileId} {
+        allow create: if isOwner(uid) && validProfileCreate();
+        allow update: if isOwner(uid) && validProfileUpdate();
+        allow read, delete: if isOwner(uid);
+
+
+        // ✅ MYLIST ANIDADA DENTRO DE PROFILES/{PROFILEID}
+        match /mylist/{docId} {
+          function validListEntry() {
+            let entry = request.resource.data;
+            return entry.keys().hasAll(['content_id','content_type','added_at']) &&
+                   entry.keys().hasOnly(['content_id','content_type','added_at']) &&
+                   entry.added_at is timestamp &&
+                   ((entry.content_type in ['movie','tv','anime'] &&
+                     entry.content_id is int && entry.content_id > 0) ||
+                    (entry.content_type == 'manga' && entry.content_id is string &&
+                     entry.content_id.size() > 0 && entry.content_id.size() <= 128 &&
+                     entry.content_id.matches('^[a-zA-Z0-9_-]+$')));
+          }
+          allow create, update: if isOwner(uid) &&
+            exists(/databases/$(database)/documents/profiles/$(uid)/profiles/$(profileId)) &&
+            validListEntry();
+          allow read, delete: if isOwner(uid);
+        }
+
+
+        // ✅ DOWNLOADS ANIDADA DENTRO DE PROFILES/{PROFILEID}
+        match /downloads/{docId} {
+          allow create: if isOwner(uid) &&
+                         request.resource.data.keys().hasAll(['content_id','content_type','status','progress','created_at']) &&
+                         request.resource.data.content_id is int &&
+                         request.resource.data.content_type in ['movie','tv','anime'] &&
+                         request.resource.data.status in ['PENDING','DOWNLOADING','COMPLETED','FAILED'] &&
+                         request.resource.data.progress is int;
+          allow update: if isOwner(uid) &&
+                         request.resource.data.diff(resource.data).changedKeys().hasOnly(['status','progress','file_path','updated_at']) &&
+                         request.resource.data.status in ['PENDING','DOWNLOADING','COMPLETED','FAILED'] &&
+                         request.resource.data.progress is int;
+          allow read, delete: if isOwner(uid);
+        }
+      }
+    }
+
+
+    match /content/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn() &&
+                    request.auth.token.admin == true &&
+                    request.resource.data.keys().hasAll(['title','type']) &&
+                    request.resource.data.title is string &&
+                    request.resource.data.type in ['movie','tv','anime'];
+    }
+  }
+}

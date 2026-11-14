@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
-import { mkdirSync } from 'fs';
+import { mkdirSync, readFileSync, unlinkSync } from 'fs';
+import { authenticateToken } from '../middleware/auth.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -24,7 +25,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = file.originalname.split('.').pop();
+    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp' }[file.mimetype];
     cb(null, `avatar-${uniqueSuffix}.${ext}`);
   }
 });
@@ -35,15 +36,10 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024 // 5MB límite
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(file.originalname.toLowerCase().split('.').pop());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const allowed = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+    if (allowed.has(file.mimetype)) cb(null, true);
+    else cb(new Error('Formato de imagen no permitido'));
 
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Solo se permiten archivos de imagen (jpeg, jpg, png, gif, webp)'));
-    }
   }
 });
 
@@ -53,56 +49,26 @@ router.get('/test', (req, res) => {
 });
 
 // Upload: avatar
-router.post('/avatar', upload.single('avatar'), (req, res) => {
-  console.log('Request recibido para subir avatar');
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('Content-Type:', req.headers['content-type']);
-  console.log('Archivo recibido:', req.file ? 'Sí' : 'No');
-
+router.post('/avatar', authenticateToken, upload.single('avatar'), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'No se proporcionó ninguna imagen' });
   try {
-    if (!req.file) {
-      console.error('No se recibió ningún archivo');
-      console.log('Body recibido:', req.body);
-      console.log('Headers:', req.headers);
-      return res.status(400).json({ message: 'No se proporcionó ninguna imagen' });
+    const bytes = readFileSync(req.file.path);
+    const valid = {
+      'image/jpeg': bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
+      'image/png': bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])),
+      'image/gif': ['GIF87a', 'GIF89a'].includes(bytes.subarray(0, 6).toString('ascii')),
+      'image/webp': bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP',
+    }[req.file.mimetype];
+    if (!valid) {
+      unlinkSync(req.file.path);
+      return res.status(400).json({ message: 'Contenido de imagen inválido' });
     }
-
-    console.log('Archivo recibido:', {
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype
-    });
-
-    // Intentar usar el BASE_URL del cliente si está disponible
-    const clientBaseURL = req.headers['x-client-baseurl'];
-    let imageUrl;
-
-    if (clientBaseURL) {
-      // Usar el BASE_URL del cliente para construir la URL correcta
-      imageUrl = `${clientBaseURL}/uploads/avatars/${req.file.filename}`;
-      console.log('Usando BASE_URL del cliente:', clientBaseURL);
-    } else {
-      // Fallback: usar el host del request
-      const protocol = req.protocol || 'http';
-      const host = req.get('host') || `${process.env.HOST || 'localhost'}:${process.env.PORT || 3001}`;
-      imageUrl = `${protocol}://${host}/uploads/avatars/${req.file.filename}`;
-      console.log('No se recibió BASE_URL del cliente, usando host del request:', host);
-    }
-
-    console.log('Avatar subido exitosamente. URL:', imageUrl);
-
-    res.json({
-      url: imageUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype
-    });
-  } catch (error) {
-    console.error('Error al subir avatar:', error);
-    res.status(500).json({ message: 'Error al procesar la imagen', error: error.message });
+    // Fixed production origin: never reflect an untrusted client header or Host.
+    const base = process.env.PUBLIC_BASE_URL || 'https://pixelnosekai.com';
+    res.json({ url: `${base}/uploads/avatars/${req.file.filename}`, filename: req.file.filename, size: req.file.size, mimetype: req.file.mimetype });
+  } catch {
+    try { unlinkSync(req.file.path); } catch {}
+    res.status(500).json({ message: 'Error al procesar la imagen' });
   }
 });
 

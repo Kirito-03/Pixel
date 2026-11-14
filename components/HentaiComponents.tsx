@@ -7,9 +7,10 @@ import { useTheme } from '../contexts/ThemeContext';
 interface HentaiCardProps {
   item: NSFWAnime;
   onPress: () => void;
+  cardWidth?: number;
 }
 
-export const HentaiCard = ({ item, onPress }: HentaiCardProps) => {
+export const HentaiCard = ({ item, onPress, cardWidth }: HentaiCardProps) => {
   const { colors } = useTheme();
   const [imageError, setImageError] = useState(false);
   const isWeb = Platform.OS === 'web';
@@ -24,7 +25,11 @@ export const HentaiCard = ({ item, onPress }: HentaiCardProps) => {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={item.title}
-      style={[styles.cardOuter, isWeb ? ({ cursor: 'pointer' } as any) : null]}
+      style={[
+        styles.cardOuter,
+        cardWidth ? { width: cardWidth } : null,
+        isWeb ? ({ cursor: 'pointer' } as any) : null,
+      ]}
     >
       <View style={styles.card}>
         <View

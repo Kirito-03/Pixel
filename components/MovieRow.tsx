@@ -1,10 +1,10 @@
-import React, { useRef, useState } from 'react';
-import { 
-  View, 
-  Text, 
+import React, { useRef, useState, useEffect } from 'react';
+import {
+  View,
+  Text,
   ScrollView,
   FlatList,
-  TouchableOpacity, 
+  TouchableOpacity,
   useWindowDimensions,
   Platform,
   StyleSheet,
@@ -20,9 +20,10 @@ interface Props {
   movies: (Movie | TVShow | ContentItem)[];
   onMoviePress: (id: number) => void;
   accentColor?: string;
+  showTitle?: boolean;
 }
 
-export default function MovieRow({ title, movies, onMoviePress, accentColor }: Props) {
+export default function MovieRow({ title, movies, onMoviePress, accentColor, showTitle = true }: Props) {
   const { colors, theme } = useTheme();
   const effectiveAccentColor = accentColor || colors.primary;
   const { width } = useWindowDimensions();
@@ -32,40 +33,35 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor }: P
   const CARD_WIDTH = isSmallScreen ? width * 0.34 : 155;
   const CARD_MARGIN = isSmallScreen ? 10 : 12;
   const TOTAL_CARD_WIDTH = CARD_WIDTH + CARD_MARGIN;
-  const CARDS_PER_SCREEN = Math.floor(width / TOTAL_CARD_WIDTH);
-  const SCROLL_AMOUNT = TOTAL_CARD_WIDTH * CARDS_PER_SCREEN;
-  
+
   const flatListRef = useRef<FlatList<Movie | TVShow | ContentItem>>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [scrollX, setScrollX] = useState(0);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(true);
-  
+  const [showRightArrow, setShowRightArrow] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(width);
+  const [contentWidth, setContentWidth] = useState(0);
+  const SCROLL_AMOUNT = TOTAL_CARD_WIDTH * Math.max(1, Math.floor(viewportWidth / TOTAL_CARD_WIDTH));
+  useEffect(() => {
+    setShowLeftArrow(scrollX > 5);
+    setShowRightArrow(contentWidth > viewportWidth + 5 && scrollX < contentWidth - viewportWidth - 5);
+  }, [contentWidth, viewportWidth, scrollX]);
+
 
 
   const handleLeftArrow = () => {
     const newPosition = Math.max(0, scrollX - SCROLL_AMOUNT);
     if (isWeb) {
-      const node = (scrollViewRef.current as any)?.getScrollableNode?.();
-      if (node && node.scrollTo) {
-        node.scrollTo({ left: newPosition, behavior: 'smooth' });
-      } else {
-        scrollViewRef.current?.scrollTo({ x: newPosition, animated: true });
-      }
+      scrollViewRef.current?.scrollTo({ x: newPosition, animated: true });
     } else {
       flatListRef.current?.scrollToOffset({ offset: newPosition, animated: true });
     }
   };
 
   const handleRightArrow = () => {
-    const newPosition = scrollX + SCROLL_AMOUNT;
+    const newPosition = Math.min(Math.max(0, contentWidth - viewportWidth), scrollX + SCROLL_AMOUNT);
     if (isWeb) {
-      const node = (scrollViewRef.current as any)?.getScrollableNode?.();
-      if (node && node.scrollTo) {
-        node.scrollTo({ left: newPosition, behavior: 'smooth' });
-      } else {
-        scrollViewRef.current?.scrollTo({ x: newPosition, animated: true });
-      }
+      scrollViewRef.current?.scrollTo({ x: newPosition, animated: true });
     } else {
       flatListRef.current?.scrollToOffset({ offset: newPosition, animated: true });
     }
@@ -76,7 +72,7 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor }: P
     const contentWidth = event.nativeEvent.contentSize.width;
     const layoutWidth = event.nativeEvent.layoutMeasurement.width;
     const maxScroll = contentWidth - layoutWidth;
-    
+
     setScrollX(offsetX);
     setShowLeftArrow(offsetX > 5);
     setShowRightArrow(offsetX < maxScroll - 5);
@@ -85,19 +81,21 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor }: P
   return (
     <View style={styles.container}>
       {/* Título de la sección con barra de acento */}
-      <View style={styles.titleRow}>
+      {showTitle && <View style={styles.titleRow}>
         <View style={[styles.titleAccent, { backgroundColor: effectiveAccentColor }]} />
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      </View>
-      
+      </View>}
+
       <View style={styles.listContainer}>
         {/* Flecha izquierda — glassmorphism */}
         {showLeftArrow && !isSmallScreen && (
-          <TouchableOpacity 
-            style={[styles.arrow, styles.leftArrow, { 
+          <TouchableOpacity
+            style={[styles.arrow, styles.leftArrow, {
               backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)',
-              borderRightColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' 
+              borderRightColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
             }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Anterior en ${title}`}
             onPress={handleLeftArrow}
             activeOpacity={0.85}
           >
@@ -109,17 +107,20 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor }: P
           <ScrollView
             ref={scrollViewRef}
             horizontal
+            onLayout={event => setViewportWidth(event.nativeEvent.layout.width)}
+            onContentSizeChange={w => setContentWidth(w)}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
             onScroll={handleScroll}
             scrollEventThrottle={16}
-            style={{ overflow: 'visible' as any }}
+            style={{ overflowX: 'auto', overflowY: 'hidden' } as any}
           >
             {movies.map((item, index) => (
-              <MovieCard 
-                key={item.id} 
-                movie={item} 
-                onPress={() => onMoviePress(item.id)} 
+              <MovieCard
+                key={item.id}
+                movie={item}
+                cardWidth={CARD_WIDTH}
+                onPress={() => onMoviePress(item.id)}
                 isFirst={index === 0}
                 isLast={index === movies.length - 1}
               />
@@ -130,12 +131,15 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor }: P
             ref={flatListRef}
             data={movies}
             horizontal
+            onLayout={event => setViewportWidth(event.nativeEvent.layout.width)}
+            onContentSizeChange={w => setContentWidth(w)}
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item, index }) => (
-              <MovieCard 
-                movie={item} 
-                onPress={() => onMoviePress(item.id)} 
+              <MovieCard
+                movie={item}
+                cardWidth={CARD_WIDTH}
+                onPress={() => onMoviePress(item.id)}
                 isFirst={index === 0}
                 isLast={index === movies.length - 1}
               />
@@ -148,11 +152,13 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor }: P
 
         {/* Flecha derecha — glassmorphism */}
         {showRightArrow && !isSmallScreen && (
-          <TouchableOpacity 
-            style={[styles.arrow, styles.rightArrow, { 
+          <TouchableOpacity
+            style={[styles.arrow, styles.rightArrow, {
               backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.85)',
-              borderLeftColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' 
+              borderLeftColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
             }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Siguiente en ${title}`}
             onPress={handleRightArrow}
             activeOpacity={0.85}
           >

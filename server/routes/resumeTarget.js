@@ -1,7 +1,10 @@
+import { authenticateToken } from '../middleware/auth.js';
+import { requireProfileOwner } from '../middleware/ownership.js';
 import express from 'express';
 import pool from '../db.js';
 
 const router = express.Router();
+router.use(authenticateToken, requireProfileOwner(getProfileId));
 
 function getProfileId(req) {
   const raw =

@@ -9,6 +9,9 @@ import passport from 'passport';
 import cookieParser from 'cookie-parser';
 import pool from './db.js';
 import helmet from 'helmet';
+import crypto from 'node:crypto';
+import { authenticateToken, authenticateAdmin } from './middleware/auth.js';
+import { requireOwnUser, requireProfileOwner } from './middleware/ownership.js';
 import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -71,7 +74,7 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 
 // Configuración estricta de CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:8081', 'http://localhost:3000', 'http://localhost:3001'];
 
@@ -96,7 +99,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Cookie parser para JWT
 app.use(cookieParser());
 
-const sessionSecret = process.env.SESSION_SECRET || 'pixel-session-secret-default';
+if (process.env.NODE_ENV === 'production' && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)) {
+  throw new Error('SESSION_SECRET must contain at least 32 characters in production');
+}
+const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
 app.use(session({
   secret: sessionSecret,
@@ -105,6 +111,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 horas
   }
 }));
@@ -203,7 +210,7 @@ app.use('/content', contentRoutes);
 
 // ── Rutas legacy de my-list (param-based) ──────────────────────
 // Estas rutas usan /my-list/:perfilId — distinto al header-based de myList.js
-app.get('/my-list/:perfilId', async (req, res) => {
+app.get('/my-list/:perfilId', authenticateToken, requireProfileOwner(r => r.params.perfilId), async (req, res) => {
   const perfilId = Number(req.params.perfilId);
   if (!perfilId) return res.status(400).json({ message: 'perfilId requerido' });
   try {
@@ -220,7 +227,7 @@ app.get('/my-list/:perfilId', async (req, res) => {
   }
 });
 
-app.post('/my-list/:perfilId/items', async (req, res) => {
+app.post('/my-list/:perfilId/items', authenticateToken, requireProfileOwner(r => r.params.perfilId), async (req, res) => {
   const perfilId = Number(req.params.perfilId);
   const { content_id, content_type } = req.body || {};
   if (!perfilId || !content_id || !content_type) return res.status(400).json({ message: 'Datos incompletos' });
@@ -242,7 +249,7 @@ app.post('/my-list/:perfilId/items', async (req, res) => {
   }
 });
 
-app.delete('/my-list/:perfilId/items/:contentId/:type', async (req, res) => {
+app.delete('/my-list/:perfilId/items/:contentId/:type', authenticateToken, requireProfileOwner(r => r.params.perfilId), async (req, res) => {
   const perfilId = Number(req.params.perfilId);
   const contentId = Number(req.params.contentId);
   const type = req.params.type;
@@ -263,7 +270,7 @@ app.delete('/my-list/:perfilId/items/:contentId/:type', async (req, res) => {
 });
 
 // ── Images metadata ────────────────────────────────────────────
-app.post('/images', async (req, res) => {
+app.post('/images', authenticateAdmin, async (req, res) => {
   const { filename, original_name, mime_type, size, width, height, url, type, entity_id, entity_type } = req.body || {};
   if (!filename || !url || !type || !['poster', 'backdrop', 'avatar', 'thumbnail'].includes(type)) {
     return res.status(400).json({ message: 'Datos de imagen incompletos o inválidos' });
@@ -296,7 +303,7 @@ app.get('/images/:entity_type/:entity_id', async (req, res) => {
 });
 
 // ── Users: get by id ───────────────────────────────────────────
-app.get('/users/:id', async (req, res) => {
+app.get('/users/:id', authenticateToken, requireOwnUser(r => r.params.id), async (req, res) => {
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ message: 'id requerido' });
   try {

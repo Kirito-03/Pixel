@@ -1,7 +1,11 @@
+import { authenticateToken } from '../middleware/auth.js';
+import { requireProfileOwner } from '../middleware/ownership.js';
 import express from 'express';
 import pool from '../db.js';
 
 const router = express.Router();
+router.use(authenticateToken);
+router.param('perfilId', (req, res, next) => requireProfileOwner(r => r.params.perfilId)(req, res, next));
 
 // Utilidad: asegura que exista el registro de descargas para un perfil y devuelve su id
 async function ensureDescargasForPerfil(perfilId) {

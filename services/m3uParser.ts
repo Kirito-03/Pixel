@@ -63,30 +63,30 @@ function extractEpisodeTitle(tvgName: string): string {
  */
 function parseEXTINFLine(line: string, nextLine: string): M3UEntry | null {
   if (!line.startsWith('#EXTINF:')) return null;
-  
+
   try {
     // Extraer el atributo group-title
     const groupTitleMatch = line.match(/group-title="([^"]+)"/);
     const groupTitle = groupTitleMatch ? groupTitleMatch[1] : '';
-    
+
     // Extraer el atributo tvg-name
     const tvgNameMatch = line.match(/tvg-name="([^"]+)"/);
     const tvgName = tvgNameMatch ? tvgNameMatch[1] : '';
-    
+
     // Extraer el atributo tvg-logo (opcional)
     const tvgLogoMatch = line.match(/tvg-logo="([^"]+)"/);
     const tvgLogo = tvgLogoMatch ? tvgLogoMatch[1] : undefined;
-    
+
     // La siguiente línea debería ser la URL
     const url = nextLine.trim();
-    
+
     if (!url || !url.startsWith('http')) {
       return null;
     }
-    
+
     const { season, episode, episodeDecimal } = parseEpisodeInfo(tvgName);
     const episodeTitle = extractEpisodeTitle(tvgName);
-    
+
     return {
       groupTitle,
       tvgName: episodeTitle || tvgName,
@@ -112,14 +112,14 @@ export async function parseM3UFile(m3uUrl?: string): Promise<ParsedM3UData> {
   const serverUrl = buildServerURL();
   const envUrl = (process.env.EXPO_PUBLIC_M3U_URL || '').trim();
   const defaultUrl = m3uUrl || (envUrl ? envUrl : `${serverUrl}/videos/animes_madre.m3u`);
-  
+
   try {
     // Si ya tenemos el cache, devolverlo (podríamos mejorar esto con cache con expiración)
     if (m3uCache) {
       console.log('Using cached M3U data');
       return m3uCache;
     }
-    
+
     console.log('Fetching M3U file from server:', defaultUrl);
 
     // Intentar múltiples candidatos si falla el primero (móvil físico vs emulador)
@@ -148,56 +148,56 @@ export async function parseM3UFile(m3uUrl?: string): Promise<ParsedM3UData> {
       throw lastError || new Error('Failed to fetch M3U file');
     }
     const lines = content.split('\n');
-    
+
     const parsedData: ParsedM3UData = {};
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : '';
-      
+
       if (line.startsWith('#EXTINF:')) {
         const entry = parseEXTINFLine(line, nextLine);
-        
+
         if (entry && entry.groupTitle) {
           const normalizedTitle = normalizeTitle(entry.groupTitle);
-          
+
           if (!parsedData[normalizedTitle]) {
             parsedData[normalizedTitle] = {
               title: entry.groupTitle,
               episodes: []
             };
           }
-          
+
           parsedData[normalizedTitle].episodes.push(entry);
         }
       }
     }
-    
+
     // Ordenar episodios por temporada y número de episodio
     for (const key in parsedData) {
       parsedData[key].episodes.sort((a, b) => {
         const seasonA = a.season || 0;
         const seasonB = b.season || 0;
-        
+
         if (seasonA !== seasonB) {
           return seasonA - seasonB;
         }
-        
+
         const epA = a.episode || 0;
         const epB = b.episode || 0;
         return epA - epB;
       });
     }
-    
+
     // Actualizar cache
     m3uCache = parsedData;
     lastModified = Date.now();
-    
+
     const animeCount = Object.keys(parsedData).length;
     const totalEpisodes = Object.values(parsedData).reduce((sum, data) => sum + data.episodes.length, 0);
-    
+
   console.log(`Parsed M3U file: ${animeCount} animes, ${totalEpisodes} episodes`);
-    
+
     return parsedData;
   } catch (error) {
   console.error('Error parsing M3U file:', error);
@@ -222,33 +222,33 @@ export async function findAnimeInM3U(animeTitle: string): Promise<{
 } | null> {
   const parsedData = await parseM3UFile();
   const normalizedSearchTitle = normalizeTitle(animeTitle);
-  
+
   console.log(`Searching for anime: "${animeTitle}" -> normalized: "${normalizedSearchTitle}"`);
   console.log(`Available animes:`, Object.keys(parsedData).slice(0, 5));
-  
+
   // Búsqueda exacta primero
   if (parsedData[normalizedSearchTitle]) {
   console.log(`Found exact match: ${normalizedSearchTitle}`);
     return parsedData[normalizedSearchTitle];
   }
-  
+
   // Búsqueda parcial (el título buscado está contenido en algún título del M3U o viceversa)
   for (const [normalizedKey, data] of Object.entries(parsedData)) {
     if (normalizedKey.includes(normalizedSearchTitle) || normalizedSearchTitle.includes(normalizedKey)) {
       return data;
     }
   }
-  
+
   // Búsqueda por palabras clave
   const searchWords = normalizedSearchTitle.split(' ').filter(w => w.length > 2);
-  
+
   for (const [normalizedKey, data] of Object.entries(parsedData)) {
     const matches = searchWords.filter(word => normalizedKey.includes(word));
     if (matches.length >= Math.min(2, searchWords.length)) {
       return data;
     }
   }
-  
+
   return null;
 }
 
@@ -261,14 +261,14 @@ export async function getStreamingInfoFromM3U(animeTitle: string): Promise<{
   image?: string;
 } | null> {
   const animeData = await findAnimeInM3U(animeTitle);
-  
+
   if (!animeData || animeData.episodes.length === 0) {
     return null;
   }
-  
+
   // Agrupar episodios por temporada
   const seasonsMap: { [season: number]: M3UEntry[] } = {};
-  
+
   for (const episode of animeData.episodes) {
     const seasonNum = episode.season || 1;
     if (!seasonsMap[seasonNum]) {
@@ -276,15 +276,15 @@ export async function getStreamingInfoFromM3U(animeTitle: string): Promise<{
     }
     seasonsMap[seasonNum].push(episode);
   }
-  
+
   // Convertir a formato AnimeSeason
   const seasons: AnimeSeason[] = Object.entries(seasonsMap).map(([seasonNum, episodes]) => {
     const seasonNumber = parseInt(seasonNum, 10);
-    
+
     const animeEpisodes: AnimeEpisode[] = episodes.map((ep, index) => {
       const episodeNumber = ep.episode || index + 1;
       // Base ID por temporada/episodio
-      let episodeId = ep.episodeDecimal 
+      let episodeId = ep.episodeDecimal
         ? `m3u-${animeData.title}-s${seasonNumber}-e${episodeNumber}-${ep.episodeDecimal}`
         : `m3u-${animeData.title}-s${seasonNumber}-e${episodeNumber}`;
 
@@ -308,7 +308,7 @@ export async function getStreamingInfoFromM3U(animeTitle: string): Promise<{
         }] as VideoSource[]
       };
     });
-    
+
     return {
       id: `season-${seasonNumber}`,
       title: `Temporada ${seasonNumber}`,
@@ -316,11 +316,11 @@ export async function getStreamingInfoFromM3U(animeTitle: string): Promise<{
       episodes: animeEpisodes
     };
   });
-  
+
   const totalEpisodes = animeData.episodes.length;
   // Elegir una imagen de portada: usar el primer tvg-logo disponible
   const firstLogo = animeData.episodes.find(e => !!e.tvgLogo)?.tvgLogo;
-  
+
   return {
     seasons,
     totalEpisodes,
@@ -337,7 +337,7 @@ export async function getEpisodeSourcesFromM3U(
   episodeNumber: number
 ): Promise<VideoSource[] | null> {
   const animeData = await findAnimeInM3U(animeTitle);
-  
+
   if (!animeData) {
     return null;
   }
@@ -383,7 +383,7 @@ export const getAvailableAnimes = async (): Promise<Array<{title: string, episod
 
     // Ordenar alfabéticamente
     animes.sort((a, b) => a.title.localeCompare(b.title));
-    
+
     console.log(`Found ${animes.length} animes in M3U file`);
     return animes;
   } catch (error) {
@@ -407,7 +407,7 @@ export async function getSourcesByURL(url: string): Promise<VideoSource[]> {
 export const debugM3U = async (): Promise<void> => {
   try {
   console.log('DEBUG: Testing M3U parser...');
-    
+
     // Probar parseo del archivo
     const m3uData = await parseM3UFile();
     if (!m3uData) {
@@ -415,13 +415,13 @@ export const debugM3U = async (): Promise<void> => {
       return;
 }
 
-    
+
   console.log(`DEBUG: M3U file parsed successfully. Found ${Object.keys(m3uData).length} animes`);
-    
+
     // Mostrar algunos animes de ejemplo
     const animeTitles = Object.keys(m3uData).slice(0, 5);
     console.log('DEBUG: Sample animes found:', animeTitles);
-    
+
     // Probar búsqueda de un anime específico
     const testAnime = animeTitles[0];
     if (testAnime) {
@@ -433,7 +433,7 @@ export const debugM3U = async (): Promise<void> => {
           seasons: streamingInfo.seasons.length,
           hasImage: !!streamingInfo.image
         });
-        
+
         // Probar búsqueda de episodio
         if (streamingInfo.seasons[0]?.episodes[0]) {
           const firstEpisode = streamingInfo.seasons[0].episodes[0];
@@ -447,7 +447,7 @@ export const debugM3U = async (): Promise<void> => {
   console.log(`DEBUG: No streaming info found for "${testAnime}"`);
       }
     }
-    
+
   console.log('DEBUG: M3U test completed successfully');
   } catch (error) {
   console.error('DEBUG: M3U test failed:', error);

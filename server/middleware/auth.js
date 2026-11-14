@@ -24,7 +24,7 @@ export const authenticateAdmin = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
+
         // Consultar la base de datos para obtener el rol del usuario
         const result = await pool.query('SELECT role FROM usuarios WHERE id = $1', [decoded.id]);
 

@@ -155,6 +155,9 @@ export type ContentDetail = MovieDetail | TVShowDetail | AnimeDetail;
 
 // Tipo discriminador para saber si es película, serie o anime
 export interface ContentItem {
+  trailer_id?: string | null;
+  trailer_site?: string | null;
+  trailer_checked_at?: string | null;
   id: number;
   type: 'movie' | 'tv' | 'anime';
   title: string;

@@ -1,7 +1,10 @@
+import { authenticateToken } from '../middleware/auth.js';
+import { requireProfileOwner } from '../middleware/ownership.js';
 import express from 'express';
 import pool from '../db.js';
 
 const router = express.Router();
+router.use(authenticateToken);
 
 function getPerfilId(req) {
   const raw = req.header('x-profile-id') ?? req.header('x-perfil-id') ?? req.body?.perfil_id ?? req.body?.profile_id ?? req.query?.perfil_id ?? req.query?.profile_id;
@@ -9,7 +12,7 @@ function getPerfilId(req) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-router.get('/', async (req, res) => {
+router.get('/', requireProfileOwner(getPerfilId), async (req, res) => {
   const perfilId = getPerfilId(req);
   if (!perfilId) return res.status(400).json({ message: 'perfilId requerido (header x-profile-id)' });
 
@@ -60,7 +63,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireProfileOwner(getPerfilId), async (req, res) => {
   const perfilId = getPerfilId(req);
   const contentId = req.body?.content_id ?? req.body?.contentId ?? req.body?.animeId ?? req.body?.anime_id;
   const contentTypeRaw = String(req.body?.content_type ?? req.body?.contentType ?? 'anime').toLowerCase();
@@ -85,7 +88,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.delete('/:contentId', async (req, res) => {
+router.delete('/:contentId', requireProfileOwner(getPerfilId), async (req, res) => {
   const perfilId = getPerfilId(req);
   const contentId = req.params.contentId;
   const contentTypeRaw = String(req.query?.type ?? req.query?.content_type ?? req.header('x-content-type') ?? 'anime').toLowerCase();

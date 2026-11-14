@@ -28,7 +28,7 @@ router.get('/cors-proxy', async (req, res) => {
 
   try {
     const targetURL = new URL(url);
-    const isAllowed = allowedDomains.some(domain => targetURL.hostname.includes(domain));
+    const isAllowed = targetURL.protocol === 'https:' && !targetURL.username && !targetURL.password && (!targetURL.port || targetURL.port === '443') && allowedDomains.includes(targetURL.hostname.toLowerCase());
 
     if (!isAllowed) {
       return res.status(403).json({ error: 'Domain not allowed' });
@@ -40,6 +40,8 @@ router.get('/cors-proxy', async (req, res) => {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json'
       },
+      maxRedirects: 0,
+      maxContentLength: 5 * 1024 * 1024,
       timeout: 10000
     });
 
@@ -129,26 +131,37 @@ router.post('/anilist', async (req, res) => {
 // Proxy de imágenes para MangaDex (evita bloqueo por hotlinking)
 router.get('/manga-cover', async (req, res) => {
   const { url } = req.query;
-  if (!url || typeof url !== 'string' || !url.startsWith('https://uploads.mangadex.org/')) {
+  let target;
+  try { target = new URL(typeof url === 'string' ? url : ''); } catch { /* rejected below */ }
+  if (!target || target.protocol !== 'https:' || target.hostname !== 'uploads.mangadex.org' || target.username || target.password || (target.port && target.port !== '443') || !target.pathname.startsWith('/covers/')) {
     return res.status(400).send('URL inválida o no permitida');
   }
 
   try {
-    const response = await axios.get(url, {
-      responseType: 'stream',
+    const response = await axios.get(target.href, {
+      responseType: 'arraybuffer',
       headers: {
         'Referer': 'https://mangadex.org/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'PixelNoSekai/1.0 (+https://pixelnosekai.com)',
+        'Accept': 'image/jpeg,image/png,image/webp',
       },
+      maxRedirects: 0,
+      maxContentLength: 5 * 1024 * 1024,
       timeout: 15000
     });
-
-    res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    const body = Buffer.from(response.data);
+    const mime = String(response.headers['content-type'] || '').split(';')[0].toLowerCase();
+    const validImage = (mime === 'image/jpeg' && body.subarray(0, 3).equals(Buffer.from([255, 216, 255]))) ||
+      (mime === 'image/png' && body.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+      (mime === 'image/webp' && body.toString('ascii', 0, 4) === 'RIFF' && body.toString('ascii', 8, 12) === 'WEBP');
+    if (!validImage) return res.set('Cache-Control', 'no-store').status(502).send('El proveedor no entregó una imagen válida');
+    res.set('Content-Type', mime);
+    res.set('X-Content-Type-Options', 'nosniff');
     res.set('Cache-Control', 'public, max-age=86400'); // Cachear por 1 día
-    response.data.pipe(res);
+    res.send(body);
   } catch (error) {
     console.error('Error proxy manga cover:', error.message);
-    res.status(error.response?.status || 500).send('Error obteniendo imagen de MangaDex');
+    res.set('Cache-Control', 'no-store').status(502).send('Error obteniendo imagen de MangaDex');
   }
 });
 

@@ -93,7 +93,7 @@ export const useProfileManagement = () => {
 
   const updateProfile = async (profileId: number, name: string, imageUri?: string) => {
     const originalProfiles = [...profiles];
-    const updatedProfiles = profiles.map(p => 
+    const updatedProfiles = profiles.map(p =>
       p.id === profileId ? { ...p, name: name.trim(), avatar_url: imageUri || p.avatar_url } : p
     );
     setProfiles(updatedProfiles);
@@ -103,7 +103,7 @@ export const useProfileManagement = () => {
       if (imageUri && imageUri !== originalProfiles.find(p=>p.id === profileId)?.avatar_url) {
           avatarUrl = await uploadImage(imageUri);
       }
-  
+
       await databaseService.updateProfile(profileId, {
           name: name.trim(),
           avatar_url: avatarUrl,

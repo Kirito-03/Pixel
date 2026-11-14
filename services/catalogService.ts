@@ -1,3 +1,4 @@
+import { isPublicCatalogItem } from '../utils/publicCatalog';
 import axios from 'axios';
 import { getCurrentBaseURL } from './databaseService';
 
@@ -9,6 +10,9 @@ export interface CatalogAnime {
   title_english?: string | null;
   title_japanese?: string | null;
   description?: string | null;
+  trailer_id?: string | null;
+  trailer_site?: string | null;
+  trailer_checked_at?: string | null;
   poster_url?: string | null;
   banner_url?: string | null;
   genres?: string[] | null;
@@ -27,6 +31,7 @@ export interface CatalogEpisode {
   duration?: number | null;
   status?: string | null;
   video_url?: string | null;
+  external_servers?: { server: string; title: string; url: string }[] | null;
   stream_url?: string | null;
 }
 
@@ -54,16 +59,17 @@ export const catalogService = {
     genre?: string;
   }) {
     const { data } = await http.get('/api/catalog/anime', { params });
-    return data as { data: CatalogAnime[]; pagination: any };
+    return { ...data, data: (data?.data || []).filter(isPublicCatalogItem) } as { data: CatalogAnime[]; pagination: any };
   },
 
   async searchAnime(query: string) {
     const { data } = await http.get('/api/catalog/search', { params: { q: query } });
-    return (data?.data || []) as CatalogAnime[];
+    return (data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[];
   },
 
   async getAnimeById(id: number) {
     const { data } = await http.get(`/api/catalog/anime/${id}`);
+    if (!isPublicCatalogItem(data)) throw new Error('Contenido no disponible en el catálogo general.');
     return data as CatalogAnime;
   },
 
@@ -81,9 +87,9 @@ export const catalogService = {
     ]);
 
     return {
-      airing: (airing.data?.data || []) as CatalogAnime[],
-      finished: (finished.data?.data || []) as CatalogAnime[],
-      upcoming: (upcoming.data?.data || []) as CatalogAnime[],
+      airing: (airing.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
+      finished: (finished.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
+      upcoming: (upcoming.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
     };
   },
 };

@@ -1,4 +1,19 @@
 import { backendClient } from './backendClient';
+import { getCurrentBaseURL } from './db/networkClient';
+
+function normalizeCover<T extends { cover_url?: string | null }>(manga: T): T {
+  if (!manga || !manga.cover_url?.startsWith('/api/manga-cover?')) return manga;
+  // Absolute URL also works in native Image; version avoids the previous cached HTML response.
+  return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}${manga.cover_url}&v=2` };
+}
+
+function normalizeList(data: any) {
+  if (Array.isArray(data)) return data.map(normalizeCover);
+  return { ...data,
+    ...(Array.isArray(data?.items) ? { items: data.items.map(normalizeCover) } : {}),
+    ...(Array.isArray(data?.data) ? { data: data.data.map(normalizeCover) } : {}),
+  };
+}
 
 export type MangaStatus = 'En emisión' | 'Finalizado' | 'Hiatus' | 'Cancelado';
 
@@ -52,17 +67,17 @@ export type MangaChapterPages = {
 export const mangaApi = {
   async list(params?: { page?: number; limit?: number; status?: string; search?: string; order?: string }) {
     const { data } = await backendClient.get('/api/manga', { params });
-    return data as { items: Manga[]; pagination: { page: number; limit: number; total: number }; meta?: any } | any;
+    return normalizeList(data) as { items: Manga[]; pagination: { page: number; limit: number; total: number }; meta?: any } | any;
   },
 
   async popular(params?: { limit?: number }) {
     const { data } = await backendClient.get('/api/manga/popular', { params });
-    return data as { items: (Manga & { rank: number })[]; meta?: any };
+    return normalizeList(data) as { items: (Manga & { rank: number })[]; meta?: any };
   },
 
   async getById(id: string) {
     const { data } = await backendClient.get(`/api/manga/${id}`);
-    return data as Manga;
+    return normalizeCover(data as Manga);
   },
 
   async chapters(id: string, params?: { limit?: number; preferredLanguage?: string; allowEnglishFallback?: boolean; refresh?: boolean }) {

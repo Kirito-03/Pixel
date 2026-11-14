@@ -1,6 +1,6 @@
 /**
  * transcode.js  →  server/routes/transcode.js
- * 
+ *
  * Endpoint POST /transcode/hls
  * Pipeline completo:
  *   1. Recibe `src` (URL de video) y `episodeId` (opcional)
@@ -13,6 +13,7 @@
 
 import express from 'express';
 import crypto from 'crypto';
+import { authenticateAdmin } from '../middleware/auth.js';
 import { transcodeHls } from '../services/transcodeHlsService.js';
 
 const router = express.Router();
@@ -31,7 +32,7 @@ const router = express.Router();
  * Respuesta de error:
  *   { ok: false, error }
  */
-router.post('/hls', async (req, res) => {
+router.post('/hls', authenticateAdmin, async (req, res) => {
   const src = req.body?.src || req.query?.src || '';
   const episodeId = req.body?.episodeId ?? null;
   const id = src ? crypto.createHash('md5').update(src).digest('hex') : null;
@@ -41,6 +42,10 @@ router.post('/hls', async (req, res) => {
   }
 
   try {
+    const sourceURL = new URL(src);
+    if (!['https:', 'http:'].includes(sourceURL.protocol) || sourceURL.username || sourceURL.password) {
+      return res.status(400).json({ ok: false, error: 'Fuente HTTP(S) invalida' });
+    }
     const result = await transcodeHls({ src, episodeId });
     return res.json({ ok: true, ...result });
   } catch (err) {

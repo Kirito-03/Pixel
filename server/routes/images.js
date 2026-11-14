@@ -1,10 +1,11 @@
 import express from 'express';
+import { authenticateAdmin } from '../middleware/auth.js';
 import pool from '../db.js';
 
 const router = express.Router();
 
 // Images: upload image metadata
-router.post('/', async (req, res) => {
+router.post('/', authenticateAdmin, async (req, res) => {
   const { filename, original_name, mime_type, size, width, height, url, type, entity_id, entity_type } = req.body || {};
   if (!filename || !url || !type || !['poster', 'backdrop', 'avatar', 'thumbnail'].includes(type)) {
     return res.status(400).json({ message: 'Datos de imagen incompletos o inválidos' });

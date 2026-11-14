@@ -31,7 +31,7 @@ const deriveLanURLFromExpo = (): string => {
   return '';
 };
 
-const BASE_CANDIDATES: string[] = [
+const BASE_CANDIDATES: string[] = !__DEV__ ? ['https://pixelnosekai.com'] : [
   // IP de la laptop en la red local (PRIMERO para dispositivos físicos)
   'http://192.168.1.144:3001',
   // Intento de LAN usando datos de Expo (útil para dispositivo físico en la misma red)

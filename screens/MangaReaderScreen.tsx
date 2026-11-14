@@ -7,14 +7,46 @@ import Header from '../components/Header';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { mangaApi, MangaChapter } from '../services/mangaApi';
 
+type PreferredLanguage = 'es' | 'es-la' | 'en';
+
 type RouteParams = {
-  chapterId: string;
-  chapters?: MangaChapter[];
-  currentIndex?: number;
+  id?: string;
+  mangaId?: string;
+  chapterId?: string;
+  language?: string;
+  selectedLanguage?: string;
+  chapters?: MangaChapter[] | string;
+  currentIndex?: number | string;
   mangaTitle?: string;
 };
 
 const STEP = 6;
+
+function safeDecode(value?: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    return decodeURIComponent(raw).trim();
+  } catch {
+    return raw;
+  }
+}
+
+function normalizeLanguage(lang?: unknown): PreferredLanguage {
+  const value = String(lang || '').trim().toLowerCase();
+  if (value === 'es' || value === 'es-la' || value === 'en') {
+    return value;
+  }
+  return 'es';
+}
+
+function sanitizeChapters(value: unknown): MangaChapter[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is MangaChapter =>
+      Boolean(item && typeof item === 'object' && typeof (item as MangaChapter).id === 'string')
+  );
+}
 
 function SkeletonPage() {
   return (
@@ -79,72 +111,138 @@ export default function MangaReaderScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { navigateByLabel } = useTabNavigation();
-  const { chapterId: rawChapterId, chapters = [], currentIndex = 0, mangaTitle = 'Manga' } = (route?.params || {}) as RouteParams;
-  const chapterId = rawChapterId ? decodeURIComponent(rawChapterId) : '';
+  const { width: viewportWidth } = useWindowDimensions();
+  const params = (route?.params || {}) as RouteParams;
+  const mangaId = String(params.mangaId || params.id || '').trim();
+  const chapterId = safeDecode(params.chapterId);
+  const preferredLanguage = normalizeLanguage(params.selectedLanguage || params.language);
+  const mangaTitle = String(params.mangaTitle || '').trim() || 'Manga';
 
+  const [chapters, setChapters] = useState<MangaChapter[]>(() => sanitizeChapters(params.chapters));
   const [loading, setLoading] = useState(true);
   const [pages, setPages] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(STEP);
   const [activePage, setActivePage] = useState(1);
-  const [activeChapterId, setActiveChapterId] = useState(String(chapterId || '').trim());
-  const [activeChapterIndex, setActiveChapterIndex] = useState(Number(currentIndex || 0));
+  const [activeChapterId, setActiveChapterId] = useState(chapterId);
   const [error, setError] = useState('');
   const listRef = useRef<FlatList<string>>(null);
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    const first = viewableItems?.[0]?.index;
+    if (typeof first === 'number') setActivePage(first + 1);
+  }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 55 }).current;
+  const chaptersSeqRef = useRef(0);
+  const pagesSeqRef = useRef(0);
+
+  const activeChapterIndex = useMemo(() => {
+    const targetId = activeChapterId || chapterId;
+    if (!targetId || !Array.isArray(chapters) || chapters.length === 0) return -1;
+    return chapters.findIndex((c) => String(c?.id || '').trim() === targetId);
+  }, [chapters, activeChapterId, chapterId]);
 
   const chapterLabel = useMemo(() => {
-    const current = chapters[activeChapterIndex];
+    const current = activeChapterIndex >= 0 ? chapters[activeChapterIndex] : undefined;
     if (!current) return 'Capítulo';
     return current.chapter ? `Cap. ${current.chapter}` : 'Capítulo';
   }, [chapters, activeChapterIndex]);
 
   const visiblePages = useMemo(() => pages.slice(0, visibleCount), [pages, visibleCount]);
   const hasMorePages = visibleCount < pages.length;
-  const canPrevChapter = activeChapterIndex < chapters.length - 1;
+  const canPrevChapter = activeChapterIndex >= 0 && activeChapterIndex < chapters.length - 1;
   const canNextChapter = activeChapterIndex > 0;
 
-  const loadChapter = async (id: string, chapterIndex: number) => {
-    if (!id) return;
-    setLoading(true);
-    setError('');
-    try {
-      const data = await mangaApi.chapterPages(id);
-      const incoming = Array.isArray(data?.pages) ? data.pages : [];
-      setPages(incoming);
-      setVisibleCount(Math.min(STEP, incoming.length || STEP));
-      setActivePage(1);
-      setActiveChapterId(id);
-      setActiveChapterIndex(chapterIndex);
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset?.({ animated: false, offset: 0 });
-      });
-    } catch (e: any) {
-      setPages([]);
-      setError(e?.message || 'No se pudo cargar el capítulo');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!mangaId) return;
+    const seq = ++chaptersSeqRef.current;
+    let cancelled = false;
+
+    const loadChapters = async () => {
+      try {
+        const res = await mangaApi.chapters(mangaId, {
+          limit: 300,
+          preferredLanguage,
+          allowEnglishFallback: true,
+        });
+        if (cancelled || chaptersSeqRef.current !== seq) return;
+        const list = Array.isArray(res?.chapters)
+          ? res.chapters
+          : Array.isArray(res?.items)
+            ? res.items
+            : [];
+        setChapters(sanitizeChapters(list));
+      } catch {
+        // Keep current safe chapters list on transient failure
+      }
+    };
+
+    loadChapters();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mangaId, preferredLanguage]);
 
   useEffect(() => {
     const id = String(chapterId || '').trim();
-    if (!id) return;
-    loadChapter(id, Number(currentIndex || 0));
-  }, [chapterId, currentIndex]);
+    if (!id) {
+      setLoading(false);
+      setPages([]);
+      setActiveChapterId('');
+      return;
+    }
 
-  const openPrevChapter = async () => {
-    if (!canPrevChapter) return;
-    const idx = activeChapterIndex + 1;
-    const target = chapters[idx];
-    if (!target?.id) return;
-    await loadChapter(target.id, idx);
+    const seq = ++pagesSeqRef.current;
+    let cancelled = false;
+
+    const loadChapterPages = async () => {
+      setLoading(true);
+      setError('');
+      setActiveChapterId(id);
+      try {
+        const data = await mangaApi.chapterPages(id);
+        if (cancelled || pagesSeqRef.current !== seq) return;
+        const incoming = Array.isArray(data?.pages) ? data.pages : [];
+        setPages(incoming);
+        setVisibleCount(Math.min(STEP, incoming.length || STEP));
+        setActivePage(1);
+        requestAnimationFrame(() => {
+          if (cancelled || pagesSeqRef.current !== seq) return;
+          listRef.current?.scrollToOffset?.({ animated: false, offset: 0 });
+        });
+      } catch (e: any) {
+        if (cancelled || pagesSeqRef.current !== seq) return;
+        setPages([]);
+        setError(e?.message || 'No se pudo cargar el capítulo');
+      } finally {
+        if (!cancelled && pagesSeqRef.current === seq) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadChapterPages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chapterId]);
+
+  const navigateToChapter = (target?: MangaChapter) => {
+    const nextId = String(target?.id || '').trim();
+    if (!nextId || nextId === (activeChapterId || chapterId)) return;
+    if (typeof navigation?.setParams === 'function') {
+      navigation.setParams({ chapterId: encodeURIComponent(nextId) });
+    }
   };
 
-  const openNextChapter = async () => {
+  const openPrevChapter = () => {
+    if (!canPrevChapter) return;
+    navigateToChapter(chapters[activeChapterIndex + 1]);
+  };
+
+  const openNextChapter = () => {
     if (!canNextChapter) return;
-    const idx = activeChapterIndex - 1;
-    const target = chapters[idx];
-    if (!target?.id) return;
-    await loadChapter(target.id, idx);
+    navigateToChapter(chapters[activeChapterIndex - 1]);
   };
 
   const onReachedEnd = () => {
@@ -162,8 +260,14 @@ export default function MangaReaderScreen() {
         onProfilePress={() => navigateByLabel('Perfil')}
       />
 
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
+      <View style={[styles.topBar, { marginTop: Platform.OS === 'web' ? (viewportWidth < 768 ? 64 : 72) : (viewportWidth < 768 ? 56 : 64) }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+        >
           <Ionicons name="arrow-back" size={18} color="#fff" />
           <Text style={styles.backText}>Volver</Text>
         </TouchableOpacity>
@@ -176,10 +280,22 @@ export default function MangaReaderScreen() {
           </View>
 
           <View style={styles.chapterActions}>
-            <TouchableOpacity disabled={!canPrevChapter} onPress={openPrevChapter} style={[styles.navBtn, !canPrevChapter && styles.navBtnDisabled]}>
+            <TouchableOpacity
+              disabled={!canPrevChapter}
+              onPress={openPrevChapter}
+              style={[styles.navBtn, !canPrevChapter && styles.navBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Capítulo anterior"
+            >
               <Ionicons name="chevron-up" size={18} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity disabled={!canNextChapter} onPress={openNextChapter} style={[styles.navBtn, !canNextChapter && styles.navBtnDisabled]}>
+            <TouchableOpacity
+              disabled={!canNextChapter}
+              onPress={openNextChapter}
+              style={[styles.navBtn, !canNextChapter && styles.navBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Capítulo siguiente"
+            >
               <Ionicons name="chevron-down" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -199,6 +315,7 @@ export default function MangaReaderScreen() {
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           ref={listRef}
           data={visiblePages}
           keyExtractor={(item, idx) => `${activeChapterId}-${idx}-${item}`}
@@ -210,11 +327,8 @@ export default function MangaReaderScreen() {
           initialNumToRender={4}
           maxToRenderPerBatch={6}
           windowSize={7}
-          onViewableItemsChanged={({ viewableItems }) => {
-            const first = viewableItems?.[0]?.index;
-            if (typeof first === 'number') setActivePage(first + 1);
-          }}
-          viewabilityConfig={{ itemVisiblePercentThreshold: 55 }}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           ListFooterComponent={
             hasMorePages ? (
               <View style={styles.footerLoading}>
@@ -282,10 +396,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listContent: { 
-    paddingHorizontal: 0, 
-    paddingBottom: 30, 
-    alignItems: 'center' // Centers the children (images) on wide screens
+  listContent: {
+    paddingHorizontal: 0,
+    paddingBottom: 30,
+    alignItems: 'stretch'
   },
   imageWrap: {
     width: '100%',

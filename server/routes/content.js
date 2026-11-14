@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticateAdmin } from '../middleware/auth.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -32,7 +33,7 @@ router.get('/:type', async (req, res) => {
 });
 
 // Content: add new content
-router.post('/', async (req, res) => {
+router.post('/', authenticateAdmin, async (req, res) => {
   const { title, type, overview, poster_url, backdrop_url } = req.body || {};
   if (!title || !type || !['movie', 'tv', 'anime'].includes(type)) {
     return res.status(400).json({ message: 'Datos de contenido incompletos o inválidos' });

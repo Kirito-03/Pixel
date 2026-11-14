@@ -7,6 +7,7 @@ import { getCurrentBaseURL } from './databaseService';
 const getAdminBaseUrl = () => {
     const envUrl = process.env.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_SERVER_BASE_URL;
     if (envUrl) return envUrl.replace(/\/api\/?$/, '').trim();
+    if (!__DEV__) return 'https://pixelnosekai.com';
     return Platform.select({
         android: 'http://10.0.2.2:3001', // Android emulator
         ios: 'http://localhost:3001',

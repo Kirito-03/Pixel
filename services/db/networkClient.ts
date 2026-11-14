@@ -20,9 +20,9 @@ const getInitialBaseURL = (): string => {
     }
     return 'http://localhost:3001';
   }
-  
+
   // 3. Producción sin variable (fallback)
-  return 'https://pixelnosekai.art';
+  return 'https://pixelnosekai.com';
 };
 
 let BASE_URL = getInitialBaseURL();

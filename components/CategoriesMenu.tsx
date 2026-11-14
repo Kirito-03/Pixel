@@ -32,7 +32,7 @@ export default function CategoriesMenu({ visible, onClose, onSelectCategory, cur
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <View style={styles.menuContainer}>
-          <ScrollView 
+          <ScrollView
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
           >
@@ -48,7 +48,7 @@ export default function CategoriesMenu({ visible, onClose, onSelectCategory, cur
                   ]}
                   onPress={() => handleSelect(category.id, category.label)}
                 >
-                  <Text 
+                  <Text
                     style={[
                       styles.categoryText,
                       isCurrentCategory && styles.highlightedText,

@@ -91,3 +91,11 @@ yarn-error.*
 *.avi
 server/videos/*.ts
 *.apk
+
+# Local recovery files and Python caches
+_temp_files/
+__pycache__/
+*.py[cod]
+
+# Version the Pixel Termux boot script
+!tools/termux/start-pixel.sh

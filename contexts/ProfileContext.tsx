@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Storage } from '../services/storage';
-import { auth, db } from '../services/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface Profile {
   id: number;
@@ -27,8 +25,16 @@ interface ProfileProviderProps {
 }
 
 export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) => {
-  const [currentProfile, setCurrentProfileState] = useState<Profile | null>(null);
-  const [adultContentEnabled, setAdultContentEnabledState] = useState<boolean>(false);
+  const [currentProfile, setCurrentProfileState] = useState<Profile | null>(() => {
+    try { return Storage.getObject<Profile>('currentProfile') || null; } catch { return null; }
+  });
+  const [adultContentEnabled, setAdultContentEnabledState] = useState<boolean>(() => {
+    try {
+      const profile = Storage.getObject<Profile>('currentProfile');
+      const saved = profile ? Storage.getString(`adultContentEnabled:${profile.id}`) : undefined;
+      return saved !== undefined && JSON.parse(saved) === true;
+    } catch { return false; }
+  });
 
   const setCurrentProfile = async (profile: Profile | null) => {
     console.log('ProfileContext: Setting current profile:', profile?.id, profile?.name);
@@ -100,31 +106,14 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
         console.warn('ProfileContext: No se pudo guardar preferencia +18');
       }
     }
-    const uid = auth.currentUser?.uid;
-    if (uid) {
-      try {
-        await setDoc(doc(db, 'profiles', uid), { adultContentEnabled: enabled, updatedAt: serverTimestamp() }, { merge: true });
-      } catch { }
-    }
+    // This is a per-profile device preference, never a shared account-wide flag.
+
   };
 
   useEffect(() => {
     loadCurrentProfile();
   }, []);
 
-  useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'profiles', uid));
-        const remote = snap.data() as any;
-        if (remote && typeof remote.adultContentEnabled === 'boolean') {
-          setAdultContentEnabledState(Boolean(remote.adultContentEnabled));
-        }
-      } catch { }
-    })();
-  }, []);
 
   const value: ProfileContextType = {
     currentProfile,
