@@ -50,7 +50,8 @@ const BASE_CANDIDATES: string[] = !__DEV__ ? ['https://pixelnosekai.com'] : [
  * Se inicializa con una URL por defecto y se puede actualizar dinámicamente.
  */
 let currentBaseURL: string = (() => {
-  const envBase = (process.env.EXPO_PUBLIC_SERVER_BASE_URL || '').trim();
+  const apiUrl = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/api\/?$/, '').trim();
+  const envBase = (process.env.EXPO_PUBLIC_SERVER_BASE_URL || apiUrl || '').trim();
   return envBase || BASE_CANDIDATES[0];
 })();
 
@@ -104,7 +105,8 @@ export const DYNAMIC_NETWORK_CONFIG = {
    */
   initialize: async (): Promise<void> => {
     const savedURL = await loadNetworkConfig();
-    const envBase = (process.env.EXPO_PUBLIC_SERVER_BASE_URL || '').trim();
+    const apiUrl = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/api\/?$/, '').trim();
+    const envBase = (process.env.EXPO_PUBLIC_SERVER_BASE_URL || apiUrl || '').trim();
     if (savedURL) {
       currentBaseURL = savedURL;
     } else if (envBase) {
