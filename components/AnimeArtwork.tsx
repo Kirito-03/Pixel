@@ -4,7 +4,7 @@ import { artworkLayout } from '../utils/animeArtwork';
 
 const dimensions = new Map<string, { width: number; height: number }>();
 
-export default function AnimeArtwork({ banner, poster, position, alignTop = false }: { banner?: string; poster?: string; position?: string; alignTop?: boolean }) {
+export default function AnimeArtwork({ banner, poster, position, alignTop = false, topOffset = 0 }: { banner?: string; poster?: string; position?: string; alignTop?: boolean; topOffset?: number }) {
   const [failedBanner, setFailedBanner] = useState(false);
   const uri = !failedBanner && banner ? banner : poster || '';
   const [frame, setFrame] = useState({ width: 0, height: 0 });
@@ -22,8 +22,21 @@ export default function AnimeArtwork({ banner, poster, position, alignTop = fals
     }, () => { if (active && uri === banner) setFailedBanner(true); });
     return () => { active = false; };
   }, [uri, banner]);
-  const layout = intrinsic?.uri === uri ? artworkLayout(frame, intrinsic, position) : null;
-  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor: '#101016' }]} onLayout={event => setFrame(event.nativeEvent.layout)}>
-    {uri && layout ? <Image source={{ uri }} accessible={false} resizeMode="stretch" style={[{ position: 'absolute' }, layout, alignTop && layout.height < frame.height ? { top: 0 } : null]} onError={() => { if (uri === banner) setFailedBanner(true); }} /> : null}
-  </View>;
+  const innerHeight = Math.max(0, frame.height - topOffset);
+  const layout = intrinsic?.uri === uri ? artworkLayout({ width: frame.width, height: innerHeight }, intrinsic, position) : null;
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor: '#08080c' }]} onLayout={event => setFrame(event.nativeEvent.layout)}>
+      <View style={{ position: 'absolute', top: topOffset, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+        {uri && layout ? (
+          <Image
+            source={{ uri }}
+            accessible={false}
+            resizeMode="stretch"
+            style={[{ position: 'absolute' }, layout, alignTop && layout.height < innerHeight ? { top: 0 } : null]}
+            onError={() => { if (uri === banner) setFailedBanner(true); }}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
 }

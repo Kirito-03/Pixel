@@ -49,17 +49,43 @@ export default function AdminDashboardScreen() {
     const [driveModalVisible, setDriveModalVisible] = useState(false);
     const [driveInventory, setDriveInventory] = useState<any>(null);
     const [loadingDrive, setLoadingDrive] = useState(false);
+    const [syncingDriveKey, setSyncingDriveKey] = useState<string | null>(null);
+    const [driveNotice, setDriveNotice] = useState('');
 
-    const openDriveInventory = async () => {
-        setDriveModalVisible(true);
+    const refreshDriveInventory = async (showSpinner = true) => {
         try {
-            setLoadingDrive(true);
+            if (showSpinner) setLoadingDrive(true);
             const data = await adminApiService.getDriveInventory();
             setDriveInventory(data);
         } catch (err) {
             console.error('Error fetching drive inventory:', err);
         } finally {
-            setLoadingDrive(false);
+            if (showSpinner) setLoadingDrive(false);
+        }
+    };
+
+    const openDriveInventory = async () => {
+        setDriveModalVisible(true);
+        setDriveNotice('');
+        await refreshDriveInventory(true);
+    };
+
+    const handleSyncDrive = async (
+        payload: { type: 'anime' | 'episode' | 'manga' | 'hentai' | 'hentai-episode' | 'batch'; id?: string | number; limit?: number },
+        key: string
+    ) => {
+        if (syncingDriveKey) return;
+        setSyncingDriveKey(key);
+        setDriveNotice('');
+        try {
+            const res = await adminApiService.syncDrive(payload);
+            setDriveNotice(res?.message || 'Sincronización con Google Drive iniciada en segundo plano.');
+            await refreshDriveInventory(false);
+        } catch (err: any) {
+            const msg = err?.response?.data?.message || err?.message || 'No se pudo iniciar la sincronización con Drive.';
+            setDriveNotice(msg);
+        } finally {
+            setSyncingDriveKey(null);
         }
     };
 
@@ -299,15 +325,34 @@ export default function AdminDashboardScreen() {
                 onRequestClose={() => setDriveModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalBox, isWide && { maxWidth: 640 }]}>
+                    <View style={[styles.modalBox, isWide && { maxWidth: 740 }]}>
                         <View style={styles.modalHeader}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                                 <Ionicons name="cloud-done" size={22} color="#2e7d32" />
-                                <Text style={styles.modalTitle}>Google Drive (5TB) - Inventario</Text>
+                                <Text style={styles.modalTitle} numberOfLines={1}>Google Drive (5TB) - Inventario</Text>
                             </View>
-                            <TouchableOpacity onPress={() => setDriveModalVisible(false)} style={styles.modalCloseBtn}>
-                                <Ionicons name="close" size={20} color={adminColors.textSecondary} />
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <TouchableOpacity
+                                    style={[styles.invSyncBtn, syncingDriveKey === 'batch' && { opacity: 0.6 }]}
+                                    disabled={!!syncingDriveKey}
+                                    onPress={() => handleSyncDrive({ type: 'batch' }, 'batch')}
+                                >
+                                    <Ionicons name="flash" size={14} color="#FFFFFF" />
+                                    <Text style={styles.invStreamBtnText}>
+                                        {syncingDriveKey === 'batch' ? 'Iniciando...' : 'Subir Lote'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => refreshDriveInventory(true)}
+                                    style={styles.modalCloseBtn}
+                                    accessibilityLabel="Actualizar inventario Drive"
+                                >
+                                    <Ionicons name="refresh" size={18} color={adminColors.textSecondary} />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => setDriveModalVisible(false)} style={styles.modalCloseBtn}>
+                                    <Ionicons name="close" size={20} color={adminColors.textSecondary} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {loadingDrive ? (
@@ -316,7 +361,22 @@ export default function AdminDashboardScreen() {
                                 <Text style={{ color: adminColors.textSecondary, marginTop: 12 }}>Consultando inventario en Google Drive...</Text>
                             </View>
                         ) : (
-                            <ScrollView style={{ maxHeight: 460, paddingHorizontal: 16 }}>
+                            <ScrollView style={{ maxHeight: 520, paddingHorizontal: 16 }}>
+                                {/* Avisos / Tareas activas */}
+                                {!!driveNotice && (
+                                    <View style={styles.invNoticeBox}>
+                                        <Text style={styles.invNoticeText}>{driveNotice}</Text>
+                                    </View>
+                                )}
+
+                                {(driveInventory?.activeJobs || []).filter((j: any) => j.status === 'running').map((job: any) => (
+                                    <View key={job.id} style={[styles.invNoticeBox, { borderColor: '#1976d2', backgroundColor: 'rgba(25, 118, 210, 0.12)' }]}>
+                                        <Text style={[styles.invNoticeText, { color: '#90caf9' }]}>
+                                            Subiendo en segundo plano: {job.label}
+                                        </Text>
+                                    </View>
+                                ))}
+
                                 {/* Resumen */}
                                 <View style={{ flexDirection: 'row', gap: 10, marginVertical: 12 }}>
                                     <View style={[styles.miniStat, { backgroundColor: 'rgba(25, 118, 210, 0.1)', borderColor: '#1976d2' }]}>
@@ -400,6 +460,76 @@ export default function AdminDashboardScreen() {
                                 ) : (
                                     <Text style={styles.invEmpty}>No hay episodios Hentai en Drive.</Text>
                                 )}
+
+                                {/* Pendientes / Incompletos */}
+                                <Text style={[styles.invSectionTitle, { color: '#f59e0b', marginTop: 20 }]}>
+                                    Pendientes / Incompletos (Subir con 1 clic)
+                                </Text>
+
+                                {(driveInventory?.pending?.anime || []).map((a: any) => (
+                                    <View key={`pa-${a.anime_id}`} style={styles.invRow}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <Text style={styles.invRowTitle} numberOfLines={1}>[Anime] {a.title}</Text>
+                                            <Text style={styles.invRowSub}>
+                                                {a.synced_episodes}/{a.total_episodes} en Drive • Faltan {a.missing_episodes}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                                            {!!a.next_episode_id && (
+                                                <TouchableOpacity
+                                                    style={[styles.invSyncBtn, { backgroundColor: '#1976d2' }, syncingDriveKey === `pa-ep-${a.next_episode_id}` && { opacity: 0.6 }]}
+                                                    disabled={!!syncingDriveKey}
+                                                    onPress={() => handleSyncDrive({ type: 'episode', id: a.next_episode_id }, `pa-ep-${a.next_episode_id}`)}
+                                                >
+                                                    <Text style={styles.invStreamBtnText}>+ Ep {a.next_episode_number}</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                            <TouchableOpacity
+                                                style={[styles.invSyncBtn, syncingDriveKey === `pa-${a.anime_id}` && { opacity: 0.6 }]}
+                                                disabled={!!syncingDriveKey}
+                                                onPress={() => handleSyncDrive({ type: 'anime', id: a.anime_id, limit: 5 }, `pa-${a.anime_id}`)}
+                                            >
+                                                <Text style={styles.invStreamBtnText}>Subir 5</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))}
+
+                                {(driveInventory?.pending?.manga || []).map((m: any) => (
+                                    <View key={`pm-${m.manga_id}`} style={styles.invRow}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <Text style={styles.invRowTitle} numberOfLines={1}>[Manga] {m.title}</Text>
+                                            <Text style={styles.invRowSub}>
+                                                {m.synced_chapters}/{m.total_chapters} caps en Drive
+                                            </Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={[styles.invSyncBtn, { backgroundColor: '#7b1fa2' }, syncingDriveKey === `pm-${m.manga_id}` && { opacity: 0.6 }]}
+                                            disabled={!!syncingDriveKey}
+                                            onPress={() => handleSyncDrive({ type: 'manga', id: m.manga_id, limit: 5 }, `pm-${m.manga_id}`)}
+                                        >
+                                            <Text style={styles.invStreamBtnText}>Subir 5 caps</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+
+                                {(driveInventory?.pending?.hentai || []).map((h: any) => (
+                                    <View key={`ph-${h.hentai_id}`} style={styles.invRow}>
+                                        <View style={{ flex: 1, paddingRight: 8 }}>
+                                            <Text style={styles.invRowTitle} numberOfLines={1}>[Hentai] {h.title}</Text>
+                                            <Text style={styles.invRowSub}>
+                                                {h.synced_episodes}/{h.total_episodes} eps en Drive • Faltan {h.missing_episodes}
+                                            </Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={[styles.invSyncBtn, { backgroundColor: '#c2185b' }, syncingDriveKey === `ph-${h.hentai_id}` && { opacity: 0.6 }]}
+                                            disabled={!!syncingDriveKey}
+                                            onPress={() => handleSyncDrive({ type: 'hentai', id: h.hentai_id }, `ph-${h.hentai_id}`)}
+                                        >
+                                            <Text style={styles.invStreamBtnText}>Subir a Drive</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
                             </ScrollView>
                         )}
                     </View>
@@ -786,9 +916,32 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
         borderRadius: 4,
     },
+    invSyncBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#2e7d32',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 4,
+    },
     invStreamBtnText: {
         fontSize: 11,
         color: '#FFFFFF',
+        fontWeight: '600',
+    },
+    invNoticeBox: {
+        marginTop: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#2e7d32',
+        backgroundColor: 'rgba(46, 125, 50, 0.12)',
+    },
+    invNoticeText: {
+        fontSize: 12,
+        color: '#a5d6a7',
         fontWeight: '600',
     },
     invEmpty: {

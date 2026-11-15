@@ -128,13 +128,18 @@
 
             <!-- Google Drive 5TB Storage Inventory -->
             <div class="card" style="margin-top: 1.5rem;">
-                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
                     <div>
                         <h2>Almacenamiento Google Drive (5TB) - VIP</h2>
                         <p style="color: #888; font-size: 0.85rem; margin-top: 0.25rem;">Contenido respaldado con streaming directo y sin anuncios</p>
                     </div>
-                    <span class="badge" style="background-color: #2e7d32; color: #fff; padding: 0.35rem 0.75rem; border-radius: 4px; font-weight: 600;">Stream VIP Activo</span>
+                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                        <button id="btn-drive-batch" class="btn btn-primary" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; cursor: pointer;">⚡ Subir Lote Pendiente</button>
+                        <span class="badge" style="background-color: #2e7d32; color: #fff; padding: 0.35rem 0.75rem; border-radius: 4px; font-weight: 600;">Stream VIP Activo</span>
+                    </div>
                 </div>
+
+                <div id="drive-sync-status" style="display: none; margin: 0 1.25rem 1rem; padding: 0.65rem 1rem; border-radius: 6px; background: rgba(46, 125, 50, 0.16); border: 1px solid #2e7d32; color: #c8e6c9; font-size: 0.85rem;"></div>
 
                 <div class="table-container">
                     <table>
@@ -156,13 +161,28 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-                                <td colspan="5" style="text-align: center; padding: 2rem;">
-                                    <div class="loading"></div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #2a2a2e;">
+                    <h3 style="font-size: 1rem; color: #f59e0b; margin-bottom: 0.75rem;">Pendientes / Incompletos en Drive (Solucionar con 1 clic)</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 100px;">Tipo</th>
+                                    <th>Título</th>
+                                    <th style="width: 200px;">Estado en Drive</th>
+                                    <th style="width: 220px;">Solucionar</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drive-pending-table">
+                                <tr>
+                                    <td colspan="4" style="text-align: center; padding: 1.5rem;">
+                                        <div class="loading"></div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>

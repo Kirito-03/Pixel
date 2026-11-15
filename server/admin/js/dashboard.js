@@ -144,32 +144,34 @@ async function loadDriveInventory() {
                     </td>
                 </tr>
             `;
-            return;
+        } else {
+            tbody.innerHTML = items.map(item => `
+                <tr>
+                    <td>
+                        <span style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; ${
+                            item.type === 'Anime' ? 'background: #1976d2; color: #fff;' :
+                            item.type === 'Manga' ? 'background: #7b1fa2; color: #fff;' :
+                            'background: #c2185b; color: #fff;'
+                        }">
+                            ${item.type}
+                        </span>
+                    </td>
+                    <td><strong>${escapeHtml(item.title)}</strong></td>
+                    <td>${escapeHtml(item.epInfo)}</td>
+                    <td><small style="color: #aaa;">${item.size}</small></td>
+                    <td>
+                        ${item.url ? `
+                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; text-decoration: none;">
+                                Ver Stream
+                            </a>
+                        ` : '—'}
+                    </td>
+                </tr>
+            `).join('');
         }
 
-        tbody.innerHTML = items.map(item => `
-            <tr>
-                <td>
-                    <span style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; ${
-                        item.type === 'Anime' ? 'background: #1976d2; color: #fff;' :
-                        item.type === 'Manga' ? 'background: #7b1fa2; color: #fff;' :
-                        'background: #c2185b; color: #fff;'
-                    }">
-                        ${item.type}
-                    </span>
-                </td>
-                <td><strong>${escapeHtml(item.title)}</strong></td>
-                <td>${escapeHtml(item.epInfo)}</td>
-                <td><small style="color: #aaa;">${item.size}</small></td>
-                <td>
-                    ${item.url ? `
-                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; text-decoration: none;">
-                            Ver Stream
-                        </a>
-                    ` : '—'}
-                </td>
-            </tr>
-        `).join('');
+        renderDriveSyncStatus(inv.activeJobs || []);
+        renderDrivePending(inv.pending || {});
     } catch (e) {
         console.error('Error cargando inventario de Drive:', e);
         tbody.innerHTML = `
@@ -182,7 +184,162 @@ async function loadDriveInventory() {
     }
 }
 
+function showDriveStatus(message, isError = false) {
+    const el = document.getElementById('drive-sync-status');
+    if (!el) return;
+    if (!message) {
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'block';
+    el.style.background = isError ? 'rgba(198, 40, 40, 0.16)' : 'rgba(46, 125, 50, 0.16)';
+    el.style.borderColor = isError ? '#e53935' : '#2e7d32';
+    el.style.color = isError ? '#ffcdd2' : '#c8e6c9';
+    el.textContent = message;
+}
+
+function renderDriveSyncStatus(activeJobs) {
+    const running = (activeJobs || []).find(j => j.status === 'running');
+    if (running) {
+        showDriveStatus(`Subiendo en segundo plano: ${running.label}`);
+    }
+}
+
+function renderDrivePending(pending) {
+    const tbody = document.getElementById('drive-pending-table');
+    if (!tbody) return;
+
+    const rows = [];
+    (pending.anime || []).forEach(a => {
+        rows.push({
+            badgeBg: '#1976d2',
+            typeLabel: 'Anime',
+            title: a.title,
+            state: `${a.synced_episodes}/${a.total_episodes} en Drive (Faltan ${a.missing_episodes})`,
+            buttons: [
+                ...(a.next_episode_id ? [{
+                    label: `+ Ep ${a.next_episode_number}`,
+                    type: 'episode',
+                    id: String(a.next_episode_id),
+                    bg: '#1976d2'
+                }] : []),
+                {
+                    label: 'Subir 5',
+                    type: 'anime',
+                    id: String(a.anime_id),
+                    limit: '5',
+                    bg: '#2e7d32'
+                }
+            ]
+        });
+    });
+
+    (pending.manga || []).forEach(m => {
+        rows.push({
+            badgeBg: '#7b1fa2',
+            typeLabel: 'Manga',
+            title: m.title,
+            state: `${m.synced_chapters}/${m.total_chapters} caps en Drive (Faltan ${m.missing_chapters})`,
+            buttons: [{
+                label: 'Subir 5 caps',
+                type: 'manga',
+                id: String(m.manga_id),
+                limit: '5',
+                bg: '#7b1fa2'
+            }]
+        });
+    });
+
+    (pending.hentai || []).forEach(h => {
+        rows.push({
+            badgeBg: '#c2185b',
+            typeLabel: 'Hentai',
+            title: h.title,
+            state: `${h.synced_episodes}/${h.total_episodes} eps en Drive (Faltan ${h.missing_episodes})`,
+            buttons: [{
+                label: 'Subir a Drive',
+                type: 'hentai',
+                id: String(h.hentai_id),
+                bg: '#c2185b'
+            }]
+        });
+    });
+
+    if (rows.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" style="text-align: center; padding: 1.5rem; color: #888;">
+                    No hay contenido pendiente con fuente compatible para Drive.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = rows.map(r => `
+        <tr>
+            <td>
+                <span style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; background: ${r.badgeBg}; color: #fff;">
+                    ${r.typeLabel}
+                </span>
+            </td>
+            <td><strong>${escapeHtml(r.title)}</strong></td>
+            <td><small style="color: #fbbf24;">${escapeHtml(r.state)}</small></td>
+            <td>
+                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                    ${r.buttons.map(btn => `
+                        <button
+                            type="button"
+                            class="btn btn-secondary js-drive-sync-btn"
+                            data-sync-type="${escapeHtml(btn.type)}"
+                            data-sync-id="${escapeHtml(btn.id)}"
+                            ${btn.limit ? `data-sync-limit="${escapeHtml(btn.limit)}"` : ''}
+                            style="padding: 0.25rem 0.6rem; font-size: 0.75rem; background: ${btn.bg}; border-color: ${btn.bg}; color: #fff; cursor: pointer;"
+                        >
+                            ${escapeHtml(btn.label)}
+                        </button>
+                    `).join('')}
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function triggerDriveSync(payload, triggerBtn) {
+    if (triggerBtn) triggerBtn.disabled = true;
+    try {
+        const res = await api.syncDrive(payload);
+        showDriveStatus(res?.message || 'Sincronización con Google Drive iniciada en segundo plano.', false);
+        await loadDriveInventory();
+    } catch (err) {
+        showDriveStatus(err?.message || 'No se pudo iniciar la sincronización con Drive.', true);
+    } finally {
+        if (triggerBtn) triggerBtn.disabled = false;
+    }
+}
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     loadDashboardStats();
+
+    const batchBtn = document.getElementById('btn-drive-batch');
+    if (batchBtn) {
+        batchBtn.addEventListener('click', () => triggerDriveSync({ type: 'batch' }, batchBtn));
+    }
+
+    const pendingTable = document.getElementById('drive-pending-table');
+    if (pendingTable) {
+        pendingTable.addEventListener('click', (event) => {
+            const btn = event.target.closest('.js-drive-sync-btn');
+            if (!btn) return;
+            const type = btn.getAttribute('data-sync-type');
+            const id = btn.getAttribute('data-sync-id');
+            const limit = btn.getAttribute('data-sync-limit');
+            triggerDriveSync({
+                type,
+                id,
+                ...(limit ? { limit: Number(limit) } : {})
+            }, btn);
+        });
+    }
 });

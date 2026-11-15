@@ -22,6 +22,7 @@ const { default: pool } = await import('../server/db.js');
 
 const INGEST_DIR = join(homedir(), 'server/data/pixel-ingest/manga');
 const RCLONE_REMOTE = 'pixel-drive:PixelNoSekai/Manga';
+const RCLONE_BIN = existsSync('/data/data/com.termux/files/usr/bin/rclone') ? '/data/data/com.termux/files/usr/bin/rclone' : 'rclone';
 const BASE_STREAM_URL = 'https://pixelnosekai.com/api/stream/Manga';
 
 if (!existsSync(INGEST_DIR)) {
@@ -142,7 +143,7 @@ export async function ingestChapter(chapterUrl) {
     console.log(`\n[MangaIngest] Subiendo lote de imágenes a Google Drive (${driveTargetDir})...`);
 
     // 3. Subir carpeta completa con rclone copy
-    await runCommand('rclone', ['copy', tmpChapterDir, driveTargetDir]);
+    await runCommand(RCLONE_BIN, ['copy', tmpChapterDir, driveTargetDir]);
     console.log(`[MangaIngest] ✓ Imágenes subidas exitosamente a Google Drive.`);
 
     // 4. Actualizar manga_page_cache con las URLs de Drive
@@ -207,20 +208,54 @@ export async function ingestManga(mangaId, limit = 50) {
   }
 }
 
+/** Ingest pending chapters across the catalog into Google Drive */
+export async function ingestBatchManga(limit = 3) {
+  console.log(`[MangaIngest] Buscando hasta ${limit} capítulos pendientes para Google Drive...`);
+  const { rows } = await pool.query(
+    `
+      SELECT mc.external_url AS chapter_url
+      FROM manga_chapters_cache mc
+      LEFT JOIN manga_page_cache mp ON mp.chapter_url = mc.external_url
+      WHERE mc.external_url IS NOT NULL
+        AND (mp.pages IS NULL OR mp.pages::text NOT LIKE '%/api/stream/Manga/%')
+      ORDER BY mc.cached_at DESC NULLS LAST, NULLIF(regexp_replace(mc.chapter, '[^0-9.]', '', 'g'), '')::numeric ASC NULLS LAST
+      LIMIT $1
+    `,
+    [limit]
+  );
+
+  if (!rows.length) {
+    console.log(`[MangaIngest] No hay capítulos pendientes para subir.`);
+    return;
+  }
+
+  console.log(`[MangaIngest] Procesando lote de ${rows.length} capítulos...`);
+  for (const row of rows) {
+    await ingestChapter(row.chapter_url);
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
+  const limitIdx = args.indexOf('--limit');
+  const limitVal = limitIdx >= 0 ? Number(args[limitIdx + 1]) : NaN;
+
   if (args.includes('--chapter-url')) {
     const url = args[args.indexOf('--chapter-url') + 1];
     await ingestChapter(url);
   } else if (args.includes('--manga-id')) {
     const id = args[args.indexOf('--manga-id') + 1];
-    const limit = Number(args[args.indexOf('--limit') + 1]) || 5;
+    const limit = Number.isFinite(limitVal) && limitVal > 0 ? limitVal : 5;
     await ingestManga(id, limit);
+  } else if (args.includes('--batch')) {
+    const limit = Number.isFinite(limitVal) && limitVal > 0 ? limitVal : 3;
+    await ingestBatchManga(limit);
   } else {
     console.log(`
 Uso de pixel-drive-manga:
   node tools/pixel-drive-manga.mjs --chapter-url "<URL_DEL_CAPITULO>"
   node tools/pixel-drive-manga.mjs --manga-id "<MANGA_SLUG>" [--limit 5]
+  node tools/pixel-drive-manga.mjs --batch [--limit 3]
     `);
   }
 }

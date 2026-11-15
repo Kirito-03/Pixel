@@ -63,6 +63,13 @@ class AdminAPI {
         return this.request('/api/admin/drive/inventory');
     }
 
+    async syncDrive(payload) {
+        return this.request('/api/admin/drive/sync', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    }
+
     // Anime endpoints
     async getAnime(params = {}) {
         const queryString = new URLSearchParams(params).toString();

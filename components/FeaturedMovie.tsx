@@ -97,14 +97,19 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     ? ['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.3)', 'transparent']
     : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.5)', 'transparent'];
 
+  const headerOffset = isSmallScreen ? 0 : (isWeb ? 68 : 60);
+  const heroHeight = isSmallScreen
+    ? Math.min(680, Math.max(500, height * 0.75))
+    : Math.min(540, Math.max(460, Math.round(height * 0.64)));
+
   return (
-    <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: isSmallScreen ? Math.min(680, Math.max(500, height * 0.75)) : Math.min(680, Math.max(480, height * 0.8)) }]}>
-      <AnimeArtwork alignTop banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "100% 40%"} />
+    <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: heroHeight }]}>
+      <AnimeArtwork alignTop topOffset={headerOffset} banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "100% 40%"} />
 
       {/* Top vignette para navbar */}
       <LinearGradient
         colors={heroTopColors as any}
-        style={[StyleSheet.absoluteFillObject, { height: '30%' }]}
+        style={[StyleSheet.absoluteFillObject, { top: headerOffset, height: '28%' }]}
         pointerEvents="none"
       />
 
@@ -112,7 +117,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
       <LinearGradient
         colors={heroBottomColors as any}
         locations={[0, 0.3, 0.7, 1]}
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, { top: headerOffset }]}
         pointerEvents="none"
       />
 
@@ -123,17 +128,18 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           locations={[0, 0.4, 0.8]}
-          style={StyleSheet.absoluteFillObject}
+          style={[StyleSheet.absoluteFillObject, { top: headerOffset }]}
           pointerEvents="none"
         />
       )}
 
       {/* Contenido del Hero */}
       <View style={[styles.content, {
-        paddingLeft: isSmallScreen ? 20 : 50,
-        paddingRight: isSmallScreen ? 20 : 50,
-        paddingBottom: isSmallScreen ? 50 : 80,
-        maxWidth: isSmallScreen ? '100%' : '55%',
+        paddingLeft: isSmallScreen ? 20 : 56,
+        paddingRight: isSmallScreen ? 20 : 56,
+        paddingTop: isSmallScreen ? 0 : headerOffset + 16,
+        paddingBottom: isSmallScreen ? 50 : 48,
+        maxWidth: isSmallScreen ? '100%' : '62%',
       } as any]}>
 
         {/* Badge de estado */}
@@ -183,7 +189,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         )}
 
         {/* Descripción corta */}
-        <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={isSmallScreen ? 3 : 4}>
+        <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={3}>
           {description || 'Sin descripción disponible.'}
         </Text>
 
@@ -193,7 +199,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
             style={[
               styles.playButton,
               androidCompact && { flexBasis: 0, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
-              !isSmallScreen && { flex: 0, flexShrink: 0, paddingHorizontal: 24, minWidth: 180 },
+              !isSmallScreen && { flex: 0, flexBasis: 'auto', flexShrink: 0, paddingHorizontal: 24, minWidth: 170 },
               { backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000' },
               isWeb && playHover && {
                 backgroundColor: theme === 'dark' ? '#E50914' : '#E50914',
@@ -224,7 +230,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
             style={[
               styles.infoButton,
               androidCompact && { flexBasis: 0, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
-              !isSmallScreen && { flex: 0, flexShrink: 0, paddingHorizontal: 24, minWidth: 200 },
+              !isSmallScreen && { flex: 0, flexBasis: 'auto', flexShrink: 0, paddingHorizontal: 24, minWidth: 210 },
               { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' },
               isWeb && infoHover && {
                 backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',

@@ -43,6 +43,7 @@ export default function EpisodeManagerScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [uploadingEpisodeId, setUploadingEpisodeId] = useState<number | null>(null);
     const [processingEpisodeId, setProcessingEpisodeId] = useState<number | null>(null);
+    const [syncingDriveEpisodeId, setSyncingDriveEpisodeId] = useState<number | null>(null);
     const [autoProcessAfterUpload, setAutoProcessAfterUpload] = useState(true);
     const [cleanupLocalAfterProcess, setCleanupLocalAfterProcess] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -299,6 +300,32 @@ export default function EpisodeManagerScreen() {
         }
     };
 
+    const handleSyncEpisodeToDrive = async (episode: any) => {
+        if (!episode?.id || syncingDriveEpisodeId) return;
+        setSyncingDriveEpisodeId(episode.id);
+        try {
+            const res = await adminApiService.syncDrive({ type: 'episode', id: episode.id });
+            const msg = res?.message || `Subida del Ep ${episode.episode_number} a Google Drive VIP iniciada en segundo plano.`;
+            if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+                window.alert(msg);
+            } else {
+                Alert.alert('Google Drive VIP', msg);
+            }
+        } catch (error: any) {
+            const msg =
+                error?.response?.data?.message ||
+                error?.message ||
+                'No se pudo iniciar la subida a Google Drive';
+            if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+                window.alert(msg);
+            } else {
+                Alert.alert('Error', msg);
+            }
+        } finally {
+            setSyncingDriveEpisodeId(null);
+        }
+    };
+
     const renderEpisodeItem = ({ item }: any) => (
         <Pressable
             style={({ hovered }: any) => [
@@ -454,6 +481,21 @@ export default function EpisodeManagerScreen() {
                             size={18}
                             color={item.video_url ? adminColors.text : adminColors.textSecondary}
                         />
+                    </TouchableOpacity>
+                )}
+
+                {item.storage_type !== 'gdrive' && (
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        disabled={syncingDriveEpisodeId === item.id}
+                        onPress={() => handleSyncEpisodeToDrive(item)}
+                        accessibilityLabel="Subir a Google Drive VIP"
+                    >
+                        {syncingDriveEpisodeId === item.id ? (
+                            <ActivityIndicator size="small" color="#2e7d32" />
+                        ) : (
+                            <Ionicons name="cloud-done-outline" size={18} color="#4ade80" />
+                        )}
                     </TouchableOpacity>
                 )}
 

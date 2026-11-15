@@ -250,7 +250,7 @@ class AdminApiService {
     }
 
     /**
-     * Get Google Drive inventory (Anime, Manga, Hentai)
+     * Get Google Drive inventory (Anime, Manga, Hentai, pending, activeJobs)
      */
     async getDriveInventory(): Promise<{
         summary: {
@@ -262,8 +262,35 @@ class AdminApiService {
         anime: Array<any>;
         manga: Array<any>;
         hentai: Array<any>;
+        pending?: {
+            anime: Array<any>;
+            manga: Array<any>;
+            hentai: Array<any>;
+        };
+        activeJobs?: Array<{
+            id: string;
+            type: string;
+            targetId?: string | number | null;
+            label: string;
+            status: 'running' | 'done' | 'error';
+            startedAt: string;
+            finishedAt?: string | null;
+            error?: string | null;
+        }>;
     }> {
         const response = await this.axiosInstance.get('/api/admin/drive/inventory');
+        return response.data;
+    }
+
+    /**
+     * Trigger Google Drive upload/repair in background
+     */
+    async syncDrive(payload: {
+        type: 'anime' | 'episode' | 'manga' | 'hentai' | 'hentai-episode' | 'batch';
+        id?: string | number;
+        limit?: number;
+    }): Promise<{ ok: boolean; message: string; job?: any }> {
+        const response = await this.axiosInstance.post('/api/admin/drive/sync', payload);
         return response.data;
     }
 

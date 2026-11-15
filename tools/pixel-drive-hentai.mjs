@@ -25,6 +25,7 @@ const { default: pool } = await import('../server/db.js');
 
 const INGEST_DIR = join(homedir(), 'server/data/pixel-ingest/hentai');
 const RCLONE_REMOTE = 'pixel-drive:PixelNoSekai';
+const RCLONE_BIN = existsSync('/data/data/com.termux/files/usr/bin/rclone') ? '/data/data/com.termux/files/usr/bin/rclone' : 'rclone';
 const BASE_STREAM_URL = 'https://pixelnosekai.com/api/stream';
 const FFMPEG_BIN = process.env.PIXEL_FFMPEG_BIN || 'ffmpeg';
 
@@ -69,7 +70,17 @@ function runCapture(bin, args) {
 
 function remoteFileExists(remotePath) {
   try {
-    const res = spawnSync('rclone', ['lsf', remotePath]);
+    const rel = String(remotePath).replace(/^pixel-drive:PixelNoSekai\/?/, '');
+    const encodedRel = rel.split('/').map((seg) => encodeURIComponent(seg)).join('/');
+    const httpCheck = spawnSync('curl', ['-sI', '-f', '--max-time', '4', `http://127.0.0.1:8086/${encodedRel}`], { encoding: 'utf8' });
+    if (httpCheck.status === 0) {
+      const lenMatch = (httpCheck.stdout || '').match(/Content-Length:\s*(\d+)/i);
+      const bytes = lenMatch ? Number(lenMatch[1]) : 1;
+      if (bytes > 0) return true;
+    }
+  } catch {}
+  try {
+    const res = spawnSync(RCLONE_BIN, ['lsf', remotePath]);
     return res.status === 0 && res.stdout.trim().length > 0;
   } catch {
     return false;
@@ -182,7 +193,7 @@ export async function ingestHentaiEpisode(episodeId) {
     console.log(`[HentaiIngest] Archivo optimizado: ${optSizeMb.toFixed(1)} MB. Subiendo a Google Drive...`);
 
     // 4. Subir a Google Drive
-    await runCommand('rclone', ['copyto', tmpProcessed, driveRemoteTarget]);
+    await runCommand(RCLONE_BIN, ['copyto', tmpProcessed, driveRemoteTarget]);
     console.log(`[HentaiIngest] ✓ Subido a Drive: ${driveRemoteTarget}`);
 
     // 5. Actualizar Base de Datos
@@ -250,6 +261,8 @@ export async function ingestHentai(hentaiIdOrSlug) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const limitIdx = args.indexOf('--limit');
+  const parsedLimit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : NaN;
 
   if (args.includes('--episode-id')) {
     const epId = Number(args[args.indexOf('--episode-id') + 1]);
@@ -261,11 +274,12 @@ async function main() {
     const slug = args[args.indexOf('--slug') + 1];
     await ingestHentai(slug);
   } else if (args.includes('--batch')) {
-    const limit = Number(args[args.indexOf('--limit') + 1]) || 5;
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 5;
     const { rows } = await pool.query(
       `SELECT he.id
        FROM hentai_episodes he
-       WHERE he.video_servers @> '[{"server":"MP4Upload"}]'::jsonb
+       WHERE he.is_active = true
+         AND he.video_servers @> '[{"server":"MP4Upload"}]'::jsonb
          AND NOT (he.video_servers::text LIKE '%/api/stream/%')
        ORDER BY he.hentai_id ASC, he.episode_number ASC
        LIMIT $1`,

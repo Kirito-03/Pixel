@@ -112,3 +112,36 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
   7. Recomendados (Top rating).
   8. Fila temática rotativa (ej. *Populares de Acción*, *Populares de Comedia*, etc. con catálogo completo).
 - **Variación en cada recarga:** Se añadió soporte `sort=random` en `/api/catalog/anime`. Cada vez que el usuario abre o actualiza la app, la selección de títulos y el orden varían automáticamente.
+
+---
+
+## 5. Corrección del Hero Carrusel (Sin pérdida de calidad) y Automatización + Gestión de Drive en Admin
+
+### A. Ajuste del Hero Carrusel en Web/Desktop (`components/AnimeArtwork.tsx` y `components/FeaturedMovie.tsx`)
+- **Causa identificada:** `utils/animeArtwork.ts` limita la escala horizontal/vertical a `<= 1.35x` para conservar la nitidez de los banners panorámicos de AniList (`~1900x350-400`), lo que da una altura renderizada de `472-540px`. Al tener `FeaturedMovie.tsx` una altura de contenedor de `680px` en escritorio y `alignTop` en `top: 0`, el banner dejaba `140-210px` de fondo negro vacío en la parte inferior donde flotaban los botones, mientras la parte superior quedaba parcialmente tapada por el navbar. Además, `infoButton` heredaba `flexBasis: 0` del estilo móvil y truncaba `"MÁS INFORMACIÓN"` a `"MÁS INFORMA..."`.
+- **Solución aplicada:**
+  - En `AnimeArtwork.tsx` se añadió `topOffset` y un contenedor recortado interior para iniciar la imagen exactamente debajo de la barra de navegación superior (`headerOffset = 68px` en web desktop) sin estirar la imagen por encima de `1.35x`.
+  - En `FeaturedMovie.tsx` se ajustó `heroHeight` en escritorio a `Math.min(540, Math.max(460, Math.round(height * 0.64)))` con `paddingBottom: 48` y gradientes alineados a `top: headerOffset`, ubicando título, sinopsis (`numberOfLines: 3`) y botones sobre la imagen.
+  - En los botones desktop se estableció `flexBasis: 'auto'` y `minWidth: 210` en `infoButton` para mostrar `"MÁS INFORMACIÓN"` completo.
+
+### B. Estabilización de `rclone`, Ingesta Automática en Cron y Botones en el Admin
+- **Servicio `rclone-drive` en `arle`:** Se detuvo un proceso manual duplicado (PID 9235) para permitir que el servicio supervisado `runsv rclone-drive` atienda `127.0.0.1:8086` (`--vfs-cache-mode minimal`).
+- **Verificación HTTP instantánea y soporte batch:** `tools/pixel-drive-ingest.mjs`, `tools/pixel-drive-hentai.mjs` y `tools/pixel-drive-manga.mjs` ahora consultan primero `http://127.0.0.1:8086/...` con `curl -sI` (`<50ms` frente a `~10s` por CLI), respetan `--limit` en `--anime-id` y soportan `--batch` para Manga.
+- **Vinculación inmediata de Hentai Ep 1:** `node tools/pixel-drive-hentai.mjs --episode-id 1` detectó `/Hentai/1/1/episode.mp4` (`80,171,512` bytes) ya alojado en Drive y actualizó `hentai_episodes` con `Pixel VIP (Drive)`.
+- **Cron automático (`server/cron.js`):** Se añadió la tarea programada `15 */4 * * *` (`runDriveIngestBatch` con bloqueo `isDriveIngestRunning`) para subir lotes ligeros de Anime (`2`), Hentai (`1`) y Manga (`2`) a Drive automáticamente.
+- **Endpoints y UI de reparación con 1 clic:**
+  - `GET /api/admin/drive/inventory` ahora devuelve `pending` (`anime`, `manga`, `hentai` con conteos sincronizados/faltantes y `next_episode_id`) y `activeJobs`.
+  - `POST /api/admin/drive/sync` inicia en segundo plano la subida por episodio, anime completo, manga, hentai o lote mixto (`409` si ya hay un trabajo activo).
+  - Actualizados `services/adminApiService.ts`, `screens/admin/AdminDashboardScreen.tsx`, `screens/admin/EpisodeManagerScreen.tsx`, `server/admin/js/api.js`, `server/admin/dashboard.html` y `server/admin/js/dashboard.js`.
+
+### C. Validaciones Reales vs Pendientes
+- **Verificado en esta sesión:**
+  - `node --check` sobre los 7 archivos JS/mjs modificados (exit 0).
+  - `npx tsc --noEmit`: 0 errores en los archivos modificados (persisten 5 errores previos no relacionados en `components/Loader.tsx`, `hooks/useProfileManagement.ts` y `services/offlineDownloads.ts`).
+  - `npm run build:web` (con `tools/build-limited.mjs`): compilación web completada y desplegada en `arle`; `https://pixelnosekai.com/` sirve `index-fa4504c3bf9ddb8eff86328f51d00c97.js`.
+  - `curl -sI http://127.0.0.1:8086/Hentai/1/1/episode.mp4` en `arle`: `HTTP/1.1 200 OK` (`Content-Length: 80171512`).
+  - `GET /api/admin/drive/inventory` autenticado contra `http://127.0.0.1:3001` en `arle`: `HTTP 200` con `totalDriveItems: 3` (`Anime: 1`, `Manga: 1`, `Hentai: 1`) y listas `pending` (`anime: 20`, `manga: 20`, `hentai: 20`).
+  - Log de PM2 `pixel-backend`: tarea `- Google Drive Ingest Batch: Cada 4 horas (minuto 15)` registrada al iniciar.
+- **Pendiente de verificación visual / externa:**
+  - Comprobación visual en navegador web del nuevo encuadre del Hero Carrusel y de los botones en el Admin UI tras limpiar caché del navegador.
+  - Sincronización de esta nota con la bóveda de Obsidian (`/run/media/arle/Reze/Users/ASUS/My Documents/Projects/`), ya que el disco externo `/run/media/arle/Reze` no se encuentra montado actualmente.

@@ -22,6 +22,58 @@ router.use(authenticateAdmin);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..', '..');
+
+const activeDriveJobs = [];
+
+function spawnNodeScript(scriptRelPath, args = []) {
+    return new Promise((resolve, reject) => {
+        const scriptPath = join(projectRoot, scriptRelPath);
+        const child = spawn(process.execPath, [scriptPath, ...args], {
+            cwd: projectRoot,
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        let stderrTail = '';
+        child.stderr?.on('data', (chunk) => {
+            stderrTail = (stderrTail + chunk.toString()).slice(-800);
+        });
+        child.on('error', reject);
+        child.on('close', (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(stderrTail || `${scriptRelPath} exited with code ${code}`));
+        });
+    });
+}
+
+function startDriveJob(jobMeta, commands) {
+    const job = {
+        id: `drive-${Date.now()}-${Math.round(Math.random() * 1e4)}`,
+        ...jobMeta,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        error: null,
+    };
+    activeDriveJobs.unshift(job);
+    if (activeDriveJobs.length > 20) activeDriveJobs.length = 20;
+
+    (async () => {
+        try {
+            for (const cmd of commands) {
+                await spawnNodeScript(cmd.script, cmd.args);
+            }
+            job.status = 'done';
+        } catch (err) {
+            job.status = 'error';
+            job.error = err?.message || 'Error en sincronización de Drive';
+            console.error(`[AdminDriveSync] Job ${job.id} error:`, job.error);
+        } finally {
+            job.finishedAt = new Date().toISOString();
+        }
+    })();
+
+    return job;
+}
 
 const episodeUploadsDir = join(__dirname, '..', 'uploads', 'episodes');
 try {
@@ -89,7 +141,7 @@ const importM3uUpload = multer({
 
 /**
  * GET /api/admin/drive/inventory
- * Retorna todo el contenido sincronizado en Google Drive: Anime, Manga, Hentai
+ * Retorna todo el contenido sincronizado en Google Drive y pendientes por subir: Anime, Manga, Hentai
  */
 router.get('/drive/inventory', async (req, res) => {
     try {
@@ -142,6 +194,117 @@ router.get('/drive/inventory', async (req, res) => {
             ORDER BY hc.title ASC, he.episode_number ASC
         `);
 
+        // 4. Contenido incompleto / pendiente por subir a Drive
+        const pendingAnimeRes = await pool.query(`
+            WITH stats AS (
+                SELECT
+                    ac.id AS anime_id,
+                    ac.title,
+                    ac.poster_url,
+                    ac.created_at,
+                    COUNT(*)::int AS total_episodes,
+                    COUNT(*) FILTER (WHERE ae.stream_url LIKE '%/api/stream/%' OR ae.storage_type = 'gdrive')::int AS synced_episodes,
+                    COUNT(*) FILTER (
+                        WHERE (ae.stream_url IS NULL OR ae.stream_url NOT LIKE '%/api/stream/%')
+                          AND COALESCE(ae.storage_type, '') != 'gdrive'
+                    )::int AS missing_episodes,
+                    COUNT(*) FILTER (
+                        WHERE (ae.stream_url IS NULL OR ae.stream_url NOT LIKE '%/api/stream/%')
+                          AND COALESCE(ae.storage_type, '') != 'gdrive'
+                          AND ae.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
+                    )::int AS uploadable_missing
+                FROM anime_content ac
+                JOIN anime_episodes ae ON ae.anime_id = ac.id
+                WHERE ac.is_active = true AND ae.is_active = true
+                GROUP BY ac.id, ac.title, ac.poster_url, ac.created_at
+                HAVING COUNT(*) FILTER (
+                    WHERE (ae.stream_url IS NULL OR ae.stream_url NOT LIKE '%/api/stream/%')
+                      AND COALESCE(ae.storage_type, '') != 'gdrive'
+                      AND ae.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
+                ) > 0
+                ORDER BY synced_episodes DESC, ac.created_at DESC
+                LIMIT 20
+            )
+            SELECT
+                s.*,
+                next_ep.id AS next_episode_id,
+                next_ep.episode_number AS next_episode_number
+            FROM stats s
+            LEFT JOIN LATERAL (
+                SELECT ae2.id, ae2.episode_number
+                FROM anime_episodes ae2
+                WHERE ae2.anime_id = s.anime_id
+                  AND ae2.is_active = true
+                  AND (ae2.stream_url IS NULL OR ae2.stream_url NOT LIKE '%/api/stream/%')
+                  AND COALESCE(ae2.storage_type, '') != 'gdrive'
+                  AND ae2.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
+                ORDER BY ae2.episode_number ASC
+                LIMIT 1
+            ) next_ep ON true
+            ORDER BY s.synced_episodes DESC, s.created_at DESC
+        `);
+
+        const pendingMangaRes = await pool.query(`
+            SELECT
+                m.manga_id,
+                m.title,
+                m.cover_url,
+                COUNT(mc.chapter_id)::int AS total_chapters,
+                COUNT(mp.chapter_url) FILTER (WHERE mp.pages::text LIKE '%/api/stream/Manga/%')::int AS synced_chapters,
+                COUNT(mc.chapter_id) FILTER (WHERE mp.pages IS NULL OR mp.pages::text NOT LIKE '%/api/stream/Manga/%')::int AS missing_chapters
+            FROM manga_cache m
+            JOIN manga_chapters_cache mc ON mc.manga_id = m.manga_id AND mc.external_url IS NOT NULL
+            LEFT JOIN manga_page_cache mp ON mp.chapter_url = mc.external_url
+            WHERE m.is_active = true
+            GROUP BY m.manga_id, m.title, m.cover_url, m.cached_at
+            HAVING COUNT(mc.chapter_id) FILTER (WHERE mp.pages IS NULL OR mp.pages::text NOT LIKE '%/api/stream/Manga/%') > 0
+            ORDER BY synced_chapters DESC, m.cached_at DESC
+            LIMIT 20
+        `);
+
+        const pendingHentaiRes = await pool.query(`
+            WITH hstats AS (
+                SELECT
+                    hc.id AS hentai_id,
+                    hc.slug,
+                    hc.title,
+                    hc.poster_url,
+                    hc.created_at,
+                    COUNT(*)::int AS total_episodes,
+                    COUNT(*) FILTER (WHERE COALESCE(he.video_servers::text, '[]') LIKE '%Pixel VIP (Drive)%')::int AS synced_episodes,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(he.video_servers::text, '[]') NOT LIKE '%Pixel VIP (Drive)%'
+                          AND he.video_servers @> '[{"server":"MP4Upload"}]'::jsonb
+                    )::int AS missing_episodes
+                FROM hentai_content hc
+                JOIN hentai_episodes he ON he.hentai_id = hc.id
+                WHERE hc.is_active = true AND he.is_active = true
+                GROUP BY hc.id, hc.slug, hc.title, hc.poster_url, hc.created_at
+                HAVING COUNT(*) FILTER (
+                    WHERE COALESCE(he.video_servers::text, '[]') NOT LIKE '%Pixel VIP (Drive)%'
+                      AND he.video_servers @> '[{"server":"MP4Upload"}]'::jsonb
+                ) > 0
+                ORDER BY synced_episodes DESC, hc.created_at DESC
+                LIMIT 20
+            )
+            SELECT
+                h.*,
+                next_ep.id AS next_episode_id,
+                next_ep.episode_number AS next_episode_number
+            FROM hstats h
+            LEFT JOIN LATERAL (
+                SELECT he2.id, he2.episode_number
+                FROM hentai_episodes he2
+                WHERE he2.hentai_id = h.hentai_id
+                  AND he2.is_active = true
+                  AND COALESCE(he2.video_servers::text, '[]') NOT LIKE '%Pixel VIP (Drive)%'
+                  AND he2.video_servers @> '[{"server":"MP4Upload"}]'::jsonb
+                ORDER BY he2.episode_number ASC
+                LIMIT 1
+            ) next_ep ON true
+            ORDER BY h.synced_episodes DESC, h.created_at DESC
+        `);
+
         res.json({
             summary: {
                 totalAnimeEpisodes: animeRes.rows.length,
@@ -152,11 +315,99 @@ router.get('/drive/inventory', async (req, res) => {
             anime: animeRes.rows,
             manga: mangaRes.rows,
             hentai: hentaiRes.rows,
+            pending: {
+                anime: pendingAnimeRes.rows,
+                manga: pendingMangaRes.rows,
+                hentai: pendingHentaiRes.rows,
+            },
+            activeJobs: activeDriveJobs.slice(0, 10),
         });
     } catch (error) {
         console.error('Error obteniendo inventario de Drive:', error);
         res.status(500).json({
             message: 'Error al obtener inventario de Google Drive',
+            error: error.message,
+        });
+    }
+});
+
+/**
+ * POST /api/admin/drive/sync
+ * Lanza en segundo plano la subida/reparación a Google Drive de un episodio, serie, manga, hentai o lote
+ */
+router.post('/drive/sync', async (req, res) => {
+    try {
+        const runningJob = activeDriveJobs.find((j) => j.status === 'running');
+        if (runningJob) {
+            return res.status(409).json({
+                ok: false,
+                message: `Ya hay una sincronización de Drive en curso (${runningJob.label}). Espera a que termine.`,
+                job: runningJob,
+            });
+        }
+
+        const { type, id, limit } = req.body || {};
+        const parsedLimit = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.min(20, Math.floor(Number(limit))) : 5;
+        let commands = [];
+        let label = '';
+
+        if (type === 'episode') {
+            const epId = parseInt(String(id), 10);
+            if (!Number.isFinite(epId) || epId <= 0) {
+                return res.status(400).json({ message: 'ID de episodio inválido' });
+            }
+            label = `Anime Ep #${epId}`;
+            commands = [{ script: 'tools/pixel-drive-ingest.mjs', args: ['--episode-id', String(epId)] }];
+        } else if (type === 'anime') {
+            const animeId = parseInt(String(id), 10);
+            if (!Number.isFinite(animeId) || animeId <= 0) {
+                return res.status(400).json({ message: 'ID de anime inválido' });
+            }
+            label = `Anime #${animeId} (hasta ${parsedLimit} caps)`;
+            commands = [{ script: 'tools/pixel-drive-ingest.mjs', args: ['--anime-id', String(animeId), '--limit', String(parsedLimit)] }];
+        } else if (type === 'manga') {
+            const mangaId = String(id || '').trim();
+            if (!mangaId) {
+                return res.status(400).json({ message: 'ID de manga requerido' });
+            }
+            label = `Manga ${mangaId} (hasta ${parsedLimit} caps)`;
+            commands = [{ script: 'tools/pixel-drive-manga.mjs', args: ['--manga-id', mangaId, '--limit', String(parsedLimit)] }];
+        } else if (type === 'hentai') {
+            const hentaiId = String(id || '').trim();
+            if (!hentaiId) {
+                return res.status(400).json({ message: 'ID o slug de hentai requerido' });
+            }
+            const flag = /^\d+$/.test(hentaiId) ? '--hentai-id' : '--slug';
+            label = `Hentai ${hentaiId}`;
+            commands = [{ script: 'tools/pixel-drive-hentai.mjs', args: [flag, hentaiId] }];
+        } else if (type === 'hentai-episode') {
+            const epId = parseInt(String(id), 10);
+            if (!Number.isFinite(epId) || epId <= 0) {
+                return res.status(400).json({ message: 'ID de episodio hentai inválido' });
+            }
+            label = `Hentai Ep #${epId}`;
+            commands = [{ script: 'tools/pixel-drive-hentai.mjs', args: ['--episode-id', String(epId)] }];
+        } else if (type === 'batch') {
+            label = 'Lote Mixto (Anime + Hentai + Manga)';
+            commands = [
+                { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '2'] },
+                { script: 'tools/pixel-drive-hentai.mjs', args: ['--batch', '--limit', '1'] },
+                { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '2'] },
+            ];
+        } else {
+            return res.status(400).json({ message: 'Tipo de sincronización inválido' });
+        }
+
+        const job = startDriveJob({ type, targetId: id ?? null, label }, commands);
+        return res.json({
+            ok: true,
+            message: `Sincronización "${label}" iniciada en segundo plano. Los archivos aparecerán al completarse.`,
+            job,
+        });
+    } catch (error) {
+        console.error('Error iniciando sincronización con Drive:', error);
+        return res.status(500).json({
+            message: 'Error al iniciar sincronización con Google Drive',
             error: error.message,
         });
     }

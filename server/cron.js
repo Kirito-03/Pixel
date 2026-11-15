@@ -1,8 +1,56 @@
 import cron from 'node-cron';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
 import { syncHentaiCatalog, syncNextHentaiCatalogPage } from './services/hentaiBotService.js';
 import { syncLatestManga, syncNextMangaCatalogPage } from './services/mangaBotService.js';
 import pool from './db.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..');
+
+let isDriveIngestRunning = false;
+
+function runScript(scriptRelPath, args = []) {
+  return new Promise((resolve) => {
+    const scriptPath = join(projectRoot, scriptRelPath);
+    const child = spawn(process.execPath, [scriptPath, ...args], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+    });
+    child.on('error', (err) => {
+      console.error(`[CronDrive] Error iniciando ${scriptRelPath}:`, err.message);
+      resolve();
+    });
+    child.on('close', (code) => {
+      if (code !== 0) {
+        console.warn(`[CronDrive] ${scriptRelPath} finalizó con código ${code}`);
+      }
+      resolve();
+    });
+  });
+}
+
+async function runDriveIngestBatch() {
+  if (isDriveIngestRunning) {
+    console.log('[CronDrive] Ya hay una ingesta a Google Drive en curso, omitiendo ciclo.');
+    return;
+  }
+  isDriveIngestRunning = true;
+  console.log('[CronDrive] Iniciando lote automático de respaldo a Google Drive (Anime + Hentai + Manga)...');
+  try {
+    await runScript('tools/pixel-drive-ingest.mjs', ['--batch', '--limit', '2']);
+    await runScript('tools/pixel-drive-hentai.mjs', ['--batch', '--limit', '1']);
+    await runScript('tools/pixel-drive-manga.mjs', ['--batch', '--limit', '2']);
+    console.log('[CronDrive] ✓ Lote automático a Google Drive finalizado.');
+  } catch (e) {
+    console.error('[CronDrive] Error en lote automático:', e.message);
+  } finally {
+    isDriveIngestRunning = false;
+  }
+}
 
 export function startBotSchedulers() {
   console.log('[Cron] Inicializando tareas automáticas del Bot...');
@@ -90,6 +138,15 @@ export function startBotSchedulers() {
     }
   });
 
+  // Tarea 9: Respaldo Automático a Google Drive (Cada 4 horas al minuto 15)
+  cron.schedule('15 */4 * * *', async () => {
+    try {
+      await runDriveIngestBatch();
+    } catch (e) {
+      console.error('[Cron] Error en Drive Ingest Batch:', e.message);
+    }
+  });
+
   console.log('[Cron] Tareas del bot configuradas:');
   console.log(' - Update Ongoing: Cada 4 horas');
   console.log(' - Sync Airing: Diario a las 02:00 AM');
@@ -99,6 +156,7 @@ export function startBotSchedulers() {
   console.log(' - Manga Bot Catálogo Incremental: Cada 20 minutos');
   console.log(' - Hentai Bot (/hub): Cada 30 minutos');
   console.log(' - Hentai Bot Catálogo Incremental: Cada 15 minutos');
+  console.log(' - Google Drive Ingest Batch: Cada 4 horas (minuto 15)');
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {

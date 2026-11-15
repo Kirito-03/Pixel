@@ -23,6 +23,7 @@ const { default: pool } = await import('../server/db.js');
 
 const INGEST_DIR = join(homedir(), 'server/data/pixel-ingest');
 const RCLONE_REMOTE = 'pixel-drive:PixelNoSekai';
+const RCLONE_BIN = existsSync('/data/data/com.termux/files/usr/bin/rclone') ? '/data/data/com.termux/files/usr/bin/rclone' : 'rclone';
 const YTDLP_BIN = process.env.PIXEL_YTDLP_BIN || join(homedir(), 'server/tools/media-resolver/bin/yt-dlp');
 const FFMPEG_BIN = process.env.PIXEL_FFMPEG_BIN || 'ffmpeg';
 const BASE_STREAM_URL = 'https://pixelnosekai.com/api/stream';
@@ -50,14 +51,31 @@ function runCapture(bin, args) {
   return res.stdout.trim();
 }
 
-/** Check if a remote path exists in Google Drive via rclone ls */
-function remoteFileExists(remotePath) {
+/** Check remote file size (> 0 if exists) checking local rclone HTTP server first (<50ms), then rclone ls */
+function getRemoteFileSize(remotePath) {
   try {
-    const out = runCapture('rclone', ['ls', remotePath]);
-    return out.length > 0;
+    const rel = String(remotePath).replace(/^pixel-drive:PixelNoSekai\/?/, '');
+    const encodedRel = rel.split('/').map((seg) => encodeURIComponent(seg)).join('/');
+    const httpCheck = spawnSync('curl', ['-sI', '-f', '--max-time', '4', `http://127.0.0.1:8086/${encodedRel}`], { encoding: 'utf8' });
+    if (httpCheck.status === 0) {
+      const lenMatch = (httpCheck.stdout || '').match(/Content-Length:\s*(\d+)/i);
+      const bytes = lenMatch ? Number(lenMatch[1]) : 1;
+      if (bytes > 0) return bytes;
+    }
+  } catch {}
+  try {
+    const out = runCapture(RCLONE_BIN, ['ls', remotePath]);
+    if (!out) return 0;
+    const match = out.match(/^\s*(\d+)\s+/);
+    return match ? Number(match[1]) : 1;
   } catch {
-    return false;
+    return 0;
   }
+}
+
+/** Check if a remote path exists in Google Drive */
+function remoteFileExists(remotePath) {
+  return getRemoteFileSize(remotePath) > 0;
 }
 
 /** Download poster, banner & trailer if not already in Drive */
@@ -75,7 +93,7 @@ async function syncAnimeImages(animeId) {
     const tmpPoster = join(INGEST_DIR, `tmp_poster_${animeId}.jpg`);
     try {
       await runCommand('curl', ['-sS', '-L', anime.poster_url, '-o', tmpPoster]);
-      await runCommand('rclone', ['copyto', tmpPoster, posterRemote]);
+      await runCommand(RCLONE_BIN, ['copyto', tmpPoster, posterRemote]);
       console.log(`[DriveIngest] ✓ Portada subida a Drive: ${posterRemote}`);
     } catch (e) {
       console.error(`[DriveIngest] Error subiendo portada:`, e.message);
@@ -90,7 +108,7 @@ async function syncAnimeImages(animeId) {
     const tmpBanner = join(INGEST_DIR, `tmp_banner_${animeId}.jpg`);
     try {
       await runCommand('curl', ['-sS', '-L', anime.banner_url, '-o', tmpBanner]);
-      await runCommand('rclone', ['copyto', tmpBanner, bannerRemote]);
+      await runCommand(RCLONE_BIN, ['copyto', tmpBanner, bannerRemote]);
       console.log(`[DriveIngest] ✓ Banner subido a Drive: ${bannerRemote}`);
     } catch (e) {
       console.error(`[DriveIngest] Error subiendo banner:`, e.message);
@@ -111,7 +129,7 @@ async function syncAnimeImages(animeId) {
         `https://www.youtube.com/watch?v=${anime.trailer_id}`,
         '-o', tmpTrailer,
       ]);
-      await runCommand('rclone', ['copyto', tmpTrailer, trailerRemote]);
+      await runCommand(RCLONE_BIN, ['copyto', tmpTrailer, trailerRemote]);
       console.log(`[DriveIngest] ✓ Trailer subido a Drive: ${trailerRemote}`);
     } catch (e) {
       console.error(`[DriveIngest] Error subiendo trailer:`, e.message);
@@ -163,9 +181,10 @@ export async function ingestEpisode(episodeId) {
   const publicStreamUrl = `${BASE_STREAM_URL}/Anime/${animeId}/${epNum}/episode.mp4`;
 
   // 1. Check if already uploaded
-  if (remoteFileExists(driveRemoteTarget)) {
+  const existingSize = getRemoteFileSize(driveRemoteTarget);
+  if (existingSize > 0) {
     console.log(`[DriveIngest] Episodio ${episodeId} (Anime ${animeId} Ep ${epNum}) ya existe en Drive.`);
-    await updateDatabaseRecord(episodeId, publicStreamUrl);
+    await updateDatabaseRecord(episodeId, publicStreamUrl, existingSize > 1 ? existingSize : null);
     return true;
   }
 
@@ -225,7 +244,7 @@ export async function ingestEpisode(episodeId) {
     console.log(`[DriveIngest] Archivo optimizado: ${optSizeMb.toFixed(1)} MB. Subiendo a Google Drive...`);
 
     // 4. Upload to Drive
-    await runCommand('rclone', ['copyto', tmpProcessed, driveRemoteTarget]);
+    await runCommand(RCLONE_BIN, ['copyto', tmpProcessed, driveRemoteTarget]);
     console.log(`[DriveIngest] ✓ Subido a Drive: ${driveRemoteTarget}`);
 
     // 5. Update Database
@@ -271,6 +290,8 @@ async function updateDatabaseRecord(episodeId, streamUrl, fileSize = null) {
 /** CLI entrypoint */
 async function main() {
   const args = process.argv.slice(2);
+  const limitIdx = args.indexOf('--limit');
+  const parsedLimit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : NaN;
 
   if (args.includes('--episode-id')) {
     const epId = Number(args[args.indexOf('--episode-id') + 1]);
@@ -279,23 +300,31 @@ async function main() {
   } else if (args.includes('--anime-id')) {
     const animeId = Number(args[args.indexOf('--anime-id') + 1]);
     if (!animeId) throw new Error('ID de anime inválido');
-    console.log(`[DriveIngest] Obteniendo episodios de Anime ${animeId}...`);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 100;
+    console.log(`[DriveIngest] Obteniendo episodios pendientes de Anime ${animeId} (máx ${limit})...`);
     const { rows } = await pool.query(
-      'SELECT id, episode_number FROM anime_episodes WHERE anime_id = $1 AND is_active = true ORDER BY episode_number ASC',
-      [animeId]
+      `SELECT id, episode_number
+       FROM anime_episodes
+       WHERE anime_id = $1
+         AND is_active = true
+         AND (stream_url IS NULL OR stream_url NOT LIKE '%/api/stream/%')
+       ORDER BY episode_number ASC
+       LIMIT $2`,
+      [animeId, limit]
     );
-    console.log(`[DriveIngest] Encontrados ${rows.length} episodios. Procesando en cola...`);
+    console.log(`[DriveIngest] Encontrados ${rows.length} episodios pendientes. Procesando en cola...`);
     for (const row of rows) {
       await ingestEpisode(row.id);
     }
   } else if (args.includes('--batch')) {
-    const limit = Number(args[args.indexOf('--limit') + 1]) || 5;
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 5;
     console.log(`[DriveIngest] Buscando los próximos ${limit} episodios pendientes con MP4Upload...`);
     const { rows } = await pool.query(
       `
         SELECT e.id, e.anime_id, e.episode_number
         FROM anime_episodes e
-        WHERE e.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
+        WHERE e.is_active = true
+          AND e.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
           AND (e.stream_url IS NULL OR NOT e.stream_url LIKE '%/api/stream/%')
         ORDER BY e.anime_id ASC, e.episode_number ASC
         LIMIT $1
