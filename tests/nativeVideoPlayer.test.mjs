@@ -161,6 +161,7 @@ function createPlayerHarness(overrides = {}) {
       if (name === 'expo-screen-orientation') return { lockAsync: () => Promise.resolve(), OrientationLock: { LANDSCAPE: 1, PORTRAIT_UP: 2 } };
       if (name === 'react-native-webview') return { WebView: 'WebView' };
       if (name === './PlaybackChrome') return { default: 'PlaybackChrome', __esModule: true };
+      if (name === './PlaybackTimeline') return { default: 'PlaybackTimeline', __esModule: true };
       if (name === './SeekButton') return { default: 'SeekButton', __esModule: true };
       if (name === '@expo/vector-icons') return { Ionicons: 'Ionicons' };
       if (name === '../services/episodePlaybackSources') return playbackSources;
@@ -329,10 +330,10 @@ test('NativeVideoPlayer never saves second 0 before resumeTimeSeconds and flushe
   assert.equal(nexted, 1);
   assert.equal(progressCalls.at(-1).payload.current_time, 150);
 
-  // Unmount flushes latest snapshot
+  // Unmount persists the last sampled snapshot without touching a released native object.
   h.player.currentTime = 155;
   h.unmount();
-  assert.equal(progressCalls.at(-1).payload.current_time, 155);
+  assert.equal(progressCalls.at(-1).payload.current_time, 150);
   assert.equal(progressCalls.at(-1).opts?.force, true);
 });
 
@@ -492,4 +493,26 @@ test('10-second buttons clamp direct video seeks and preserve paused state and s
   buttons.find(button => button.props.forward).props.onPress();
   assert.equal(h.player.currentTime, 300); assert.equal(h.player.playing, false);
   h.unmount();
+});
+
+test('unmount persists the JS snapshot after Expo has released the native player', () => {
+  const h = createPlayerHarness({ player: { currentTime: 80, duration: 300 } });
+  const saved = [];
+  h.renderNative({ videoUrl: 'https://video.test/drive.mp4', episode: { id: '11', number: 11 }, animeTitle: 'Drive', onClose() {}, onProgress: value => saved.push(value) });
+  h.tickIntervals();
+  Object.defineProperty(h.player, 'currentTime', { get() { throw Error('ERR_USING_RELEASED_SHARED_OBJECT'); } });
+  Object.defineProperty(h.player, 'duration', { get() { throw Error('ERR_USING_RELEASED_SHARED_OBJECT'); } });
+  Object.defineProperty(h.player, 'playing', { get() { throw Error('ERR_USING_RELEASED_SHARED_OBJECT'); } });
+  assert.doesNotThrow(() => h.unmount());
+  assert.equal(saved.at(-1).current_time, 80);
+});
+
+
+test('timeline seeks to an arbitrary minute while preserving pause and saving that position', () => {
+  const h = createPlayerHarness({ player: { currentTime: 60, duration: 1200, playing: false } });
+  const saved = [];
+  const tree = h.renderNative({ videoUrl: 'https://video.test/drive.mp4', episode: { id: '11', number: 11 }, animeTitle: 'Drive', onClose() {}, onProgress: value => saved.push(value) });
+  h.findByType(tree, 'PlaybackTimeline').props.onSeek(600);
+  assert.equal(h.player.currentTime, 600); assert.equal(h.player.playing, false);
+  assert.equal(saved.at(-1).current_time, 600); h.unmount();
 });

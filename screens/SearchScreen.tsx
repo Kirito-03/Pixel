@@ -9,6 +9,8 @@ import { colors, spacing, shadows, borderRadius } from '../theme';
 import { ContentItem } from '../types';
 import { useProfile } from '../contexts/ProfileContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../contexts/AuthContext';
+import { searchHistoryStore } from '../services/searchHistoryStore';
 import { catalogService } from '../services/catalogService';
 import { useTheme } from '../contexts/ThemeContext';
 import { universalSearch, animeSearchResult, type UniversalSearchResult } from '../services/universalSearch';
@@ -17,6 +19,11 @@ export default function SearchScreen() {
   const { colors, theme } = useTheme();
   const navigation = useNavigation<any>();
   const { currentProfile } = useProfile();
+  const { user } = useAuth();
+  const historyScope = `${user?.uid}:${currentProfile?.id}`;
+  const historyScopeRef = useRef(historyScope);
+  historyScopeRef.current = historyScope;
+  const [historyNotice, setHistoryNotice] = useState('');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UniversalSearchResult[]>([]);
   const [suggestions, setSuggestions] = useState<UniversalSearchResult[]>([]);
@@ -49,45 +56,47 @@ export default function SearchScreen() {
   }, [navigation]);
 
   useEffect(() => {
-    const loadRecent = async () => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    setRecentQueries([]); setHistoryNotice('');
+    const profileId = currentProfile?.id;
+    if (!profileId || !user?.uid) return;
+    const start = async () => {
       try {
-        const profileId = currentProfile?.id;
-        if (!profileId) return setRecentQueries([]);
-        const stored = await AsyncStorage.getItem(`recentSearches:${profileId}`);
-        if (stored) {
-          const arr = JSON.parse(stored);
-          if (Array.isArray(arr)) setRecentQueries(arr.slice(0, 5));
-          else setRecentQueries([]);
-        }
-      } catch (err) {
-        setRecentQueries([]);
-      }
+        const stop = await searchHistoryStore.watch(profileId, queries => {
+          if (active) { setRecentQueries(queries); setHistoryNotice(''); }
+        }, () => { if (active) setHistoryNotice('No se pudo sincronizar el historial. Comprueba tu conexión.'); }, user.uid);
+        if (!active) { stop(); return; }
+        unsubscribe = stop;
+        const legacy = await AsyncStorage.getItem(`recentSearches:${profileId}`);
+        let local: string[] = [];
+        try { local = legacy ? JSON.parse(legacy) : []; } catch { /* Ignore malformed legacy cache. */ }
+        if (!active) return;
+        await searchHistoryStore.migrate(profileId, local, user.uid);
+        if (active && legacy) await AsyncStorage.removeItem(`recentSearches:${profileId}`);
+      } catch { if (active) setHistoryNotice('No se pudo sincronizar el historial. Comprueba tu conexión.'); }
     };
-    loadRecent();
-  }, [currentProfile?.id]);
+    void start();
+    return () => { active = false; unsubscribe?.(); };
+  }, [historyScope]);
 
   const recordRecentSearch = async (text: string) => {
-    const q = (text || '').trim();
     const profileId = currentProfile?.id;
-    if (!profileId || q.length === 0) return;
+    const scope = historyScope;
+    if (!profileId || !user?.uid || !text.trim()) return;
     try {
-      const stored = await AsyncStorage.getItem(`recentSearches:${profileId}`);
-      const list: string[] = stored ? JSON.parse(stored) : [];
-      const lower = q.toLowerCase();
-      const filtered = list.filter(item => item.toLowerCase() !== lower);
-      const updated = [q, ...filtered].slice(0, 5);
-      setRecentQueries(updated);
-      await AsyncStorage.setItem(`recentSearches:${profileId}`, JSON.stringify(updated));
-    } catch (err) {}
+      await searchHistoryStore.add(profileId, text, user.uid);
+      if (historyScopeRef.current === scope) setHistoryNotice('');
+    } catch { if (historyScopeRef.current === scope) setHistoryNotice('No se pudo guardar esta búsqueda en tu cuenta.'); }
   };
-
   const clearRecent = async () => {
     const profileId = currentProfile?.id;
-    if (!profileId) return;
+    const scope = historyScope;
+    if (!profileId || !user?.uid) return;
     try {
-      await AsyncStorage.removeItem(`recentSearches:${profileId}`);
-      setRecentQueries([]);
-    } catch (err) {}
+      await searchHistoryStore.clear(profileId, user.uid);
+      if (historyScopeRef.current === scope) { setRecentQueries([]); setHistoryNotice(''); }
+    } catch { if (historyScopeRef.current === scope) setHistoryNotice('No se pudo borrar el historial de tu cuenta.'); }
   };
 
   const clearSearch = () => {
@@ -297,6 +306,7 @@ export default function SearchScreen() {
 
 
 
+      {!!historyNotice && <Text accessibilityRole="alert" style={{ color: colors.textMuted, paddingHorizontal: hPad, paddingVertical: 10 }}>{historyNotice}</Text>}
       {/* Main Content Area (Scrollable) */}
       <FlatList
         data={results}

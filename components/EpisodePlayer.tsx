@@ -14,6 +14,7 @@ import { useImmersivePlayer } from '../hooks/useImmersivePlayer';
 import PlayerSystemBars from './PlayerSystemBars';
 import PlaybackChrome from './PlaybackChrome';
 import SeekButton from './SeekButton';
+import PlaybackTimeline from './PlaybackTimeline';
 import { episodePlaybackSources, isDirectPlaybackUrl } from '../services/episodePlaybackSources';
 import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -65,11 +66,16 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   onProgress,
 }) => {
   const [showControls, setShowControls] = useState(true);
+  const [timeline, setTimeline] = useState({ current_time: 0, duration: 0 });
+  const scrubbing = useRef(false);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSentSecond = useRef(0);
   const lastSentAt = useRef(0);
   const lastValidSnapshot = useRef<{ current_time: number; duration: number } | null>(null);
 
+  // This effect is registered before Expo's auto-release cleanup.
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const player = useVideoPlayer(videoUrl, p => {
     p.play();
   });
@@ -85,7 +91,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   }, [videoUrl, resumeTimeSeconds]);
 
   const captureSnapshot = useCallback(() => {
-    if (!resumed.current) return null;
+    if (!mounted.current || !resumed.current) return null;
     const cur = Math.floor(player.currentTime ?? 0);
     const dur = Math.floor(player.duration ?? 0);
     if (!Number.isFinite(cur) || cur < 0 || (cur === 0 && !(dur > 0))) return null;
@@ -106,13 +112,15 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   flushProgressRef.current = flushProgress;
 
   const resetControlsTimer = useCallback(() => {
+    if (!mounted.current) return;
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
-    if (player.playing) controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
+    if (player.playing && !scrubbing.current) controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
   }, [player]);
   useEffect(() => {
     setPlaying(player.playing);
     const playingSubscription = player.addListener('playingChange', event => {
+      if (!mounted.current) return;
       setPlaying(event.isPlaying);
       resetControlsTimer();
       if (!event.isPlaying) {
@@ -120,10 +128,15 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
       }
     });
     const statusSubscription = player.addListener('statusChange', event => {
+      if (!mounted.current) return;
       setPlaybackError(event.status === 'error' ? event.error?.message || 'No se pudo reproducir este vídeo.' : '');
       if (event.status === 'readyToPlay' && !resumed.current && resumeTimeSeconds > 0) {
         resumed.current = true;
         player.currentTime = Math.min(resumeTimeSeconds, player.duration || resumeTimeSeconds);
+      }
+      if (event.status === 'readyToPlay') {
+        const snapshot = captureSnapshot();
+        if (snapshot) setTimeline(snapshot);
       }
     });
     resetControlsTimer();
@@ -137,6 +150,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   useEffect(() => {
     const interval = setInterval(() => {
       const snap = captureSnapshot();
+      if (snap) setTimeline(snap);
       if (!snap || !player.playing) return;
       const now = Date.now();
       const moved = Math.abs(snap.current_time - lastSentSecond.current);
@@ -159,13 +173,15 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
     });
     return () => {
       sub?.remove?.();
-      flushProgressRef.current(true);
+      const snapshot = lastValidSnapshot.current;
+      if (snapshot) onProgress({ ...snapshot, position_known: true }, { force: true });
     };
   }, []);
 
   // Advancing is tied to the actual end event, never to pausing near the end.
   useEffect(() => {
     const subscription = player.addListener('playToEnd', () => {
+      if (!mounted.current) return;
       flushProgressRef.current(true);
       if (hasNextEpisode && onNextEpisode) onNextEpisode();
     });
@@ -173,31 +189,37 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   }, [player, hasNextEpisode, onNextEpisode]);
 
   const handleClose = useCallback(() => {
+    if (!mounted.current) return;
     flushProgressRef.current(true);
     player.pause();
     onClose();
   }, [onClose, player]);
 
   const handleNextEpisode = useCallback(() => {
+    if (!mounted.current) return;
     flushProgressRef.current(true);
     player.pause();
     onNextEpisode?.();
   }, [onNextEpisode, player]);
 
   const handlePreviousEpisode = useCallback(() => {
+    if (!mounted.current) return;
     flushProgressRef.current(true);
     player.pause();
     onPreviousEpisode?.();
   }, [onPreviousEpisode, player]);
 
-  const seekBy = (seconds: number) => {
+  const seekTo = (seconds: number) => {
+    if (!mounted.current) return;
     const duration = Number(player.duration);
-    const current = Number(player.currentTime);
-    if (!resumed.current || !Number.isFinite(duration) || duration <= 0 || !Number.isFinite(current)) return;
-    player.currentTime = Math.max(0, Math.min(duration, current + seconds));
+    if (!resumed.current || !Number.isFinite(duration) || duration <= 0 || !Number.isFinite(seconds)) return;
+    const target = Math.max(0, Math.min(duration, seconds));
+    player.currentTime = target;
+    setTimeline({ current_time: target, duration });
     flushProgressRef.current(true);
     resetControlsTimer();
   };
+  const seekBy = (seconds: number) => { if (mounted.current) seekTo(Number(player.currentTime) + seconds); };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }} onTouchStart={resetControlsTimer}>
@@ -238,6 +260,14 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
             style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 }}
             pointerEvents="none"
           />
+          <View style={{ position: 'absolute', bottom: 14, left: 24, right: 24 }}>
+            <PlaybackTimeline currentTime={timeline.current_time} duration={timeline.duration} onSeek={seekTo}
+              onScrubbingChange={active => {
+                scrubbing.current = active;
+                if (active) { if (controlsTimer.current) clearTimeout(controlsTimer.current); }
+                else resetControlsTimer();
+              }} />
+          </View>
         </View>
       )}
     </View>
@@ -261,6 +291,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   const [sources, setSources] = useState<(VideoSource & { server?: string })[]>([]);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const serverMenuOpenRef = useRef(false);
+  const loadedEpisode = useRef<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<VideoSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [webViewLoading, setWebViewLoading] = useState(false);
@@ -528,6 +559,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   useEffect(() => { loadEpisodeSources(); }, [episode.id]);
 
   const loadEpisodeSources = async () => {
+    loadedEpisode.current = String(episode.id);
     try {
       setLoading(true);
       setError(null);
@@ -709,7 +741,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
 
     return (
       <NativeVideoPlayer
-        key={`${profileId}:${animeId}:${episodeId}`}
+        key={`${profileId}:${animeId}:${episodeId}:${videoUrl}`}
         videoUrl={videoUrl}
         resumeTimeSeconds={resumeTimeSeconds}
         episode={episode}
@@ -725,7 +757,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds, serverMenuOpen, sources, seasonNumber]);
 
   // ── Loading / Error screens ──────────────────────────────────
-  if (loading) {
+  if (loading || loadedEpisode.current !== String(episode.id)) {
     return (
       <View style={styles.container}>
         <PlayerSystemBars /><StatusBar hidden />
