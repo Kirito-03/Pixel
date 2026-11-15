@@ -60,10 +60,10 @@ function remoteFileExists(remotePath) {
   }
 }
 
-/** Download poster & banner if not already in Drive */
+/** Download poster, banner & trailer if not already in Drive */
 async function syncAnimeImages(animeId) {
   const { rows } = await pool.query(
-    'SELECT id, title, poster_url, banner_url FROM anime_content WHERE id = $1',
+    'SELECT id, title, poster_url, banner_url, trailer_id FROM anime_content WHERE id = $1',
     [animeId]
   );
   if (!rows.length) return;
@@ -96,6 +96,27 @@ async function syncAnimeImages(animeId) {
       console.error(`[DriveIngest] Error subiendo banner:`, e.message);
     } finally {
       if (existsSync(tmpBanner)) unlinkSync(tmpBanner);
+    }
+  }
+
+  const trailerRemote = `${RCLONE_REMOTE}/Anime/${animeId}/trailer.mp4`;
+  if (anime.trailer_id && !remoteFileExists(trailerRemote)) {
+    console.log(`[DriveIngest] Sincronizando trailer de anime ${animeId} (${anime.trailer_id})...`);
+    const tmpTrailer = join(INGEST_DIR, `tmp_trailer_${animeId}.mp4`);
+    const ytDlpCmd = existsSync(YTDLP_BIN) ? YTDLP_BIN : 'yt-dlp';
+    try {
+      await runCommand(ytDlpCmd, [
+        '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best',
+        '--merge-output-format', 'mp4',
+        `https://www.youtube.com/watch?v=${anime.trailer_id}`,
+        '-o', tmpTrailer,
+      ]);
+      await runCommand('rclone', ['copyto', tmpTrailer, trailerRemote]);
+      console.log(`[DriveIngest] ✓ Trailer subido a Drive: ${trailerRemote}`);
+    } catch (e) {
+      console.error(`[DriveIngest] Error subiendo trailer:`, e.message);
+    } finally {
+      if (existsSync(tmpTrailer)) unlinkSync(tmpTrailer);
     }
   }
 }
