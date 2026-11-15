@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
+  Alert,
   Text,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import { Linking } from 'react-native';
 import { MOCK_TRENDING } from '../data/mockNews';
 import { NewsHero, NewsCard, TrendingItem } from '../components/NewsComponents';
 import Header from '../components/Header';
+import AndroidNewsFeed from '../components/AndroidNewsFeed';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { newsApi, NewsArticle } from '../services/newsApi';
 
@@ -53,6 +55,7 @@ export default function NewsScreen() {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
   const isWeb = Platform.OS === 'web';
+  const isAndroid = Platform.OS === 'android';
   const insets = useSafeAreaInsets();
   const headerHeight = isWeb ? 90 : (56 + insets.top);
   const navigation = useNavigation<any>();
@@ -74,6 +77,16 @@ export default function NewsScreen() {
     const run = async () => {
       setLoading(true);
       try {
+        if (isAndroid) {
+          const [list, highlights] = await Promise.all([
+            newsApi.list({ category: category || undefined, page: 1, limit: 18 }),
+            category ? Promise.resolve({ featured: null }) : newsApi.featured({ limit: 1 }).catch(() => ({ featured: null })),
+          ]);
+          if (cancelled) return;
+          setFeatured(highlights.featured);
+          setItems(list.data || []);
+          return;
+        }
         const f = await newsApi.featured({ limit: 9 });
         const list = await newsApi.list({ category: category || undefined, page: 1, limit: 18 });
         const t = await newsApi.trending();
@@ -143,6 +156,18 @@ export default function NewsScreen() {
   for (let i = 0; i < grid.length; i += columns) {
     chunks.push(grid.slice(i, i + columns));
   }
+
+  if (isAndroid) return <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <Header black={blackHeader} activeSection="Noticias" onProfilePress={() => navigateByLabel('Perfil')}
+      onSearchPress={() => navigateByLabel('Buscar')} onNavPress={navigateByLabel} />
+    <View style={{ height: headerHeight }} />
+    <AndroidNewsFeed items={items} featured={featured} loading={loading} colors={colors} bottomInset={insets.bottom}
+      category={category} categories={categories} onCategoryChange={setCategory} onOpen={article => {
+        if (article.external_url && /^https?:\/\//i.test(article.external_url)) {
+          void Linking.openURL(article.external_url).catch(() => Alert.alert('No se pudo abrir la noticia', 'Inténtalo de nuevo en un momento.'));
+        } else navigation.navigate('NewsDetail', { slug: String(article.slug || article.id) });
+      }} />
+  </View>;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

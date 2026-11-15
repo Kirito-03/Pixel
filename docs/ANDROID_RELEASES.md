@@ -43,3 +43,5 @@ Compilar solo una cosa a la vez. No ejecutar el emulador durante la compilación
 La versión 1.0.4 (código 5) incluye el reproductor inmersivo, restauración de orientación, correcciones de botones Android y manga, siguiente capítulo al final y documentos legales integrados. El comprobador instalado desde 1.0.3 avisa al abrir o volver tras seis horas; Perfil → Preferencias → Buscar actualización permite hacerlo inmediatamente. Android siempre pide confirmar la instalación. Una APK anterior a 1.0.3 debe actualizarse manualmente una vez.
 
 Versión publicada más reciente:1.0.5/código6 (15nov2026). Lector con enlaces limpios, imágenes originales en AndroidWebView, caché persistente de páginas, precarga/reintentos y controles de video reorganizados. Descarga por el manifiesto público; ver docs/brain/2026-11-15-lector-manga-y-controles.md para validación y límites.
+
+Actualización1.0.6/código7: Noticias compactas específicas de Android. Ver docs/brain/2026-11-15-noticias-android-compactas.md.
