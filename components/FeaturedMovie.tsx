@@ -22,7 +22,8 @@ interface Props {
 export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }: Props) {
   const { theme, colors } = useTheme();
   const { width, height } = useWindowDimensions();
-  const isSmallScreen = width < 768;
+  const [layoutWidth, setLayoutWidth] = useState(width);
+  const isSmallScreen = layoutWidth < 768;
   const isWeb = Platform.OS === 'web';
   const androidCompact = Platform.OS === 'android' && isSmallScreen;
   const { currentProfile } = useProfile();
@@ -99,7 +100,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.5)', 'transparent'];
 
   return (
-    <View style={[styles.container, { width, height: isSmallScreen ? height * 0.75 : height * 0.9 }]}>
+    <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: isSmallScreen ? height * 0.75 : height * 0.9 }]}>
       <Image
         source={{ uri: imageUri }}
         style={StyleSheet.absoluteFillObject}
@@ -262,6 +263,8 @@ const styles = StyleSheet.create({
   },
   content: {
     zIndex: 2,
+    width: '100%',
+    minWidth: 0,
   },
   statusBadge: {
     alignSelf: 'flex-start',
@@ -346,6 +349,8 @@ const styles = StyleSheet.create({
   },
   playButton: {
     flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -364,6 +369,8 @@ const styles = StyleSheet.create({
   },
   infoButton: {
     flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

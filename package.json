@@ -10,7 +10,9 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f backend",
-    "docker:rebuild": "docker-compose build --no-cache backend && docker-compose up -d backend"
+    "docker:rebuild": "docker-compose build --no-cache backend && docker-compose up -d backend",
+    "build:android": "node tools/build-limited.mjs android",
+    "build:web": "node tools/build-limited.mjs web"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -54,18 +55,18 @@ Nos reservamos el derecho de modificar o discontinuar el servicio (o cualquier p
   }, [type]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { borderBottomColor: colors.divider }]}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver" style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {content.split('\\n\\n').map((paragraph, index) => (
+        {content.trim().split(/\n\s*\n/).map((paragraph, index) => (
           <Text key={index} style={[styles.paragraph, { color: colors.text }]}>
-            {paragraph.replace(/\\*\\*/g, '')}
+            {paragraph.replace(/\*\*/g, '')}
           </Text>
         ))}
       </ScrollView>
@@ -89,11 +90,16 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
+    flex: 1,
+    marginHorizontal: 12,
     fontSize: 18,
     fontWeight: '700',
   },
   scrollContent: {
     padding: 24,
+    maxWidth: 900,
+    width: '100%',
+    alignSelf: 'center',
     paddingBottom: 40,
   },
   paragraph: {

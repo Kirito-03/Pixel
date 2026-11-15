@@ -312,6 +312,7 @@ type LinkRoutes = {
   SeleccionPerfil: undefined;
   Apariencia: undefined;
   Descargas: undefined;
+  LegalScreen: { type: 'terms' | 'privacy' };
   Principal: NavigatorScreenParams<{
     Inicio: undefined;
     Buscar: undefined;
@@ -363,6 +364,7 @@ const linking: LinkingOptions<LinkRoutes> = {
       },
       Apariencia: 'appearance',
       Descargas: 'downloads',
+      LegalScreen: 'legal/:type',
       Admin: {
         screens: {
           AdminLogin: 'admin/login',

@@ -573,6 +573,8 @@ export default function NSFWScreen() {
           visible={showPlayer}
           animationType="slide"
           presentationStyle="fullScreen"
+          statusBarTranslucent
+          navigationBarTranslucent
           onRequestClose={closePlayer}
         >
           <HentaiVideoPlayer

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, AppState, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, AppState, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimeArtwork from './AnimeArtwork';
@@ -17,6 +17,7 @@ export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DES
   const compact = width < 768;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [interaction, setInteraction] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(true);
   const [active, setActive] = useState(AppState.currentState === 'active');
   useEffect(() => { setIndex(0); }, [items]);
@@ -31,13 +32,13 @@ export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DES
     if (items.length < 2 || paused || reducedMotion || !active) return;
     const timer = setInterval(() => setIndex(current => (current + 1) % items.length), 7000);
     return () => clearInterval(timer);
-  }, [items.length, paused, reducedMotion, active]);
+  }, [items.length, paused, reducedMotion, active, interaction]);
   if (!items.length) return null;
   const selected = Math.min(index, items.length - 1);
   const item = items[selected];
   const gutter = Math.max(compact ? 20 : 40, (width - 1120) / 2 + 20);
-  const go = (direction: number) => { setPaused(true); setIndex(current => (current + direction + items.length) % items.length); };
-  return <Pressable accessibilityRole="none" onHoverIn={() => setPaused(true)} onHoverOut={() => setPaused(false)} style={[styles.hero, { height: compact ? 460 : Math.max(480, Math.min(height * 0.74, 660)) }]}>
+  const go = (direction: number) => { setInteraction(value => value + 1); setIndex(current => (current + direction + items.length) % items.length); };
+  return <Pressable accessibilityRole="none" onHoverIn={() => { if (Platform.OS === 'web') setPaused(true); }} onHoverOut={() => setPaused(false)} style={[styles.hero, { height: compact ? 460 : Math.max(480, Math.min(height * 0.74, 660)) }]}>
     <AnimeArtwork banner={item.banner} poster={item.poster} />
     <LinearGradient pointerEvents="none" colors={['rgba(8,8,8,0.75)', 'rgba(8,8,8,0.2)', 'transparent']} locations={[0, 0.22, 0.5]} style={StyleSheet.absoluteFill} />
     <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
@@ -52,7 +53,7 @@ export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DES
     </View>
     {items.length > 1 ? <View style={[styles.navigation, { left: gutter, right: gutter }]}>
       <View style={styles.dots}>
-        {items.map((entry, i) => <TouchableOpacity key={entry.key} accessibilityRole="button" accessibilityLabel={`Mostrar destacado ${i + 1} de ${items.length}`} accessibilityState={{ selected: i === selected }} onPress={() => { setPaused(true); setIndex(i); }} style={[styles.dotTarget, compact && { minWidth: 24, paddingHorizontal: 3 }]}>
+        {items.map((entry, i) => <TouchableOpacity key={entry.key} accessibilityRole="button" accessibilityLabel={`Mostrar destacado ${i + 1} de ${items.length}`} accessibilityState={{ selected: i === selected }} onPress={() => { setInteraction(value => value + 1); setIndex(i); }} style={[styles.dotTarget, compact && { minWidth: 24, paddingHorizontal: 3 }]}>
           <View style={[styles.dot, compact && { width: 18 }, { backgroundColor: i === selected ? '#E50914' : 'rgba(255,255,255,0.38)' }]} />
         </TouchableOpacity>)}
       </View>

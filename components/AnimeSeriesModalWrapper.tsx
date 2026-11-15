@@ -162,6 +162,8 @@ export default function AnimeSeriesModalWrapper({
           transparent={false}
           animationType="slide"
           statusBarTranslucent
+          navigationBarTranslucent
+          onRequestClose={handleCloseEpisodePlayer}
         >
           <EpisodePlayer
             episode={selectedEpisode}

@@ -346,6 +346,12 @@ export default function MangaReaderScreen() {
             ) : (
               <View style={styles.footerEnd}>
                 <Text style={styles.footerText}>Fin del capítulo</Text>
+                {canNextChapter ? <TouchableOpacity
+                  accessibilityRole="button" accessibilityLabel="Siguiente capítulo"
+                  onPress={openNextChapter} style={styles.nextChapterButton}>
+                  <Text style={styles.nextChapterText}>Siguiente capítulo</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </TouchableOpacity> : <Text style={styles.footerText}>No hay más capítulos disponibles.</Text>}
               </View>
             )
           }
@@ -424,7 +430,9 @@ const styles = StyleSheet.create({
   errorPage: { minHeight: 260, alignItems: 'center', justifyContent: 'center', gap: 8 },
   errorPageText: { color: 'rgba(255,255,255,0.62)', fontWeight: '700', fontSize: 12 },
   footerLoading: { alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 18 },
-  footerEnd: { alignItems: 'center', justifyContent: 'center', paddingVertical: 18 },
+  footerEnd: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, paddingHorizontal: 20, gap: 16 },
+  nextChapterButton: { minHeight: 50, maxWidth: 360, width: '100%', backgroundColor: '#E50914', paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  nextChapterText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   footerText: { color: 'rgba(255,255,255,0.58)', fontWeight: '700', fontSize: 12 },
   errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   errorText: { color: 'rgba(255,255,255,0.68)', fontWeight: '700', fontSize: 13, paddingHorizontal: 18, textAlign: 'center' },

@@ -3,6 +3,8 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
+// Leave memory and CPU available for the desktop during native/web exports.
+config.maxWorkers = 1;
 
 // ── Platform-specific module resolution ────────────────────────
 // Ensure Metro correctly prioritizes .web.tsx on web and .tsx on native.

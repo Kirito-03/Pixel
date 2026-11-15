@@ -7,9 +7,8 @@ La APK 1.0.3 (código 4) incluye el comprobador. Las instalaciones anteriores ne
 
    ```bash
    node tools/android-release.mjs prepare
-   cd android
-   ./gradlew :app:assembleRelease
-   cd ..
+   # JAVA_HOME debe apuntar a JDK 21; ANDROID_HOME al SDK local.
+   npm run build:android
    ```
 
 3. Prepara el paquete. Este comando comprueba identidad, versión y certificado contra las instalaciones anteriores; genera la APK y `latest.json` en una carpeta fuera de Git:
@@ -33,3 +32,12 @@ La APK 1.0.3 (código 4) incluye el comprobador. Las instalaciones anteriores ne
 Los binarios/manifiestos no forman parte de `dist` ni de Git, por lo que un despliegue web no los sustituye. El backend ofrece solo el archivo de la publicación validada. La URL de descarga incluye el código: un enlace obsoleto devuelve 409 para evitar descargar una APK diferente a la anunciada.
 
 Se mantiene el certificado de desarrollo que ya usaban las APK instaladas. Antes de una distribución amplia hay que planificar una firma de producción y su transición; no sustituir la clave durante una actualización normal. El archivo `config/android-release-certificate.sha256` contiene únicamente la huella pública de continuidad.
+
+
+## Evitar bloqueos de la laptop (15 de noviembre de 2026)
+
+Compilar solo una cosa a la vez. No ejecutar el emulador durante la compilación. `npm run build:android` y `npm run build:web -- --output-dir <carpeta>` comparten bloqueo y usan un scope de systemd: máximo equivalente a dos CPU, prioridad baja, MemoryHigh=3 GiB, MemoryMax=4 GiB y máximo 512 MiB de swap. Gradle tiene un trabajador, sin tareas paralelas ni daemon persistente; Metro usa un trabajador. El flujo comprueba al menos 5 GiB de memoria disponible antes de empezar. Un límite puede hacer fallar la compilación; no se aumenta automáticamente.
+
+`node tools/build-limited.mjs check` comprueba los límites efectivos del kernel sin compilar. Requiere Linux con systemd de usuario y cgroup v2. Abrir el emulador después de construir. Las invocaciones directas de Gradle desde el IDE tienen las restricciones de trabajadores del proyecto, pero el límite total de memoria/CPU requiere el flujo anterior.
+
+La versión 1.0.4 (código 5) incluye el reproductor inmersivo, restauración de orientación, correcciones de botones Android y manga, siguiente capítulo al final y documentos legales integrados. El comprobador instalado desde 1.0.3 avisa al abrir o volver tras seis horas; Perfil → Preferencias → Buscar actualización permite hacerlo inmediatamente. Android siempre pide confirmar la instalación. Una APK anterior a 1.0.3 debe actualizarse manualmente una vez.

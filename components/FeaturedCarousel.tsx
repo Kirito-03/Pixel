@@ -108,7 +108,7 @@ export default function FeaturedCarousel({ movies, onWatch, onMoreInfo }: Props)
   }
 
   return (
-    <View style={[styles.container, { width }]}>
+    <View style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%' }]}>
       {(Platform.OS === 'android' || Platform.OS === 'web') ? (
         // --- VISTA ANDROID & WEB (FADE) ---
         <View {...panResponder.panHandlers} style={{ flex: 1 }}>

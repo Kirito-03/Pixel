@@ -10,12 +10,12 @@ import {
   AppState,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as NavigationBar from 'expo-navigation-bar';
+import { useImmersivePlayer } from '../hooks/useImmersivePlayer';
+import PlayerSystemBars from './PlayerSystemBars';
 import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import { AnimeEpisode, VideoSource } from '../types';
 import { progressApi } from '../services/progressApi';
 
@@ -185,7 +185,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }} onTouchStart={resetControlsTimer}>
-      <StatusBar hidden={true} translucent={true} />
+      <PlayerSystemBars /><StatusBar hidden={true} translucent={true} />
       <VideoView
         player={player}
         style={{ flex: 1 }}
@@ -499,36 +499,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, []);
 
-  // ── Pantalla Completa (Inmersiva) ────────────────────────────
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      try {
-        NavigationBar.setVisibilityAsync("hidden");
-        NavigationBar.setBehaviorAsync("overlay-swipe");
-      } catch (e) {}
-    }
-    return () => {
-      if (Platform.OS === 'android') {
-        try {
-          NavigationBar.setVisibilityAsync("visible");
-        } catch (e) {}
-      }
-    };
-  }, []);
-
-  // ── Orientación: forzar landscape al entrar, restaurar al salir ──
-  useEffect(() => {
-    if (Platform.OS === 'android' || Platform.OS === 'ios') {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-        .catch(() => {});
-    }
-    return () => {
-      if (Platform.OS === 'android' || Platform.OS === 'ios') {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
-          .catch(() => {});
-      }
-    };
-  }, []);
+  useImmersivePlayer();
 
   // ── HLS (web) ────────────────────────────────────────────────
   useEffect(() => {
@@ -668,7 +639,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     if (!isDirectVideo) {
       return (
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <StatusBar hidden={true} translucent={true} />
+          <PlayerSystemBars /><StatusBar hidden={true} translucent={true} />
           <WebView
             ref={webViewRef}
             source={{ uri: videoUrl }}
@@ -794,7 +765,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   if (loading) {
     return (
       <View style={styles.container}>
-        <StatusBar hidden />
+        <PlayerSystemBars /><StatusBar hidden />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#e50914" />
           <Text style={styles.loadingText}>Cargando episodio...</Text>
@@ -806,7 +777,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   if (error) {
     return (
       <View style={styles.container}>
-        <StatusBar hidden />
+        <PlayerSystemBars /><StatusBar hidden />
         <LinearGradient
           colors={['#0a0a0a', '#1a0000', '#0a0a0a']}
           style={styles.errorContainer}
@@ -830,7 +801,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container} {...webContainerProps as any}>
-        <StatusBar hidden />
+        <PlayerSystemBars /><StatusBar hidden />
         <View style={styles.videoFullscreen}>
           {renderVideoPlayer}
         </View>
@@ -874,7 +845,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   // ── Mobile: NativeVideoPlayer fills entire screen ────────────
   return (
     <View style={styles.container}>
-      <StatusBar hidden />
+      <PlayerSystemBars /><StatusBar hidden />
       <View style={styles.videoFullscreen}>
         {renderVideoPlayer}
       </View>

@@ -18,7 +18,7 @@ test('Android pause reflects player events, stays visible while paused and advan
   const source=ts.transpileModule(fs.readFileSync(new URL('../components/EpisodePlayer.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
   vm.runInNewContext(source,{exports,setTimeout:fn=>{timers.set(++clock,fn);return clock;},clearTimeout:id=>timers.delete(id),setInterval:()=>1,clearInterval(){},require(name){
     if(name==='react')return react;if(name==='react-native')return native;
-    if(name==='expo-video')return{useVideoPlayer:()=>player,VideoView:'VideoView'};
+    if(name==='../hooks/useImmersivePlayer')return{useImmersivePlayer(){}};if(name==='expo-video')return{useVideoPlayer:()=>player,VideoView:'VideoView'};
     if(name==='expo-status-bar')return{StatusBar:'StatusBar'};
     if(name==='expo-linear-gradient')return{LinearGradient:'LinearGradient'};
     if(name==='@expo/vector-icons')return{Ionicons:'Ionicons'};
@@ -151,6 +151,7 @@ function createPlayerHarness(overrides = {}) {
     require(name) {
       if (name === 'react') return react;
       if (name === 'react-native') return native;
+      if (name === '../hooks/useImmersivePlayer') return { useImmersivePlayer() {} };
       if (name === 'expo-video') return { useVideoPlayer: () => player, VideoView: 'VideoView' };
       if (name === 'expo-status-bar') return { StatusBar: 'StatusBar' };
       if (name === 'expo-linear-gradient') return { LinearGradient: 'LinearGradient' };

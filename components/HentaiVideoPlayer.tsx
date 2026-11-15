@@ -10,8 +10,8 @@ import {
   Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as NavigationBar from 'expo-navigation-bar';
-import * as ScreenOrientation from 'expo-screen-orientation';
+import { useImmersivePlayer } from '../hooks/useImmersivePlayer';
+import PlayerSystemBars from './PlayerSystemBars';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { EMBEDDED_PLAYER_BRIDGE, shouldAllowEmbeddedNavigation } from '../utils/embeddedPlayerBridge';
@@ -53,6 +53,7 @@ export default function HentaiVideoPlayer({
   onRetry,
 }: HentaiVideoPlayerProps) {
   const isWeb = Platform.OS === 'web';
+  useImmersivePlayer();
   const [activeServer, setActiveServer] = useState<VideoServer | null>(
     servers.length > 0 ? servers[0] : null
   );
@@ -106,35 +107,6 @@ export default function HentaiVideoPlayer({
     [clearHideTimer, controlsOpacity, scheduleHide]
   );
 
-  // Lock landscape & hide system bars on Android/iOS while player is mounted
-  useEffect(() => {
-    if (isWeb) return;
-    let active = true;
-    (async () => {
-      try {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-      } catch {
-        // Ignore orientation lock failures on unsupported devices
-      }
-      try {
-        if (Platform.OS === 'android') {
-          await NavigationBar.setVisibilityAsync('hidden');
-        }
-      } catch {
-        // Ignore navigation bar failures
-      }
-    })();
-
-    return () => {
-      if (!active) return;
-      active = false;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
-      if (Platform.OS === 'android') {
-        NavigationBar.setVisibilityAsync('visible').catch(() => {});
-      }
-    };
-  }, [isWeb]);
-
   useEffect(() => {
     const nextServer = servers.length > 0 ? servers[0] : null;
     setActiveServer(nextServer);
@@ -150,12 +122,6 @@ export default function HentaiVideoPlayer({
 
   const handleClose = useCallback(() => {
     clearHideTimer();
-    if (!isWeb) {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
-      if (Platform.OS === 'android') {
-        NavigationBar.setVisibilityAsync('visible').catch(() => {});
-      }
-    }
     onClose();
   }, [clearHideTimer, isWeb, onClose]);
 
@@ -167,6 +133,7 @@ export default function HentaiVideoPlayer({
 
   return (
     <View style={styles.container} {...webMouseProps}>
+      <PlayerSystemBars />
       {!isWeb && <StatusBar hidden={true} translucent={true} />}
 
       {/* Fullscreen Video Area */}
@@ -237,10 +204,10 @@ export default function HentaiVideoPlayer({
                   try {
                     const msg = JSON.parse(event.nativeEvent.data);
                     if (msg?.type === 'pixel:player' && msg.canControl) {
-                      if (!msg.playing) {
+                      if (!msg.playing && !isPausedRef.current) {
                         isPausedRef.current = true;
                         showControls(false);
-                      } else {
+                      } else if (msg.playing && isPausedRef.current) {
                         isPausedRef.current = false;
                         showControls(true);
                       }

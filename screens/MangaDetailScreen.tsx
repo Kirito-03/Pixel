@@ -280,7 +280,7 @@ export default function MangaDetailScreen() {
                     disabled={!chapters.length}
                   >
                     <Ionicons name="play" size={18} color="#000" />
-                    <Text style={styles.primaryText}>{primaryButtonLabel}</Text>
+                    <Text numberOfLines={2} style={[styles.primaryText, { flexShrink: 1, textAlign: 'center' }]}>{primaryButtonLabel}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -299,7 +299,7 @@ export default function MangaDetailScreen() {
                     }}
                   >
                     {savingList ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color="#fff" />}
-                    <Text style={styles.secondaryText}>{savingList ? 'Guardando…' : isInMyList(id, 'manga') ? 'En mi lista' : 'Mi lista'}</Text>
+                    <Text numberOfLines={2} style={[styles.secondaryText, { flexShrink: 1, textAlign: 'center' }]}>{savingList ? 'Guardando…' : isInMyList(id, 'manga') ? 'En mi lista' : 'Mi lista'}</Text>
                   </TouchableOpacity>
 
                 </View>
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   heroContentMobile: {
     flexDirection: 'column',
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   posterContainer: {
     borderRadius: 0,
@@ -469,6 +469,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   posterMobile: {
+    alignSelf: 'center',
     width: 180,
     height: 270,
     marginBottom: 24,
@@ -486,7 +487,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoMobile: {
-    alignItems: 'center',
+    alignItems: 'stretch',
+    width: '100%',
+    minWidth: 0,
     textAlign: 'center',
   },
   title: {
@@ -549,6 +552,8 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     flex: 1,
+    minWidth: 0,
+    flexBasis: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -568,6 +573,8 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     flex: 1,
+    minWidth: 0,
+    flexBasis: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

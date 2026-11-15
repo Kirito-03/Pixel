@@ -46,3 +46,10 @@ El JDK de esa ruta vive en el directorio de trabajo del chat; si se limpia ese d
 El AVD pudo arrancar y aparecer enADB, pero no se mantuvo conectado en la comprobación final. No se declara instalación/ejecución final del APK ni loginAndroid verificados. La revisión con navegador390px sirve para responsive, no sustituye el emulador real.
 
 Comprobar en el AVD: acceso y perfiles, barra inferior/safeareas, botónAtrás, carruseles táctiles, detalles, trailer silenciado a3segundos, reproducciónAV1 del archivoautorizado, lector y administración. El proveedor del manga probado devuelve403 para páginas; tampoco se da esa lectura por reparada.
+
+
+## Validación y límites nuevos — 15 de noviembre de 2026
+
+Para próximas APK usar `npm run build:android` con el JDK 21 anterior y `ANDROID_HOME` configurados, en lugar de la llamada directa a Gradle de esta nota histórica. No arrancar el AVD hasta que termine el build. Los límites están descritos en `docs/ANDROID_RELEASES.md`.
+
+Se instaló la APK release 1.0.4/5 en el AVD API 37 y se ejecutó instrumentación nativa, usando la clase real `PlayerSystemBarsView` empaquetada en la APK: ambas barras comienzan visibles, se ocultan al adjuntar la vista dentro de un Dialog y se restauran al retirarla. Resultado PASS. Fuente: `tools/android-tests/PlayerBarsInstrumentation.java`, APK auxiliar de prueba fuera de Git. Esta prueba usa una ventana vacía; no autentica cuentas ni reproduce contenido real. Los recorridos completos de reproducción en el teléfono del usuario siguen pendientes.
