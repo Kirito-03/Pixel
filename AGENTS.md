@@ -6,3 +6,4 @@
 - Los archivos nativos de `android/` son generados e ignorados. Los cambios nativos duraderos viven en `plugins/` y sus config plugins. `withPlayerSystemBars` registra la vista del reproductor y configura Gradle para trabajo secuencial.
 - No incluir secretos, archivos `.env`, configuraciones Google locales ni binarios APK en Git. Publicar la APK completa y comprobar SHA256 antes de reemplazar el manifiesto público.
 - Registrar cambios y validaciones en `docs/brain/`, distinguiendo pruebas reales de pendientes.
+- El emulador con SwiftShader también presiona la memoria/swap de esta laptop: cerrar después de la prueba. Cualquier ejecución futura debe limitar también `MemorySwapMax` (por ejemplo 256 MiB); si no cabe, preferir la comprobación manual en el dispositivo físico en lugar de ampliar límites.

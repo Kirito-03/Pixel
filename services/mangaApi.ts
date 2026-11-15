@@ -4,6 +4,7 @@ import { getCurrentBaseURL } from './db/networkClient';
 function normalizeCover<T extends { cover_url?: string | null }>(manga: T): T {
   const cover = manga?.cover_url;
   if (!manga || !cover) return manga;
+  if (cover.includes('/api/proxy/manga-image?')) return cover.startsWith('/') ? { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}${cover}` } : manga;
   if (cover.startsWith('/api/manga-cover?')) {
     return { ...manga, cover_url: `${getCurrentBaseURL().replace(/\/$/, '')}${cover}&v=2` };
   }
@@ -87,12 +88,12 @@ export const mangaApi = {
   },
 
   async chapters(id: string, params?: { limit?: number; preferredLanguage?: string; allowEnglishFallback?: boolean; refresh?: boolean }) {
-    const { data } = await backendClient.get(`/api/manga/${id}/chapters`, { params });
+    const { data } = await backendClient.get(`/api/manga/${id}/chapters`, { params, cache: false });
     return data as MangaChaptersResponse;
   },
 
-  async chapterPages(chapterId: string) {
-    const { data } = await backendClient.get(`/api/manga/chapter/${encodeURIComponent(chapterId)}/pages`);
+  async chapterPages(chapterId: string, options: { signal?: AbortSignal } = {}) {
+    const { data } = await backendClient.get(`/api/manga/chapter/${encodeURIComponent(chapterId)}/pages`, { cache: false, signal: options.signal, timeout: 30000 });
     if (data && Array.isArray(data.pages)) {
       data.pages = data.pages.map((p: string) => {
         if (p.startsWith('/')) {

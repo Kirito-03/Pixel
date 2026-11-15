@@ -35,3 +35,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-14-perfil-admin-actualizaciones]]: Perfil unificado, tema persistente, manga de Mi Lista, administración adaptable y avisos de APK 1.0.3.
 
 - [[2026-11-15-android-inmersivo-y-compilacion]]: APK1.0.4, barras inmersivas, manga, documentos legales y límites para no saturar la laptop.
+
+- [[2026-11-15-lector-manga-y-controles]]: APK1.0.5, navegación clara, direcciones limpias, carga anticipada/reintentos y caché de páginas en PostgreSQL.

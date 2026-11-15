@@ -1,0 +1,29 @@
+const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
+
+export function nativeReaderHtml(pages: string[], previous?: string | null, next?: string | null) {
+  const nav = () => `<nav aria-label="Navegación de capítulos"><button ${previous == null ? 'disabled' : ''} onclick="send('previous')">← Anterior<small>${previous == null ? 'Primer capítulo' : `Capítulo ${escape(previous)}`}</small></button><button class="next" ${next == null ? 'disabled' : ''} onclick="send('next')">Siguiente capítulo →<small>${next == null ? 'No hay más capítulos' : `Capítulo ${escape(next)}`}</small></button></nav>`;
+  return `<!doctype html><html lang="es"><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5"><meta name="referrer" content="same-origin"><style>
+  *{box-sizing:border-box}body{margin:0;background:#080808;color:#fff;font:14px system-ui,sans-serif}nav{display:flex;gap:12px;max-width:840px;margin:auto;padding:20px}button{font:inherit;cursor:pointer;border:0;color:#fff;background:#252525;padding:14px;min-height:52px}nav button{flex:1;font-weight:700;min-width:0}small{display:block;font-size:11px;font-weight:400;margin-top:5px;color:#ddd}button.next{background:#e50914}button:disabled{opacity:.38}.page{position:relative;max-width:800px;margin:auto;min-height:360px;background:#111}.page img{display:block;width:100%;height:auto}.state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#bbb;padding:20px;text-align:center}.page.loaded{min-height:0}.page.loaded .state{display:none}.spinner{width:24px;height:24px;border:2px solid #333;border-top-color:#e50914;border-radius:50%;animation:spin 1s linear infinite}.retry{display:none}.page.failed .retry{display:block}.page.failed img{visibility:hidden}.end{text-align:center;color:#999;margin-top:30px}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+  </style></head><body>${nav()}${pages.map((uri, page) => `<section class="page" data-page="${page + 1}"><img data-src="${escape(uri)}" alt="Página ${page + 1}" decoding="async"><div class="state"><span class="spinner"></span><span class="message">Página ${page + 1} · Cargando…</span><button class="retry" onclick="retry(this.closest('.page'))">Reintentar ahora</button></div></section>`).join('')}<p class="end">Fin del capítulo</p>${nav()}<script>
+  function send(type,value){window.ReactNativeWebView.postMessage(JSON.stringify({type:type,value:value}));}
+  var active=true;
+  function retry(page){
+    if(!active||page.classList.contains('loaded'))return;
+    clearTimeout(page.timer);page.classList.remove('failed');page.querySelector('.message').textContent='Página '+page.dataset.page+' · Cargando…';
+    var img=page.querySelector('img'),url=img.dataset.src;
+    page.attempt=(page.attempt||0)+1;
+    try{var parsed=new URL(url);if(page.attempt>1&&parsed.pathname==='/api/proxy/manga-image'){parsed.searchParams.set('_retry',page.attempt);url=parsed.href;}}catch(e){}
+    img.src=url;page.timer=setTimeout(function(){failed(page)},30000);
+  }
+  function failed(page){
+    if(page.classList.contains('loaded'))return;
+    clearTimeout(page.timer);page.timer=null;page.classList.add('failed');page.querySelector('.message').textContent='Página '+page.dataset.page+' · Reintentando la imagen…';
+    if(active&&page.near)page.timer=setTimeout(function(){retry(page)},Math.min(30000,3000*Math.pow(2,Math.min(4,(page.attempt||1)-1))));
+  }
+  var pages=Array.from(document.querySelectorAll('.page'));
+  var observer=new IntersectionObserver(function(entries){entries.forEach(function(entry){var page=entry.target;page.near=entry.isIntersecting;if(page.near&&!page.classList.contains('loaded')&&!page.timer)retry(page);});},{rootMargin:'1600px 0px'});
+  pages.forEach(function(page){var img=page.querySelector('img');img.onload=function(){clearTimeout(page.timer);page.timer=null;page.classList.remove('failed');page.classList.add('loaded');page.style.maxWidth=Math.min(800,img.naturalWidth)+'px';};img.onerror=function(){failed(page)};observer.observe(page);});
+  window.pixelReaderActive=function(value){active=value;pages.forEach(function(page){clearTimeout(page.timer);page.timer=null;if(active&&page.near&&!page.classList.contains('loaded'))retry(page);});};
+  var queued=false;document.addEventListener('scroll',function(){if(queued)return;queued=true;requestAnimationFrame(function(){queued=false;var current=1;pages.forEach(function(page){if(page.getBoundingClientRect().top<innerHeight*.4)current=Number(page.dataset.page);});send('page',current);});},{passive:true});
+  </script></body></html>`;
+}

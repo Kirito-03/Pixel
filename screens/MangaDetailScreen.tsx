@@ -1,3 +1,5 @@
+import { useReaderImage } from '../hooks/useReaderImage';
+import { mangaChapterKey, rememberMangaReader } from '../utils/mangaChapterNavigation';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +48,7 @@ export default function MangaDetailScreen() {
   const [preferredLanguage, setPreferredLanguage] = useState<'es' | 'es-la' | 'en'>('es');
   const [allowEnglishFallback, setAllowEnglishFallback] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const coverImage = useReaderImage(manga?.cover_url || '');
   const [readingProgress, setReadingProgress] = useState<MangaReadingProgress | null>(null);
 
   const loadProgress = useCallback(async () => {
@@ -161,15 +164,8 @@ export default function MangaDetailScreen() {
       chapterNumber: String(chapter.chapter ?? ''),
       updatedAt: Date.now(),
     });
-    const lang = selectedLanguage || preferredLanguage || 'es';
-    navigation.navigate('MangaReader', {
-      id,
-      mangaId: id,
-      chapterId: encodeURIComponent(chapter.id),
-      language: lang,
-      selectedLanguage: lang,
-      mangaTitle: manga?.title || 'Manga',
-    });
+    rememberMangaReader(id, manga?.title || 'Manga', chapters);
+    navigation.navigate('MangaReader', { id, chapterKey: mangaChapterKey(chapter) });
   };
 
   const updatedText = manga?.updated_at ? formatDate(manga.updated_at) : '';
@@ -226,11 +222,16 @@ export default function MangaDetailScreen() {
 
             <View style={[styles.heroContent, isSmallScreen ? styles.heroContentMobile : styles.heroContentWeb]}>
               <View style={[styles.posterContainer, isSmallScreen ? styles.posterMobile : styles.posterWeb]}>
-                {manga.cover_url && !imageError ? (
-                  <Image source={{ uri: manga.cover_url }} style={styles.posterImage} resizeMode="cover" />
+                {manga.cover_url && !coverImage.failed ? (
+                  <>
+                    <Image key={coverImage.attempt} source={{ uri: coverImage.source }} style={styles.posterImage} resizeMode="cover" onLoad={coverImage.onLoad} onError={coverImage.onError} />
+                    {!coverImage.loaded && <ActivityIndicator color="#E50914" style={StyleSheet.absoluteFill} />}
+                  </>
                 ) : (
                   <View style={styles.posterFallback}>
                     <Ionicons name="image-outline" size={40} color="rgba(255,255,255,0.2)" />
+                    <Text style={{ color: '#aaa', fontSize: 12, marginTop: 12 }}>Reintentando portada…</Text>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar portada" onPress={coverImage.retry} style={{ padding: 12, minHeight: 44 }}><Text style={{ color: '#fff' }}>Reintentar ahora</Text></TouchableOpacity>
                   </View>
                 )}
               </View>
@@ -318,26 +319,7 @@ export default function MangaDetailScreen() {
                   ) : null}
                 </View>
 
-                <View style={styles.languageControls}>
-                  <TouchableOpacity
-                    accessibilityRole="button" accessibilityLabel="Capítulos en español"
-                    accessibilityState={{ selected: selectedLanguage === 'es' || selectedLanguage === 'es-la' }}
-                    activeOpacity={0.9}
-                    onPress={() => setPreferredLanguage('es')}
-                    style={[styles.langChip, selectedLanguage?.startsWith('es') && styles.langChipActive]}
-                  >
-                    <Text style={[styles.langChipText, selectedLanguage?.startsWith('es') && styles.langChipTextActive]}>ES</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    accessibilityRole="button" accessibilityLabel="Capítulos en inglés"
-                    accessibilityState={{ selected: selectedLanguage === 'en' }}
-                    activeOpacity={0.9}
-                    onPress={() => setPreferredLanguage('en')}
-                    style={[styles.langChip, selectedLanguage === 'en' && styles.langChipActive]}
-                  >
-                    <Text style={[styles.langChipText, selectedLanguage === 'en' && styles.langChipTextActive]}>EN</Text>
-                  </TouchableOpacity>
-                </View>
+
               </View>
 
               {languageNotice ? (

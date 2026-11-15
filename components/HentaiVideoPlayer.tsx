@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useImmersivePlayer } from '../hooks/useImmersivePlayer';
 import PlayerSystemBars from './PlayerSystemBars';
@@ -53,6 +55,7 @@ export default function HentaiVideoPlayer({
   onRetry,
 }: HentaiVideoPlayerProps) {
   const isWeb = Platform.OS === 'web';
+  const compact = useWindowDimensions().width < 600;
   useImmersivePlayer();
   const [activeServer, setActiveServer] = useState<VideoServer | null>(
     servers.length > 0 ? servers[0] : null
@@ -261,20 +264,7 @@ export default function HentaiVideoPlayer({
             onPress={() => showControls(true)}
             {...(isWeb ? ({ onMouseEnter: () => showControls(true) } as any) : {})}
           />
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Mostrar selector de servidor"
-            style={[styles.cornerRevealPill, isWeb && ({ cursor: 'pointer' } as any)]}
-            activeOpacity={0.85}
-            onPress={() => {
-              setServerMenuOpen(true);
-              showControls(false);
-            }}
-            {...(isWeb ? ({ onMouseEnter: () => showControls(true) } as any) : {})}
-          >
-            <Ionicons name="server-outline" size={14} color="#fff" />
-            <Text style={styles.cornerRevealText}>{activeServer?.server || 'Servidor'}</Text>
-          </TouchableOpacity>
+
         </View>
       )}
 
@@ -283,20 +273,21 @@ export default function HentaiVideoPlayer({
         style={[styles.overlayWrap, { opacity: controlsOpacity }]}
         pointerEvents={controlsVisible ? 'box-none' : 'none'}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Volver a detalles de la serie"
-            style={[styles.backButton, isWeb && ({ cursor: 'pointer' } as any)]}
-            onPress={handleClose}
-          >
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {animeTitle} - Ep {episodeNumber}
-            </Text>
-          </TouchableOpacity>
+        <LinearGradient colors={['rgba(0,0,0,0.88)', 'transparent']} style={styles.headerGradient} pointerEvents="box-none">
+          <View style={styles.header}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a detalles de la serie" style={styles.backButton} onPress={handleClose}>
+              <Ionicons name="arrow-back" size={23} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.titleCopy}>
+              <Text style={styles.eyebrow}>AHORA ESTÁS VIENDO</Text>
+              <Text style={styles.headerTitle} numberOfLines={2}>{animeTitle}</Text>
+              <Text style={styles.episodeLabel}>Episodio {episodeNumber}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+        <View style={[styles.playbackToolbar, compact && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+          <View style={[styles.headerActions, compact && { justifyContent: 'space-between' }]}>
 
-          <View style={styles.headerActions}>
             {hasPreviousEpisode && onPreviousEpisode && (
               <TouchableOpacity
                 accessibilityRole="button"
@@ -335,6 +326,7 @@ export default function HentaiVideoPlayer({
               </TouchableOpacity>
             )}
 
+          </View>
             {!loadingServers && !error && servers && servers.length > 0 && (
               <TouchableOpacity
                 accessibilityRole="button"
@@ -357,7 +349,7 @@ export default function HentaiVideoPlayer({
               >
                 <Ionicons name="server-outline" size={15} color="#fff" />
                 <Text style={styles.serverCornerBtnText} numberOfLines={1}>
-                  {activeServer?.server || 'Servidor'}
+                  {`Servidor · ${activeServer?.server || 'Elegir'}`}
                 </Text>
                 <Ionicons
                   name={serverMenuOpen ? 'chevron-up' : 'chevron-down'}
@@ -366,7 +358,6 @@ export default function HentaiVideoPlayer({
                 />
               </TouchableOpacity>
             )}
-          </View>
         </View>
 
         {/* Corner Server Dropdown */}
@@ -514,32 +505,19 @@ const styles = StyleSheet.create({
   overlayWrap: {
     position: 'absolute',
     top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
     zIndex: 30,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    gap: 10,
-  },
-  backButton: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 10,
-    flexShrink: 1,
-  },
+  headerGradient: { minHeight: 155, paddingBottom: 36 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 24, paddingTop: 22, gap: 16 },
+  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(20,20,20,0.6)' },
+  titleCopy: { flex: 1, minWidth: 0, maxWidth: 900, gap: 6 },
+  eyebrow: { color: '#bbb', fontSize: 9, fontWeight: '700', letterSpacing: 1.8 },
+  headerTitle: { color: '#fff', fontSize: 20, lineHeight: 26, fontWeight: '700' },
+  episodeLabel: { color: '#bbb', fontSize: 12 },
+  playbackToolbar: { position: 'absolute', left: 24, right: 24, bottom: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -550,9 +528,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 46,
+    borderRadius: 0,
   },
   navButtonSecondary: {
     backgroundColor: '#262626',
@@ -575,7 +554,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
-    maxWidth: 150,
+    maxWidth: 210,
+    minHeight: 46,
+    alignSelf: 'flex-end',
   },
   serverCornerBtnActive: {
     backgroundColor: '#E50914',
@@ -589,8 +570,8 @@ const styles = StyleSheet.create({
   },
   serverDropdown: {
     position: 'absolute',
-    top: 56,
-    right: 16,
+    bottom: 138,
+    right: 24,
     width: 210,
     maxHeight: 260,
     backgroundColor: 'rgba(18,18,18,0.96)',

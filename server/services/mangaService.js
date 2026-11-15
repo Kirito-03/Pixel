@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import axios from 'axios';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import net from 'net';
+import { createChapterPageLoader, bestMangaImageUrl } from './mangaPageCache.js';
 
 let launchCloak = null;
 try {
@@ -385,11 +386,7 @@ export async function scrapeMangaList(url) {
       title = title.substring(5).trim();
     }
 
-    let cover_url = $(el).find('img').attr('src') || $(el).find('img').attr('data-src');
-    if (!cover_url && $(el).find('img').attr('srcset')) {
-      cover_url = $(el).find('img').attr('srcset').split(',')[0].trim().split(' ')[0];
-    }
-    if (cover_url && cover_url.includes(' ')) cover_url = cover_url.split(' ')[0];
+    const cover_url = bestMangaImageUrl($(el).find('img').first(), BASE_URL);
 
     const statusText = $(el).find('.ac-status').text().trim().toLowerCase();
     const status = statusText.includes('ongoing') ? 'ongoing' : 'completed';
@@ -595,12 +592,7 @@ export async function getMangaDetail(pool, id) {
     if (!title) title = $('h1').text().replace(/^manga/i, '').trim();
     if (!title) return null;
 
-    let cover_url = $('.summary_image img, .tab-summary img, .wp-post-image, .c-poster img').first().attr('src') ||
-                    $('.summary_image img, .tab-summary img, .wp-post-image, .c-poster img').first().attr('data-src');
-    if (!cover_url && $('.summary_image img, .tab-summary img, .wp-post-image').first().attr('srcset')) {
-      cover_url = $('.summary_image img, .tab-summary img, .wp-post-image').first().attr('srcset').split(',')[0].trim().split(' ')[0];
-    }
-    if (cover_url && cover_url.includes(' ')) cover_url = cover_url.split(' ')[0];
+    const cover_url = bestMangaImageUrl($('.summary_image img, .tab-summary img, .wp-post-image, .c-poster img').first(), url);
 
     let description = $('.mbee38d1 p, .manga-excerpt, .summary__content, .description-summary, .post-content').text().trim();
     if (!description) {
@@ -839,42 +831,13 @@ export async function getMangaChapters(pool, id, { limit = 200, forceRefresh = f
     };
 }
 
-export async function getChapterPages(pool, chapterUrl) {
-  let url = String(chapterUrl || '').trim();
-  try {
-    while (url.includes('%')) {
-      const decoded = decodeURIComponent(url);
-      if (decoded === url) break;
-      url = decoded;
-    }
-  } catch {}
-  if (!url || !url.startsWith('http')) return null;
+const loadChapterPages = createChapterPageLoader({ fetchHtml: url => fetchHtmlWithCloak(url, '.reading-content') });
 
-  try {
-    const html = await fetchHtmlWithCloak(url, '.reading-content');
-    const $ = cheerio.load(html);
-    const pages = [];
-    
-    $('.reading-content img, .wp-manga-chapter-img').each((_, el) => {
-       const src = $(el).attr('data-src') || $(el).attr('src') || $(el).attr('data-lazy-src');
-       if (src && !pages.includes(src.trim()) && !src.includes('logo') && !src.includes('icon')) {
-         const clean = src.trim();
-         pages.push(`/api/proxy/manga-image?url=${encodeURIComponent(clean)}`);
-       }
-    });
-    
-    // Guardar el conteo de páginas en la base de datos
-    if (pool && pages.length > 0) {
-      await pool.query(
-        `UPDATE manga_chapters_cache SET pages = $1 WHERE chapter_id = $2`,
-        [pages.length, url]
-      ).catch(() => {});
-    }
-    
-    return { baseUrl: '', pages, chapterId: url, meta: { source: 'dragon', cache_hit: false } };
-  } catch (error) {
-    console.error("Error scraping chapter pages:", error);
-    return { baseUrl: '', pages: [], chapterId: url };
+export async function getChapterPages(pool, chapterUrl) {
+  try { return await loadChapterPages(pool, chapterUrl); }
+  catch (error) {
+    console.error('Error loading chapter pages:', error.message);
+    return { baseUrl: '', pages: [], chapterId: String(chapterUrl || '') };
   }
 }
 export async function refreshMangaPopularCache(pool) {

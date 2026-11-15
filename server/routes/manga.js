@@ -40,8 +40,11 @@ router.get(['/chapter/:chapterId(*)/pages', '/chapter/:chapterId/pages', '/chapt
         chapterId = decoded;
       }
     } catch {}
+    res.set('Cache-Control', 'no-store');
     const result = await getChapterPages(pool, chapterId);
-    return res.json(result || { baseUrl: null, pages: [], chapterId });
+    if (!result) return res.status(400).json({ message: 'Capítulo no válido' });
+    if (!result.pages?.length) return res.set('Retry-After', '3').status(503).json({ message: 'El origen todavía no entregó las páginas. Reintentando…' });
+    return res.json(result);
   } catch (e) {
     return res.status(500).json({ message: 'Error obteniendo páginas del capítulo', error: e.message });
   }

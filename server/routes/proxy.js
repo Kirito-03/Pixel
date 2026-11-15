@@ -188,6 +188,14 @@ router.get('/manga-image', async (req, res) => {
     });
     const body = Buffer.from(response.data);
     const mime = String(response.headers['content-type'] || 'image/jpeg').split(';')[0].toLowerCase();
+    const validImage = body.length > 12 && (
+      (mime === 'image/jpeg' && body[0] === 255 && body[1] === 216 && body[2] === 255) ||
+      (mime === 'image/png' && body.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) ||
+      (mime === 'image/webp' && body.toString('ascii', 0, 4) === 'RIFF' && body.toString('ascii', 8, 12) === 'WEBP') ||
+      (mime === 'image/gif' && /^GIF8[79]a/.test(body.toString('ascii', 0, 6))) ||
+      (mime === 'image/avif' && body.toString('ascii', 4, 8) === 'ftyp' && /avif|avis/.test(body.toString('ascii', 8, 32)))
+    );
+    if (!validImage) return res.set('Cache-Control', 'no-store').status(502).send('El origen no entregó una imagen válida');
     res.set('Content-Type', mime);
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('Cache-Control', 'public, max-age=604800'); // Cachear por 7 días

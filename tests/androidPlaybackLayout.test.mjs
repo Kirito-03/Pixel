@@ -24,7 +24,7 @@ function runtime(file, mocks = {}) {
   };
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true } }).outputText, {
-    exports, console, Promise, requestAnimationFrame: fn => fn(),
+    exports, console, Promise, AbortController, requestAnimationFrame: fn => fn(),
     setTimeout: fn => { timeouts.set(++clock, fn); return clock; }, clearTimeout: id => timeouts.delete(id),
     setInterval: fn => { intervals.set(++clock, fn); return clock; }, clearInterval: id => intervals.delete(id),
     require(name) { if (name === 'react') return react; if (name === 'react-native') return native; return mocks[name] || {}; },
@@ -88,17 +88,21 @@ test('reader footer opens the actual next chapter and disappears on the last one
   const chapters = [{ id: 'three', chapter: '3' }, { id: 'two', chapter: '2' }, { id: 'one', chapter: '1' }];
   const route = { params: { id: 'manga', chapterId: 'two', chapters } }, navigated = [];
   const f = runtime('screens/MangaReaderScreen.tsx', {
-    '@react-navigation/native': { useNavigation: () => ({ setParams: value => navigated.push(value) }), useRoute: () => route },
+    '@react-navigation/native': { useIsFocused: () => true, useNavigation: () => ({ setParams: value => navigated.push(value) }), useRoute: () => route },
     '../hooks/useTabNavigation': { useTabNavigation: () => ({ navigateByLabel() {} }) },
-    '../services/mangaApi': { mangaApi: { chapters: async () => ({ chapters }), chapterPages: async () => ({ pages: ['https://example.test/page.jpg'] }) } },
+    '../services/mangaApi': { mangaApi: { getById: async () => ({title:'Fixture'}), chapters: async () => ({ chapters }), chapterPages: async () => ({ pages: ['https://example.test/page.jpg'] }) } },
     '../utils/mangaProgress': { saveMangaProgress() {} },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0 }) },
+    '../utils/mangaChapterNavigation': { getMangaReaderContext: () => undefined, mangaChapterKey: chapter => 'cap-' + chapter.chapter },
+    '../utils/readerRetry': { loadReaderPages: async ({request}) => (await request()).pages, readerRetryDelay: () => 3000 },
+    '../components/NativeMangaPages': { default: 'NativeMangaPages', __esModule: true },
   });
   f.render(); await tick(); let tree = f.render();
-  let footer = type(tree, 'FlatList').props.ListFooterComponent;
-  find(footer, 'Siguiente capítulo').props.onPress(); assert.equal(navigated[0].chapterId, 'three');
+  let reader = type(tree, 'NativeMangaPages');
+  reader.props.onNext(); assert.equal(navigated[0].chapterKey, 'cap-3'); assert.equal(navigated[0].chapterId, undefined);
   route.params.chapterId = 'three'; f.render(); await tick(); tree = f.render();
-  footer = type(tree, 'FlatList').props.ListFooterComponent;
-  assert.equal(find(footer, 'Siguiente capítulo'), null);
+  reader = type(tree, 'NativeMangaPages');
+  assert.equal(reader.props.next, null);
   f.unmount();
 });
 

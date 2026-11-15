@@ -324,7 +324,7 @@ type LinkRoutes = {
     Manga: NavigatorScreenParams<{
       MangaHome: undefined;
       MangaDetail: { id: string };
-      MangaReader: { id: string; chapterId: string };
+      MangaReader: { id: string; chapterId?: string; chapterKey?: string };
     }>;
   }>;
   Admin: NavigatorScreenParams<Record<'AdminLogin' | 'AdminDashboard' | 'AdminImport' | 'AnimeList' | 'AnimeForm' | 'EpisodeManager' | 'AdminBot', undefined>>;
@@ -354,7 +354,7 @@ const linking: LinkingOptions<LinkRoutes> = {
             screens: {
               MangaHome: '',
               MangaDetail: 'detail/:id',
-              MangaReader: 'read/:id/:chapterId'
+              MangaReader: { path: ':id/:chapterKey', alias: ['read/:id/:chapterId'] }
             }
           },
           Hentai: { path: 'h-anime', alias: ['Hentai'] },
