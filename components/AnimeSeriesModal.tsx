@@ -47,15 +47,20 @@ interface AnimeSeriesModalProps {
   content: ContentItem | null;
   visible: boolean;
   onClose: () => void;
+  playback?: React.ReactNode;
+  onClosePlayback?: () => void;
   onPlayEpisode?: (episode: AnimeEpisode, season: AnimeSeason, resumeTimeSeconds?: number) => void;
 }
 
 export default function AnimeSeriesModal({
   content,
-  visible,
+  visible: modalVisible,
   onClose,
   onPlayEpisode,
+  playback,
+  onClosePlayback,
 }: AnimeSeriesModalProps) {
+  const visible = modalVisible && !playback;
   const [currentContent, setCurrentContent] = useState<ContentItem | null>(null);
   const detailScrollRef = useRef<ScrollView>(null);
   const [detailData, setDetailData] = useState<MovieDetail | TVShowDetail | AnimeDetail | null>(null);
@@ -863,19 +868,20 @@ export default function AnimeSeriesModal({
     });
   };
 
-  if (!visible || !currentContent) {
+  if (!modalVisible || !currentContent) {
     return null;
   }
 
   return (
     <Modal
-      visible={visible}
-      transparent
+      visible={modalVisible}
+      transparent={Platform.OS !== 'android'}
       animationType="slide"
       statusBarTranslucent
-      onRequestClose={handleClose}
+      navigationBarTranslucent
+      onRequestClose={playback ? onClosePlayback : handleClose}
     >
-      <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center' }]}>
+      {playback ? <View style={{ flex: 1, backgroundColor: '#000' }}>{playback}</View> : <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center' }]}>
         <StatusBar style="light" translucent />
 
         <Animated.View style={[styles.content, { opacity: contentFadeAnim, maxWidth: undefined, maxHeight: '100%', borderRadius: 0, overflow: 'hidden' }]}>
@@ -1370,7 +1376,7 @@ export default function AnimeSeriesModal({
             </View>
           </ScrollView>
         </Animated.View>
-      </Animated.View>
+      </Animated.View>}
 
     </Modal>
   );

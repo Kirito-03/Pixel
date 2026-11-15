@@ -56,3 +56,9 @@ test('completed chapter continues at the next real playable episode, not number 
   assert.equal((await api.get(1,10)).episodeId,40);
   assert.equal((await resume({...entry,current_time:300,duration:300},[{id:21,episode_number:2,video_url:'x'}]).get(1,10)).episodeId,null);
 });
+
+
+test('seeking to second zero resumes the same chapter instead of restarting the series', async () => {
+  const target = await resume({ ...entry, current_time: 0, duration: 300, position_known: true }, []).get(1, 10);
+  assert.equal(target.episodeId, 21); assert.equal(target.resumeTime, 0);
+});

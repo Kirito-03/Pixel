@@ -160,6 +160,8 @@ function createPlayerHarness(overrides = {}) {
       if (name === 'expo-navigation-bar') return { setVisibilityAsync: () => {}, setBehaviorAsync: () => {} };
       if (name === 'expo-screen-orientation') return { lockAsync: () => Promise.resolve(), OrientationLock: { LANDSCAPE: 1, PORTRAIT_UP: 2 } };
       if (name === 'react-native-webview') return { WebView: 'WebView' };
+      if (name === './PlaybackChrome') return { default: 'PlaybackChrome', __esModule: true };
+      if (name === './SeekButton') return { default: 'SeekButton', __esModule: true };
       if (name === '@expo/vector-icons') return { Ionicons: 'Ionicons' };
       if (name === '../services/episodePlaybackSources') return playbackSources;
       if (name === '../services/progressApi') return { progressApi };
@@ -316,16 +318,14 @@ test('NativeVideoPlayer never saves second 0 before resumeTimeSeconds and flushe
   // Close button flushes latest snapshot
   h.player.currentTime = 145;
   tree = h.renderNative(props);
-  const buttons = h.findAllByType(tree, 'TouchableOpacity');
-  buttons[0].props.onPress(); // back/close button
+  h.findByType(tree, 'PlaybackChrome').props.onClose();
   assert.equal(closed, 1);
   assert.equal(progressCalls.at(-1).payload.current_time, 145);
 
   // Next episode button flushes latest snapshot
   h.player.currentTime = 150;
   tree = h.renderNative(props);
-  const nextButtons = h.findAllByType(tree, 'TouchableOpacity');
-  nextButtons[nextButtons.length - 1].props.onPress();
+  h.findByType(tree, 'PlaybackChrome').props.onNext();
   assert.equal(nexted, 1);
   assert.equal(progressCalls.at(-1).payload.current_time, 150);
 
@@ -475,4 +475,21 @@ test('EpisodePlayer WebView handles pixel:player for cross-origin (position_know
   h.triggerAppState('background');
   assert.equal(h.savedCalls.length, 4);
   assert.equal(h.savedCalls[3].payload.current_time, 26);
+});
+
+
+test('10-second buttons clamp direct video seeks and preserve paused state and second zero', () => {
+  const h = createPlayerHarness({ player: { currentTime: 6, duration: 300, playing: false } });
+  const calls = [];
+  const tree = h.renderNative({ videoUrl: 'https://video.test/drive.webm', episode: { id: '11', number: 11 }, animeTitle: 'Drive', onClose() {}, onProgress: (payload, options) => calls.push({ payload, options }) });
+  const buttons = h.findAllByType(tree, 'SeekButton');
+  buttons.find(button => !button.props.forward).props.onPress();
+  assert.equal(h.player.currentTime, 0); assert.equal(h.player.playing, false);
+  assert.equal(calls.at(-1).payload.current_time, 0); assert.equal(calls.at(-1).payload.position_known, true); assert.equal(calls.at(-1).options.force, true);
+  buttons.find(button => button.props.forward).props.onPress();
+  assert.equal(h.player.currentTime, 10);
+  h.player.currentTime = 297;
+  buttons.find(button => button.props.forward).props.onPress();
+  assert.equal(h.player.currentTime, 300); assert.equal(h.player.playing, false);
+  h.unmount();
 });

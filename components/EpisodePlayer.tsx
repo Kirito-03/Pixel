@@ -13,7 +13,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useImmersivePlayer } from '../hooks/useImmersivePlayer';
 import PlayerSystemBars from './PlayerSystemBars';
 import PlaybackChrome from './PlaybackChrome';
-import { episodePlaybackSources } from '../services/episodePlaybackSources';
+import SeekButton from './SeekButton';
+import { episodePlaybackSources, isDirectPlaybackUrl } from '../services/episodePlaybackSources';
 import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,7 +88,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
     if (!resumed.current) return null;
     const cur = Math.floor(player.currentTime ?? 0);
     const dur = Math.floor(player.duration ?? 0);
-    if (!Number.isFinite(cur) || cur <= 0) return null;
+    if (!Number.isFinite(cur) || cur < 0 || (cur === 0 && !(dur > 0))) return null;
     const snap = { current_time: cur, duration: Number.isFinite(dur) && dur > 0 ? dur : 0 };
     lastValidSnapshot.current = snap;
     return snap;
@@ -95,7 +96,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
 
   const flushProgress = useCallback((force = true) => {
     const snap = captureSnapshot() || lastValidSnapshot.current;
-    if (!snap || snap.current_time <= 0) return;
+    if (!snap || snap.current_time < 0) return;
     lastSentSecond.current = snap.current_time;
     lastSentAt.current = Date.now();
     onProgress({ ...snap, position_known: true }, { force });
@@ -110,6 +111,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
     if (player.playing) controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
   }, [player]);
   useEffect(() => {
+    setPlaying(player.playing);
     const playingSubscription = player.addListener('playingChange', event => {
       setPlaying(event.isPlaying);
       resetControlsTimer();
@@ -172,18 +174,30 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
 
   const handleClose = useCallback(() => {
     flushProgressRef.current(true);
+    player.pause();
     onClose();
-  }, [onClose]);
+  }, [onClose, player]);
 
   const handleNextEpisode = useCallback(() => {
     flushProgressRef.current(true);
+    player.pause();
     onNextEpisode?.();
-  }, [onNextEpisode]);
+  }, [onNextEpisode, player]);
 
   const handlePreviousEpisode = useCallback(() => {
     flushProgressRef.current(true);
+    player.pause();
     onPreviousEpisode?.();
-  }, [onPreviousEpisode]);
+  }, [onPreviousEpisode, player]);
+
+  const seekBy = (seconds: number) => {
+    const duration = Number(player.duration);
+    const current = Number(player.currentTime);
+    if (!resumed.current || !Number.isFinite(duration) || duration <= 0 || !Number.isFinite(current)) return;
+    player.currentTime = Math.max(0, Math.min(duration, current + seconds));
+    flushProgressRef.current(true);
+    resetControlsTimer();
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }} onTouchStart={resetControlsTimer}>
@@ -199,56 +213,23 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
       {playbackError ? <Text accessibilityRole="alert" style={{ color: '#fff', position: 'absolute', top: '40%', left: 24, right: 24, textAlign: 'center' }}>{playbackError}</Text> : null}
       {showControls && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          {/* Top gradient */}
-          <LinearGradient
-            colors={['rgba(0,0,0,0.85)', 'transparent']}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140 }}
-            pointerEvents="none"
-          />
-
-          {/* Top bar */}
-          <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0,
-            flexDirection: 'row', alignItems: 'center',
-            paddingTop: 44, paddingHorizontal: 20, paddingBottom: 16, gap: 14,
-          }}>
-            <TouchableOpacity
-              onPress={handleClose}
-              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}
-            >
-              <Ionicons name="arrow-back" size={20} color="#fff" />
-            </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{animeTitle}</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                Ep. {episode.number} — {episode.title}
-              </Text>
-            </View>
-          </View>
+          <PlaybackChrome title={animeTitle} subtitle={`Episodio ${episode.number} · ${episode.title}`}
+            onClose={handleClose} onPrevious={hasPreviousEpisode ? handlePreviousEpisode : undefined}
+            onNext={hasNextEpisode ? handleNextEpisode : undefined} />
 
           {/* Center controls */}
           <View style={{
             position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 40,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28,
           }} pointerEvents="box-none">
-            {hasPreviousEpisode && (
-              <TouchableOpacity onPress={handlePreviousEpisode}
-                style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}>
-                <Ionicons name="play-skip-back" size={24} color="#fff" />
-              </TouchableOpacity>
-            )}
+            <SeekButton onPress={() => seekBy(-10)} />
             <TouchableOpacity
               accessibilityRole="button" accessibilityLabel={playing ? 'Pausar capítulo' : 'Reproducir capítulo'}
               onPress={() => { if (player.playing) player.pause(); else player.play(); resetControlsTimer(); }}
               style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#344544', justifyContent: 'center', alignItems: 'center' }}>
               <Ionicons name={playing ? 'pause' : 'play'} size={30} color="#fff" />
             </TouchableOpacity>
-            {hasNextEpisode && (
-              <TouchableOpacity onPress={handleNextEpisode}
-                style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}>
-                <Ionicons name="play-skip-forward" size={24} color="#fff" />
-              </TouchableOpacity>
-            )}
+            <SeekButton forward onPress={() => seekBy(10)} />
           </View>
 
           {/* Bottom gradient */}
@@ -391,7 +372,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
       const currentTime = Number(payload.current_time);
       if (!Number.isFinite(currentTime) || currentTime < 0) return;
       const currentSecond = Math.floor(currentTime);
-      if (currentSecond <= 0) return;
+      if (currentSecond === 0 && (!force || payload.position_known !== true || !(payload.duration > 0))) return;
 
       const durationRaw = Number(payload.duration);
       const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.floor(durationRaw) : 0;
@@ -426,7 +407,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   const flushLatestSnapshot = useCallback(() => {
     const snap = latestSnapshotRef.current;
     if (!snap || !profileId || !snap.episodeId || !snap.animeId) return;
-    if (snap.position_known && snap.current_time <= 0) return;
+    if (snap.position_known && snap.current_time < 0) return;
     const prev = lastSavedStateRef.current;
     if (
       prev &&
@@ -640,7 +621,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
 
     // ── MOBILE: native expo-video ─────────────────────────────
     // Si no es un enlace directo de video (mp4, m3u8, webm), usamos WebView
-    const isDirectVideo = ext === 'm3u8' || ext === 'mp4' || ext === 'webm' || ext === 'mov' || /^(file|content):/i.test(videoUrl) || selectedSource.isM3U8 === true;
+    const isDirectVideo = isDirectPlaybackUrl(videoUrl) || selectedSource.isM3U8 === true;
     
     if (!isDirectVideo) {
       return (

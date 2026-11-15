@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Hls from 'hls.js';
 import PlaybackChrome from './PlaybackChrome';
+import SeekButton from './SeekButton';
+import { episodePlaybackSources, isDirectPlaybackUrl } from '../services/episodePlaybackSources';
 import { progressApi } from '../services/progressApi';
 import { getCurrentBaseURL } from '../services/databaseService';
 
@@ -63,26 +65,17 @@ const EpisodePlayer: React.FC<any> = ({
     progressRef.current = { current_time: video.currentTime, duration: video.duration, position_known: true };
     saveRef.current(force);
   };
+  const seekBy = (seconds: number) => {
+    const video = videoRef.current;
+    if (!video || !restored.current || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
+    snapshotVideo(true); reveal();
+  };
   const leave = (action?: () => void) => { snapshotVideo(true); action?.(); };
 
 
-  // Fallback to episode.url if external_servers is empty
-  let servers = [];
-  try {
-    servers = typeof episode?.external_servers === 'string' 
-      ? JSON.parse(episode.external_servers) 
-      : (episode?.external_servers || []);
-  } catch (e) {
-    console.error('Error parsing external_servers', e);
-  }
-  
-  // Resolve source based on serverIndex or default
-  let source = '';
-  if (servers.length > 0 && servers[serverIndex]) {
-    source = servers[serverIndex].url;
-  } else {
-    source = episode?.url || episode?.stream_url || episode?.video_url || '';
-  }
+  const servers = episodePlaybackSources({ ...episode, url: episode?.url || episode?.stream_url || episode?.video_url });
+  let source = servers[serverIndex]?.url || '';
 
   if (source.startsWith('/')) {
     const baseUrl = getCurrentBaseURL() || 'http://localhost:3001';
@@ -92,7 +85,7 @@ const EpisodePlayer: React.FC<any> = ({
     source = `${baseUrl}/api/video/stream/${episode?.id}`;
   }
 
-  const isIframe = source.includes('jkanime.net/jkplayer') || source.includes('iframe') || servers.length > 0;
+  const isIframe = !isDirectPlaybackUrl(source);
 
   useEffect(() => {
     if (!episode || !videoRef.current || isIframe) return;
@@ -166,9 +159,12 @@ const EpisodePlayer: React.FC<any> = ({
         />
       )}
       
+      {!isIframe && showChrome && <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, top: '50%', marginTop: -26, flexDirection: 'row', justifyContent: 'center', gap: 100, zIndex: 12 }}>
+        <SeekButton onPress={() => seekBy(-10)} /><SeekButton forward onPress={() => seekBy(10)} />
+      </View>}
       <View style={[StyleSheet.absoluteFill, { zIndex: 15 }]} pointerEvents="box-none">
         {showChrome ? <PlaybackChrome title={animeTitle} subtitle={`Temporada ${seasonNumber || 1} · Episodio ${episode?.number}`}
-          onClose={() => leave(onClose)} servers={servers} selectedIndex={serverIndex}
+          onClose={() => leave(onClose)} servers={isIframe ? servers : []} selectedIndex={serverIndex}
           menuOpen={menuOpen} onMenuChange={setMenuOpen} onSelectServer={index => { snapshotVideo(true); setServerIndex(index); setError(''); }}
           onPrevious={hasPreviousEpisode ? () => leave(onPreviousEpisode) : undefined}
           onNext={hasNextEpisode ? () => leave(onNextEpisode) : undefined} />

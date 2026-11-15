@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Alert, Modal, Platform } from 'react-native';
 import AnimeSeriesModal from './AnimeSeriesModal';
 import EpisodePlayer from './EpisodePlayer';
@@ -29,18 +29,29 @@ export default function AnimeSeriesModalWrapper({
   const [selectedEpisode, setSelectedEpisode] = useState<AnimeEpisode | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<AnimeSeason | null>(null);
   const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
-  const [autoplaying, setAutoplaying] = useState(false);
+  const consumedStart = useRef<string | null>(null);
+  const openSession = useRef(0);
   const [resumeTimeSeconds, setResumeTimeSeconds] = useState<number>(0);
+
+  React.useEffect(() => {
+    openSession.current++;
+    setShowEpisodePlayer(false);
+    setSelectedEpisode(null);
+    setSelectedSeason(null);
+    consumedStart.current = null;
+  }, [visible, content?.id]);
 
   React.useEffect(() => {
     if (!visible) return;
     if (!content || content.type !== 'anime') return;
-    if (!startFromEpisodeId || autoplaying) return;
+    if (!startFromEpisodeId) return;
+    const requestKey = `${content.id}:${startFromEpisodeId}:${startFromTimeSeconds || 0}`;
+    if (consumedStart.current === requestKey) return;
+    consumedStart.current = requestKey;
 
     let cancelled = false;
     const run = async () => {
       try {
-        setAutoplaying(true);
         const episodes = await catalogService.getAnimeEpisodes(Number(content.id));
         const target = episodes.find((ep) => Number(ep.id) === Number(startFromEpisodeId));
         if (!target) return;
@@ -80,18 +91,19 @@ export default function AnimeSeriesModalWrapper({
         setSelectedEpisode(e);
         setCurrentEpisodeIndex(idx);
         setShowEpisodePlayer(true);
-      } finally {
-        if (!cancelled) setAutoplaying(false);
+      } catch {
+        if (!cancelled) Alert.alert('No se pudo abrir el episodio', 'Puedes elegirlo desde los detalles e intentarlo otra vez.');
       }
     };
     run();
     return () => {
       cancelled = true;
     };
-  }, [visible, content?.id, content?.type, startFromEpisodeId, startFromTimeSeconds, autoplaying]);
+  }, [visible, content?.id, content?.type, startFromEpisodeId, startFromTimeSeconds]);
 
   const handlePlayEpisode = async (episode: AnimeEpisode, season: AnimeSeason, resumeSeconds?: number) => {
     // NO cerrar el modal de detalles, solo abrir el reproductor
+    const session = openSession.current;
     let ep = episode;
     const profileId = currentProfile?.id;
     const animeId = content?.id ? Number(content.id) : 0;
@@ -109,6 +121,7 @@ export default function AnimeSeriesModalWrapper({
       }
     }
 
+    if (session !== openSession.current || !visible) return;
     setSelectedEpisode(ep);
     setSelectedSeason(season);
     setCurrentEpisodeIndex(season.episodes.findIndex(e => e.id === episode.id));
@@ -147,40 +160,23 @@ export default function AnimeSeriesModalWrapper({
     return content?.title || 'Sin título';
   };
 
+  const player = visible && showEpisodePlayer && selectedEpisode && selectedSeason ? (
+    <EpisodePlayer episode={selectedEpisode} animeTitle={getTitle()}
+      animeId={content?.id ? Number(content.id) : 0} seasonNumber={selectedSeason.season}
+      profileId={currentProfile?.id} resumeTimeSeconds={resumeTimeSeconds}
+      onClose={handleCloseEpisodePlayer} onNextEpisode={handleNextEpisode} onPreviousEpisode={handlePreviousEpisode}
+      hasNextEpisode={currentEpisodeIndex < selectedSeason.episodes.length - 1} hasPreviousEpisode={currentEpisodeIndex > 0} />
+  ) : null;
+  const sharedWindow = Platform.OS === 'android';
   return (
     <>
-      <AnimeSeriesModal
-        content={content}
-        visible={visible && !showEpisodePlayer}
-        onClose={onClose}
-        onPlayEpisode={handlePlayEpisode}
-      />
-      
-      {/* Episode Player Modal - Completamente separado */}
-      {showEpisodePlayer && selectedEpisode && selectedSeason && (
-        <Modal
-          visible={showEpisodePlayer}
-          transparent={false}
-          animationType="slide"
-          statusBarTranslucent
-          navigationBarTranslucent
-          onRequestClose={handleCloseEpisodePlayer}
-        >
-          <EpisodePlayer
-            episode={selectedEpisode}
-            animeTitle={getTitle()}
-            animeId={content?.id ? Number(content.id) : 0}
-            seasonNumber={selectedSeason.season}
-            profileId={currentProfile?.id}
-            resumeTimeSeconds={resumeTimeSeconds}
-            onClose={handleCloseEpisodePlayer}
-            onNextEpisode={handleNextEpisode}
-            onPreviousEpisode={handlePreviousEpisode}
-            hasNextEpisode={currentEpisodeIndex < (selectedSeason?.episodes.length || 0) - 1}
-            hasPreviousEpisode={currentEpisodeIndex > 0}
-          />
-        </Modal>
-      )}
+      <AnimeSeriesModal content={content} visible={visible && (sharedWindow || !showEpisodePlayer)}
+        onClose={onClose} onPlayEpisode={handlePlayEpisode}
+        playback={sharedWindow ? player : null} onClosePlayback={handleCloseEpisodePlayer} />
+      {!sharedWindow && player && <Modal visible animationType="slide" transparent={false}
+        statusBarTranslucent navigationBarTranslucent onRequestClose={handleCloseEpisodePlayer}>
+        {player}
+      </Modal>}
     </>
   );
 }

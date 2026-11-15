@@ -41,3 +41,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-15-noticias-android-compactas]]: APK1.0.6 con noticias más pequeñas, destacada compacta, filtros fijos y dos columnas en tablet.
 
 - [[2026-11-15-noticias-web-y-reproductores]]: Noticias web sin marcos, nuevos feeds, importación resiliente, selector compartido y episodio real para continuar. APK1.0.7/8.
+
+- [[2026-11-15-drive-player-saltos-y-salida]]: saltos de10segundos, encabezado de video directo, ventana Android única y prioridad de Drive frente a proveedores.

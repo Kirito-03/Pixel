@@ -5,7 +5,7 @@ export const resumeTargetApi = {
   async get(profileId: number, animeId: number): Promise<ResumeTarget> {
     const saved = await watchProgressStore.get(profileId, animeId);
     const finished = !!saved && saved.duration > 0 && saved.current_time / saved.duration >= 0.95;
-    if (saved && !finished && (saved.current_time > 0 || saved.position_known === false)) return {
+    if (saved && !finished) return {
       animeId, episodeId: saved.episode_id, season: saved.season ?? null, episodeNumber: saved.episode_number ?? null,
       resumeTime: saved.position_known === false ? 0 : saved.current_time,
     };

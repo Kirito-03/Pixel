@@ -47,3 +47,5 @@ Versión publicada más reciente:1.0.5/código6 (15nov2026). Lector con enlaces 
 Actualización1.0.6/código7: Noticias compactas específicas de Android. Ver docs/brain/2026-11-15-noticias-android-compactas.md.
 
 Actualización1.0.7/código8: selector de servidores compartido y discreto, continuación del episodio real, apertura de capítulos con proveedores en Android. Noticias web y fuentes RSS ampliadas. Ver docs/brain/2026-11-15-noticias-web-y-reproductores.md para pruebas y limitaciones de proveedores. APK124234278bytes; SHA2560506fabca02816fe15bbd22076465c83828d9d5c67e40b889f58cdaff081b890.
+
+Actualización1.0.9/código10: archivo de Drive priorizado sobre proveedores externos, controles−10/+10segundos, encabezado superior y una sola ventana Android al volver del reproductor al detalle. Incluye apertura desde Mi lista sin bucles y continuación al segundo0. APK124235714bytes; SHA2569ef7ee1606905122d95e08959a1dd978b61c9b762031ec0a1b81e3be4c613a72. Instalada por actualización en Samsung conectado; pendiente confirmación visual del usuario sobre la salida. Ver docs/brain/2026-11-15-drive-player-saltos-y-salida.md.
