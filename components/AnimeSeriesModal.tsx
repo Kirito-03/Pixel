@@ -38,6 +38,7 @@ import EpisodePlayer from './EpisodePlayer';
 import { canReachUrl } from '../services/connectivity';
 import { offlineDownloads } from '../services/offlineDownloads';
 import { getResumeTarget } from '../services/resumeTarget';
+import { seriesPlaybackTarget } from '../services/seriesPlaybackTarget';
 import { styles, heroStyles, continueStyles, infoStyles, epStyles, simStyles } from './AnimeSeriesModalStyles';
 import AnimeArtwork from './AnimeArtwork';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,6 +87,24 @@ export default function AnimeSeriesModal({
   const isSmallScreen = width < 768;
   const androidCompact = Platform.OS === 'android' && isSmallScreen;
   const insets = useSafeAreaInsets();
+  const [continueTarget, setContinueTarget] = useState<ReturnType<typeof seriesPlaybackTarget>>(null);
+  const [loadingContinue, setLoadingContinue] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setContinueTarget(null);
+    if (!visible || currentContent?.type !== 'anime' || !streamingInfo || loadingStreaming) return;
+    const seasons = streamingInfo.seasons;
+    setLoadingContinue(true);
+    const resolve = async () => {
+      try {
+        const resume = currentProfile?.id ? await getResumeTarget(Number(currentContent.id), Number(currentProfile.id)) : undefined;
+        if (!cancelled) setContinueTarget(seriesPlaybackTarget(seasons, resume));
+      } catch { if (!cancelled) setContinueTarget(seriesPlaybackTarget(seasons)); }
+      finally { if (!cancelled) setLoadingContinue(false); }
+    };
+    void resolve();
+    return () => { cancelled = true; };
+  }, [visible, currentContent?.id, currentProfile?.id, streamingInfo, loadingStreaming, showEpisodePlayer]);
   const [refreshing, setRefreshing] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -1028,26 +1047,15 @@ export default function AnimeSeriesModal({
 
             <View style={{ width: '100%', maxWidth: 1120, alignSelf: 'center' }}>
             {/* ── TARJETA CONTINUAR VIENDO ── */}
-            {currentContent?.type === 'anime' && streamingInfo && streamingInfo.seasons.length > 0 && !loadingStreaming && (() => {
-              const firstSeason = streamingInfo.seasons[0];
-              const nextEp = firstSeason?.episodes?.[0];
-              if (!nextEp) return null;
+            {currentContent?.type === 'anime' && continueTarget && !loadingStreaming && (() => {
+              const { episode: nextEp, season: targetSeason, resumeTime } = continueTarget;
               return (
                 <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver episodio ${nextEp.number} de la temporada ${targetSeason.season}`}
+                  accessibilityState={{ busy: loadingContinue, disabled: loadingContinue }} disabled={loadingContinue}
                   style={[continueStyles.card, Platform.OS === 'android' && { marginTop: 0 }]}
-                  onPress={async () => {
-                    if (!currentProfile?.id || !currentContent?.id) {
-                      handlePlayEpisode(nextEp, firstSeason, 0);
-                      return;
-                    }
-                    try {
-                      const target = await getResumeTarget(Number(currentContent.id), Number(currentProfile.id));
-                      const resumeTime = String(target.episodeId) === String(nextEp.id) ? Number(target.resumeTime || 0) : 0;
-                      handlePlayEpisode(nextEp, firstSeason, resumeTime);
-                    } catch {
-                      handlePlayEpisode(nextEp, firstSeason, 0);
-                    }
-                  }}
+                  onPress={() => handlePlayEpisode(nextEp, targetSeason, resumeTime)}
                   activeOpacity={0.92}
                 >
                   {/* Miniatura */}
@@ -1070,16 +1078,16 @@ export default function AnimeSeriesModal({
 
                   {/* Info */}
                   <View style={continueStyles.info}>
-                    <Text style={continueStyles.label}>▶ PRÓXIMO EPISODIO</Text>
+                    <Text style={continueStyles.label}>{resumeTime > 0 ? 'CONTINUAR VIENDO' : 'VER EPISODIO'}</Text>
                     <Text style={continueStyles.epTitle} numberOfLines={1}>
                       Ep. {nextEp.number} — {nextEp.title}
                     </Text>
-                    <Text style={continueStyles.duration}>~24 min</Text>
+                    <Text style={continueStyles.duration}>Temporada {targetSeason.season}{resumeTime > 0 ? ` · Minuto ${Math.floor(resumeTime / 60)}` : ''}</Text>
                   </View>
 
                   {/* CTA horizontal premium */}
                   <View style={continueStyles.playBtn}>
-                    <Ionicons name="play" size={16} color="#fff" />
+                    <Ionicons name="play" size={16} color="#181818" />
                     <Text style={continueStyles.playBtnText}>Ver ahora</Text>
                   </View>
                 </TouchableOpacity>

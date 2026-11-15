@@ -19,9 +19,12 @@ async function setLastRun(pool, jobKey) {
 
 export function startNewsScheduler({ pool }) {
   const jobKey = 'news_refresh';
-  const intervalMs = 6 * 60 * 60 * 1000;
+  const intervalMs = 2 * 60 * 60 * 1000;
 
+  let running = false;
   const run = async (reason) => {
+    if (running) return;
+    running = true;
     try {
       const last = await getLastRun(pool, jobKey);
       if (Date.now() - last < intervalMs) return;
@@ -37,12 +40,13 @@ export function startNewsScheduler({ pool }) {
         skipped: Number(result?.skipped || 0),
         deactivated: Number(result?.deactivated || 0),
         message: result?.message || null,
+        feeds: result?.feeds || [],
       });
     } catch (e) {
       console.log('[NewsScheduler][ERR]', e?.message);
-    }
+    } finally { running = false; }
   };
 
   run('startup');
-  setInterval(() => run('interval'), intervalMs);
+  setInterval(() => run('interval'), 10 * 60 * 1000);
 }

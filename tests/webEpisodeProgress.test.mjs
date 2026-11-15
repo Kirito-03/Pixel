@@ -8,7 +8,7 @@ function fixture(overrides={}) {
   const react={createElement:(type,props,...children)=>({type,props:{...props,children}}),useState(value){const n=cursor++;if(!(n in hooks))hooks[n]=value;return[hooks[n],x=>hooks[n]=x];},useRef(value){const n=cursor++;return hooks[n]??=( {current:value});},useEffect(fn){effects.push(fn);}};
   const exports={};
   const source=ts.transpileModule(fs.readFileSync(new URL('../components/EpisodePlayer.web.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
-  vm.runInNewContext(source,{exports,console,Date,window:{addEventListener(){},removeEventListener(){}},document:{addEventListener(){},removeEventListener(){}},require(name){
+  vm.runInNewContext(source,{exports,console,Date,setTimeout:()=>1,clearTimeout(){},window:{addEventListener(){},removeEventListener(){}},document:{addEventListener(){},removeEventListener(){}},require(name){
     if(name==='react')return react;if(name==='react-native')return{View:'View',Text:'Text',TouchableOpacity:'Button',ScrollView:'ScrollView',StyleSheet:{create:s=>s}};
     if(name==='@expo/vector-icons')return{Ionicons:'Icon'};if(name==='hls.js')return{};
     if(name.includes('progressApi'))return{progressApi:{save:async(profile,entry)=>calls.push({profile,entry})}};

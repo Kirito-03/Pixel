@@ -685,7 +685,7 @@ export const continueStyles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: -10, // Menor margen negativo para no tapar los botones
     marginBottom: 16,
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.09)',
@@ -721,7 +721,7 @@ export const continueStyles = StyleSheet.create({
     gap: 3,
   },
   label: {
-    color: '#E50914',
+    color: '#b5c8c5',
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1.5,
@@ -734,7 +734,7 @@ export const continueStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#E50914',
+    backgroundColor: '#e0e7e5',
     paddingHorizontal: 18,
     height: 84,
     justifyContent: 'center',
@@ -743,7 +743,7 @@ export const continueStyles = StyleSheet.create({
     borderLeftColor: 'rgba(0,0,0,0.35)',
     borderRadius: 0,
   },
-  playBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.2 },
+  playBtnText: { color: '#181818', fontSize: 12, fontWeight: '800', letterSpacing: 0.2 },
 });
 
 // ── INFO RÁPIDA ─────────────────────────────────────────────────

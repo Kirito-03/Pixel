@@ -5,6 +5,7 @@ const DEFAULT_ALLOWED_DOMAINS = [
   'ramenparados.com',
   'misiontokyo.com',
   'otakustudy.com',
+  'anmosugoi.com',
 ];
 
 const VALID_NEWS_CATEGORIES = new Set([
@@ -117,11 +118,11 @@ function decodeHtmlEntities(s) {
   const dec = named
     .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
       const code = Number.parseInt(hex, 16);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
+      return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
     })
     .replace(/&#([0-9]+);/g, (_, num) => {
       const code = Number.parseInt(num, 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
+      return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
     });
 
   return dec;
@@ -313,6 +314,7 @@ function scoreRelevance(title, excerpt, content) {
 }
 
 function isRelevantArticle(a) {
+  if (/\b(hentai|pornograf\w*|h-anime)\b/.test(normalizeText(a.title))) return false;
   const score = scoreRelevance(a.title, a.excerpt, a.content);
   return score >= 6;
 }
@@ -354,7 +356,7 @@ export async function fetchNewsApiArticles({ apiKey, queries, language = 'es', p
     url.searchParams.set('sortBy', 'publishedAt');
     url.searchParams.set('pageSize', String(pageSize));
     url.searchParams.set('domains', domainsParam);
-    const resp = await fetch(url.toString(), { headers });
+    const resp = await fetch(url.toString(), { headers, signal: AbortSignal.timeout(10000) });
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
       throw new Error(`NewsAPI ${resp.status}: ${text || resp.statusText}`);
@@ -367,44 +369,46 @@ export async function fetchNewsApiArticles({ apiKey, queries, language = 'es', p
   return all;
 }
 
-export async function fetchRssArticles({ feeds }) {
-  const items = [];
-  for (const feedUrl of feeds) {
-    const resp = await fetch(feedUrl);
-    if (!resp.ok) continue;
-    const xml = await resp.text();
-    const matches = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
-    for (const block of matches) {
-      const getTag = (tag) => {
-        const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
-        const m = block.match(re);
-        return m ? String(m[1] || '') : '';
-      };
-      const title = stripHtml(getTag('title'));
-      const link = stripHtml(getTag('link'));
-      const pubDate = stripHtml(getTag('pubDate'));
-      const desc = stripHtml(getTag('description'));
-      const content = stripHtml(getTag('content:encoded'));
-      const mediaContent = extractAttrUrl(block, 'media:content', 'url');
-      const mediaThumb = extractAttrUrl(block, 'media:thumbnail', 'url');
-      const enclosureUrl = extractAttrUrl(block, 'enclosure', 'url');
-      const contentRaw = getTag('content:encoded');
-      const descRaw = getTag('description');
-      items.push({
-        title,
-        url: link,
-        publishedAt: pubDate ? new Date(pubDate).toISOString() : null,
-        description: descRaw || desc,
-        content: contentRaw || content,
-        source: { name: hostFromUrl(link) },
-        urlToImage: mediaContent || mediaThumb || enclosureUrl || '',
-        media_content: mediaContent,
-        media_thumbnail: mediaThumb,
-        enclosure_url: enclosureUrl,
+export async function fetchRssArticles({ feeds, fetchImpl = fetch, onFeedResult = () => {} }) {
+  // Each publisher is independent: a timeout or malformed date must not discard other feeds.
+  const batches = await Promise.all(feeds.map(async feedUrl => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const items = [];
+    try {
+      const resp = await fetchImpl(feedUrl, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'PixelNoSekaiBot/1.0 (+news-ingest)' },
       });
-    }
-  }
-  return items;
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const xml = await resp.text();
+      const matches = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
+      for (const block of matches) {
+        try {
+          const getTag = tag => {
+            const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+            return m ? String(m[1] || '') : '';
+          };
+          const title = stripHtml(getTag('title'));
+          const link = stripHtml(getTag('link'));
+          if (!title || !isValidHttpUrl(link)) continue;
+          const pubDate = Date.parse(stripHtml(getTag('pubDate')));
+          const mediaContent = extractAttrUrl(block, 'media:content');
+          const mediaThumb = extractAttrUrl(block, 'media:thumbnail');
+          const enclosureUrl = extractAttrUrl(block, 'enclosure');
+          items.push({ title, url: link, publishedAt: Number.isFinite(pubDate) ? new Date(pubDate).toISOString() : null,
+            description: getTag('description'), content: getTag('content:encoded'), source: { name: hostFromUrl(link) },
+            urlToImage: mediaContent || mediaThumb || enclosureUrl || '',
+            media_content: mediaContent, media_thumbnail: mediaThumb, enclosure_url: enclosureUrl });
+        } catch { /* Skip only the malformed item. */ }
+      }
+      onFeedResult({ host: hostFromUrl(feedUrl), ok: matches.length > 0, fetched: items.length });
+    } catch (error) {
+      onFeedResult({ host: hostFromUrl(feedUrl), ok: false, fetched: 0, error: error?.name === 'AbortError' ? 'timeout' : 'unavailable' });
+    } finally { clearTimeout(timeout); }
+    return items;
+  }));
+  return batches.flat();
 }
 
 export function normalizeArticle(raw) {
@@ -482,8 +486,11 @@ export async function upsertArticles(pool, articles) {
 
   for (const a of list) {
     const existing = await pool.query(
-      `SELECT id, slug, updated_at FROM news_articles WHERE external_url = $1 LIMIT 1`,
-      [a.external_url]
+      `SELECT id, slug, updated_at FROM news_articles
+       WHERE external_url = $1 OR (lower(btrim(title)) = lower(btrim($2))
+         AND lower(split_part(split_part(external_url, '://', 2), '/', 1)) = $3)
+       ORDER BY has_valid_image DESC, quality_score DESC, id DESC LIMIT 1`,
+      [a.external_url, a.title, hostFromUrl(a.external_url)]
     );
 
     let slug = a.slug;
@@ -572,15 +579,17 @@ export async function refreshNews(pool, opts = {}) {
   const rssFeeds = rssFeedsRaw
     ? rssFeedsRaw.split(',').map((s) => s.trim()).filter(Boolean)
     : [
-      'https://somoskudasai.com/feed/',
+      'https://somoskudasai.com/noticias/anime/feed/',
+      'https://somoskudasai.com/noticias/feed/',
+      'https://anmosugoi.com/feed/',
       'https://ramenparados.com/feed/',
-      'https://misiontokyo.com/feed/',
     ];
 
   let raw = [];
   let source = 'rss';
+  const feedResults = [];
   try {
-    raw = await fetchRssArticles({ feeds: rssFeeds });
+    raw = await fetchRssArticles({ feeds: rssFeeds, onFeedResult: result => feedResults.push(result) });
   } catch {
     raw = [];
   }
@@ -596,8 +605,10 @@ export async function refreshNews(pool, opts = {}) {
       '"tráiler anime" OR "trailer anime"',
       '"estudio anime"',
     ];
-    const fallback = await fetchNewsApiArticles({ apiKey, queries, language: 'es', pageSize: 50 });
-    raw = raw.concat(fallback);
+    try {
+      const fallback = await fetchNewsApiArticles({ apiKey, queries, language: 'es', pageSize: 50 });
+      raw = raw.concat(fallback);
+    } catch { source = 'rss'; /* Keep successful RSS entries even if the API quota is exhausted. */ }
   }
 
   if (!raw.length) {
@@ -605,8 +616,9 @@ export async function refreshNews(pool, opts = {}) {
       `SELECT COUNT(*)::int AS total FROM news_articles WHERE is_active = true AND is_publishable = true`
     );
     return {
-      ok: true,
+      ok: false,
       source,
+      feeds: feedResults,
       fetched: 0,
       inserted: 0,
       updated: 0,
@@ -616,7 +628,8 @@ export async function refreshNews(pool, opts = {}) {
     };
   }
 
-  const normalizedBase = raw
+  const uniqueRaw = [...new Map(raw.map(article => [String(article.url || '').trim(), article])).values()];
+  const normalizedBase = uniqueRaw
     .map(normalizeArticle)
     .filter((a) => a.title && a.external_url)
     .filter((a) => isAllowedDomain(a.external_url, allowedDomains))
@@ -671,5 +684,5 @@ export async function refreshNews(pool, opts = {}) {
 
   const result = await upsertArticles(pool, normalized);
   const deactivated = opts.cleanup === false ? 0 : await cleanupExisting(pool, allowedDomains);
-  return { ok: true, source, fetched: raw.length, enriched_images: enrichedResult.enriched, ...result, deactivated };
+  return { ok: true, source, feeds: feedResults, fetched: raw.length, enriched_images: enrichedResult.enriched, ...result, deactivated };
 }

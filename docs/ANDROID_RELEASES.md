@@ -45,3 +45,5 @@ La versión 1.0.4 (código 5) incluye el reproductor inmersivo, restauración de
 Versión publicada más reciente:1.0.5/código6 (15nov2026). Lector con enlaces limpios, imágenes originales en AndroidWebView, caché persistente de páginas, precarga/reintentos y controles de video reorganizados. Descarga por el manifiesto público; ver docs/brain/2026-11-15-lector-manga-y-controles.md para validación y límites.
 
 Actualización1.0.6/código7: Noticias compactas específicas de Android. Ver docs/brain/2026-11-15-noticias-android-compactas.md.
+
+Actualización1.0.7/código8: selector de servidores compartido y discreto, continuación del episodio real, apertura de capítulos con proveedores en Android. Noticias web y fuentes RSS ampliadas. Ver docs/brain/2026-11-15-noticias-web-y-reproductores.md para pruebas y limitaciones de proveedores. APK124234278bytes; SHA2560506fabca02816fe15bbd22076465c83828d9d5c67e40b889f58cdaff081b890.

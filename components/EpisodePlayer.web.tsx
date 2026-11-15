@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Hls from 'hls.js';
+import PlaybackChrome from './PlaybackChrome';
 import { progressApi } from '../services/progressApi';
 import { getCurrentBaseURL } from '../services/databaseService';
 
@@ -19,6 +19,15 @@ const EpisodePlayer: React.FC<any> = ({
   hasPreviousEpisode
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showChrome, setShowChrome] = useState(true);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    setShowChrome(true);
+    if (!menuOpen) hideTimer.current = setTimeout(() => setShowChrome(false), 3500);
+    return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
+  }, [menuOpen, episode?.id]);
+  const reveal = () => { setShowChrome(true); if (hideTimer.current) clearTimeout(hideTimer.current); if (!menuOpen) hideTimer.current = setTimeout(() => setShowChrome(false), 3500); };
   const [error, setError] = useState('');
   const [serverIndex, setServerIndex] = useState(0);
   const [progressError, setProgressError] = useState(false);
@@ -30,7 +39,7 @@ const EpisodePlayer: React.FC<any> = ({
 
   useEffect(() => {
     progressRef.current = null; lastSent.current = 0; restored.current = false; endedRef.current = false;
-    setServerIndex(0); setError(''); setProgressError(false);
+    setServerIndex(0); setMenuOpen(false); setError(''); setProgressError(false);
     let active = true;
     const save = (force = false) => {
       const snapshot = progressRef.current;
@@ -112,18 +121,7 @@ const EpisodePlayer: React.FC<any> = ({
   }, [episode, serverIndex, source, isIframe]);
 
   return (
-    <View style={styles.container}>
-      {/* Header/Close Button */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => leave(onClose)}>
-          <Ionicons name="close" size={28} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.titleText}>
-          {animeTitle} - S{seasonNumber || 1} E{episode?.number}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
-
+    <View style={styles.container} {...({ onMouseMove: reveal } as any)}>
       {progressError && <Text style={styles.progressNotice}>No se pudo guardar el avance. Revisa tu conexión.</Text>}
       {error ? (
         <View style={styles.errorContainer}>
@@ -168,146 +166,23 @@ const EpisodePlayer: React.FC<any> = ({
         />
       )}
       
-      {/* Server Selector */}
-      {servers.length > 0 && (
-        <View style={styles.serverSelector}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
-            {servers.map((srv: any, idx: number) => (
-              <TouchableOpacity
-                key={idx}
-                style={[styles.serverButton, serverIndex === idx && styles.serverButtonActive]}
-                onPress={() => setServerIndex(idx)}
-              >
-                <Text style={[styles.serverButtonText, serverIndex === idx && styles.serverButtonTextActive]}>
-                  {srv.server}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Navigation Controls */}
-      <View style={styles.controlsRow}>
-         {hasPreviousEpisode && (
-            <TouchableOpacity style={styles.navButton} onPress={() => leave(onPreviousEpisode)}>
-               <Ionicons name="play-skip-back" size={24} color="#fff" />
-               <Text style={styles.navText}>Anterior</Text>
-            </TouchableOpacity>
-         )}
-         {hasNextEpisode && (
-            <TouchableOpacity style={styles.navButton} onPress={() => leave(onNextEpisode)}>
-               <Text style={styles.navText}>Siguiente</Text>
-               <Ionicons name="play-skip-forward" size={24} color="#fff" />
-            </TouchableOpacity>
-         )}
+      <View style={[StyleSheet.absoluteFill, { zIndex: 15 }]} pointerEvents="box-none">
+        {showChrome ? <PlaybackChrome title={animeTitle} subtitle={`Temporada ${seasonNumber || 1} · Episodio ${episode?.number}`}
+          onClose={() => leave(onClose)} servers={servers} selectedIndex={serverIndex}
+          menuOpen={menuOpen} onMenuChange={setMenuOpen} onSelectServer={index => { snapshotVideo(true); setServerIndex(index); setError(''); }}
+          onPrevious={hasPreviousEpisode ? () => leave(onPreviousEpisode) : undefined}
+          onNext={hasNextEpisode ? () => leave(onNextEpisode) : undefined} />
+          : <TouchableOpacity accessibilityRole="button" accessibilityLabel="Mostrar controles del reproductor" onPress={reveal} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 48 }} />}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  progressNotice: { position: 'absolute', top: 75, alignSelf: 'center', zIndex: 20, backgroundColor: '#292015', color: '#fff', padding: 10 },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 15,
-  },
-  titleText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  iconButton: {
-    padding: 5,
-  },
-  video: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#000',
-    objectFit: 'contain',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#ff4444',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  iframeContainer: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-  serverSelector: {
-    position: 'absolute',
-    bottom: 80,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  serverButton: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginHorizontal: 5,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  serverButtonActive: {
-    backgroundColor: 'rgba(231, 76, 60, 0.9)',
-    borderColor: '#fff',
-  },
-  serverButtonText: {
-    color: '#ccc',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  serverButtonTextActive: {
-    color: '#fff',
-  },
-  controlsRow: {
-    position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    zIndex: 10,
-    paddingHorizontal: 20,
-    pointerEvents: 'box-none',
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    gap: 8,
-  },
-  navText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  }
+  container: { flex: 1, backgroundColor: '#000' },
+  progressNotice: { position: 'absolute', top: 90, alignSelf: 'center', zIndex: 20, backgroundColor: '#292015', color: '#fff', padding: 10 },
+  video: { width: '100%', height: '100%', backgroundColor: '#000', objectFit: 'contain' },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { color: '#ddd', fontSize: 16 }, iframeContainer: { width: '100%', height: '100%', position: 'relative' },
 });
-
 export default EpisodePlayer;

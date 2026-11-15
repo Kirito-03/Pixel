@@ -8,12 +8,11 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
-  useWindowDimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useImmersivePlayer } from '../hooks/useImmersivePlayer';
 import PlayerSystemBars from './PlayerSystemBars';
+import PlaybackChrome from './PlaybackChrome';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { EMBEDDED_PLAYER_BRIDGE, shouldAllowEmbeddedNavigation } from '../utils/embeddedPlayerBridge';
@@ -55,7 +54,6 @@ export default function HentaiVideoPlayer({
   onRetry,
 }: HentaiVideoPlayerProps) {
   const isWeb = Platform.OS === 'web';
-  const compact = useWindowDimensions().width < 600;
   useImmersivePlayer();
   const [activeServer, setActiveServer] = useState<VideoServer | null>(
     servers.length > 0 ? servers[0] : null
@@ -143,12 +141,12 @@ export default function HentaiVideoPlayer({
       <View style={styles.videoContainer}>
         {loadingServers ? (
           <View style={styles.statusContainer}>
-            <ActivityIndicator size="large" color="#E50914" />
+            <ActivityIndicator size="large" color="#a9c0bd" />
             <Text style={styles.statusText}>Cargando episodio {episodeNumber}...</Text>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={36} color="#E50914" />
+            <Ionicons name="alert-circle-outline" size={36} color="#a9c0bd" />
             <Text style={styles.errorText}>{error}</Text>
             {onRetry && (
               <TouchableOpacity
@@ -166,7 +164,7 @@ export default function HentaiVideoPlayer({
           <>
             {loading && (
               <View style={styles.loaderContainer} pointerEvents="none">
-                <ActivityIndicator size="large" color="#E50914" />
+                <ActivityIndicator size="large" color="#a9c0bd" />
               </View>
             )}
 
@@ -229,7 +227,7 @@ export default function HentaiVideoPlayer({
                 startInLoadingState={true}
                 renderLoading={() => (
                   <View style={[styles.loaderContainer, { backgroundColor: '#000' }]}>
-                    <ActivityIndicator size="large" color="#E50914" />
+                    <ActivityIndicator size="large" color="#a9c0bd" />
                   </View>
                 )}
               />
@@ -273,132 +271,13 @@ export default function HentaiVideoPlayer({
         style={[styles.overlayWrap, { opacity: controlsOpacity }]}
         pointerEvents={controlsVisible ? 'box-none' : 'none'}
       >
-        <LinearGradient colors={['rgba(0,0,0,0.88)', 'transparent']} style={styles.headerGradient} pointerEvents="box-none">
-          <View style={styles.header}>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a detalles de la serie" style={styles.backButton} onPress={handleClose}>
-              <Ionicons name="arrow-back" size={23} color="#fff" />
-            </TouchableOpacity>
-            <View style={styles.titleCopy}>
-              <Text style={styles.eyebrow}>AHORA ESTÁS VIENDO</Text>
-              <Text style={styles.headerTitle} numberOfLines={2}>{animeTitle}</Text>
-              <Text style={styles.episodeLabel}>Episodio {episodeNumber}</Text>
-            </View>
-          </View>
-        </LinearGradient>
-        <View style={[styles.playbackToolbar, compact && { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
-          <View style={[styles.headerActions, compact && { justifyContent: 'space-between' }]}>
-
-            {hasPreviousEpisode && onPreviousEpisode && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={
-                  previousEpisodeNumber !== null
-                    ? `Capítulo anterior: episodio ${previousEpisodeNumber}`
-                    : 'Capítulo anterior'
-                }
-                style={[styles.navButton, styles.navButtonSecondary, isWeb && ({ cursor: 'pointer' } as any)]}
-                onPress={() => {
-                  showControls(true);
-                  onPreviousEpisode();
-                }}
-              >
-                <Ionicons name="chevron-back" size={16} color="#fff" />
-                <Text style={styles.navButtonText}>Anterior</Text>
-              </TouchableOpacity>
-            )}
-
-            {hasNextEpisode && onNextEpisode && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={
-                  nextEpisodeNumber !== null
-                    ? `Siguiente capítulo: episodio ${nextEpisodeNumber}`
-                    : 'Siguiente capítulo'
-                }
-                style={[styles.navButton, styles.navButtonPrimary, isWeb && ({ cursor: 'pointer' } as any)]}
-                onPress={() => {
-                  showControls(true);
-                  onNextEpisode();
-                }}
-              >
-                <Text style={styles.navButtonText}>Siguiente</Text>
-                <Ionicons name="chevron-forward" size={16} color="#fff" />
-              </TouchableOpacity>
-            )}
-
-          </View>
-            {!loadingServers && !error && servers && servers.length > 0 && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Cambiar servidor de video"
-                style={[
-                  styles.serverCornerBtn,
-                  serverMenuOpen && styles.serverCornerBtnActive,
-                  isWeb && ({ cursor: 'pointer' } as any),
-                ]}
-                onPress={() => {
-                  const nextOpen = !serverMenuOpen;
-                  setServerMenuOpen(nextOpen);
-                  serverMenuOpenRef.current = nextOpen;
-                  if (nextOpen) {
-                    showControls(false);
-                  } else {
-                    showControls(true);
-                  }
-                }}
-              >
-                <Ionicons name="server-outline" size={15} color="#fff" />
-                <Text style={styles.serverCornerBtnText} numberOfLines={1}>
-                  {`Servidor · ${activeServer?.server || 'Elegir'}`}
-                </Text>
-                <Ionicons
-                  name={serverMenuOpen ? 'chevron-up' : 'chevron-down'}
-                  size={15}
-                  color="#fff"
-                />
-              </TouchableOpacity>
-            )}
-        </View>
-
-        {/* Corner Server Dropdown */}
-        {serverMenuOpen && !loadingServers && !error && servers && servers.length > 0 && (
-          <View style={styles.serverDropdown}>
-            <Text style={styles.serverDropdownTitle}>Cambiar servidor</Text>
-            <ScrollView style={styles.serverDropdownList} showsVerticalScrollIndicator={false}>
-              {servers.map((s, index) => {
-                const isActive = activeServer?.server === s.server;
-                return (
-                  <TouchableOpacity
-                    key={`${s.server}-${index}`}
-                    style={[
-                      styles.serverDropdownItem,
-                      isActive && styles.serverDropdownItemActive,
-                      isWeb && ({ cursor: 'pointer' } as any),
-                    ]}
-                    onPress={() => {
-                      setLoading(true);
-                      setActiveServer(s);
-                      setServerMenuOpen(false);
-                      serverMenuOpenRef.current = false;
-                      showControls(true);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.serverDropdownItemText,
-                        isActive && styles.serverDropdownItemTextActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {s.server}
-                    </Text>
-                    {isActive && <Ionicons name="checkmark" size={15} color="#fff" />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
+        <PlaybackChrome title={animeTitle} subtitle={`Episodio ${episodeNumber}`} onClose={handleClose}
+          servers={!loadingServers && !error ? servers : []} selectedIndex={Math.max(0, servers.indexOf(activeServer!))}
+          menuOpen={serverMenuOpen} onMenuChange={open => {
+            setServerMenuOpen(open); serverMenuOpenRef.current = open; showControls(!open);
+          }} onSelectServer={index => { setLoading(true); setActiveServer(servers[index]); }}
+          onPrevious={hasPreviousEpisode && onPreviousEpisode ? () => { showControls(true); onPreviousEpisode(); } : undefined}
+          onNext={hasNextEpisode && onNextEpisode ? () => { showControls(true); onNextEpisode(); } : undefined} />
       </Animated.View>
     </View>
   );
@@ -458,7 +337,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#E50914',
+    backgroundColor: '#344544',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 0,
@@ -509,111 +388,5 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 30,
-  },
-  headerGradient: { minHeight: 155, paddingBottom: 36 },
-  header: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 24, paddingTop: 22, gap: 16 },
-  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(20,20,20,0.6)' },
-  titleCopy: { flex: 1, minWidth: 0, maxWidth: 900, gap: 6 },
-  eyebrow: { color: '#bbb', fontSize: 9, fontWeight: '700', letterSpacing: 1.8 },
-  headerTitle: { color: '#fff', fontSize: 20, lineHeight: 26, fontWeight: '700' },
-  episodeLabel: { color: '#bbb', fontSize: 12 },
-  playbackToolbar: { position: 'absolute', left: 24, right: 24, bottom: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 46,
-    borderRadius: 0,
-  },
-  navButtonSecondary: {
-    backgroundColor: '#262626',
-  },
-  navButtonPrimary: {
-    backgroundColor: '#E50914',
-  },
-  navButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  serverCornerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: 'rgba(38,38,38,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    maxWidth: 210,
-    minHeight: 46,
-    alignSelf: 'flex-end',
-  },
-  serverCornerBtnActive: {
-    backgroundColor: '#E50914',
-    borderColor: '#E50914',
-  },
-  serverCornerBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
-  serverDropdown: {
-    position: 'absolute',
-    bottom: 138,
-    right: 24,
-    width: 210,
-    maxHeight: 260,
-    backgroundColor: 'rgba(18,18,18,0.96)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 2,
-    padding: 8,
-    zIndex: 40,
-  },
-  serverDropdownTitle: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 6,
-    paddingHorizontal: 4,
-  },
-  serverDropdownList: {
-    maxHeight: 215,
-  },
-  serverDropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    borderRadius: 2,
-    marginBottom: 4,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  serverDropdownItemActive: {
-    backgroundColor: '#E50914',
-  },
-  serverDropdownItemText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 6,
-  },
-  serverDropdownItemTextActive: {
-    fontWeight: '800',
   },
 });

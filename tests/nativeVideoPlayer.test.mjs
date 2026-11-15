@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+const playbackSources = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../services/episodePlaybackSources.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: playbackSources });
 test('Android pause reflects player events, stays visible while paused and advances only on real end',()=>{
   const hooks=[];let cursor=0;let effects=[];const events={};const timers=new Map();let clock=0;let advanced=0;
   const player={playing:true,currentTime:96,duration:100,
@@ -159,6 +161,7 @@ function createPlayerHarness(overrides = {}) {
       if (name === 'expo-screen-orientation') return { lockAsync: () => Promise.resolve(), OrientationLock: { LANDSCAPE: 1, PORTRAIT_UP: 2 } };
       if (name === 'react-native-webview') return { WebView: 'WebView' };
       if (name === '@expo/vector-icons') return { Ionicons: 'Ionicons' };
+      if (name === '../services/episodePlaybackSources') return playbackSources;
       if (name === '../services/progressApi') return { progressApi };
       if (name === '../utils/embeddedPlayerBridge') return { EMBEDDED_PLAYER_BRIDGE: '' };
       return {};

@@ -39,3 +39,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-15-lector-manga-y-controles]]: APK1.0.5, navegación clara, direcciones limpias, carga anticipada/reintentos y caché de páginas en PostgreSQL.
 
 - [[2026-11-15-noticias-android-compactas]]: APK1.0.6 con noticias más pequeñas, destacada compacta, filtros fijos y dos columnas en tablet.
+
+- [[2026-11-15-noticias-web-y-reproductores]]: Noticias web sin marcos, nuevos feeds, importación resiliente, selector compartido y episodio real para continuar. APK1.0.7/8.

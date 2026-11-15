@@ -4,6 +4,14 @@ import cache from '../services/cacheService.js';
 
 const router = express.Router();
 
+// A publisher may expose a canonical URL and a WordPress ?p= URL for one story.
+// Keep the best row visible without deleting older links or their records.
+const publishedNews = `(SELECT DISTINCT ON (lower(btrim(title)), lower(split_part(split_part(external_url, '://', 2), '/', 1))) *
+  FROM news_articles WHERE is_active = true AND is_publishable = true
+  ORDER BY lower(btrim(title)), lower(split_part(split_part(external_url, '://', 2), '/', 1)),
+    is_featured DESC, has_valid_image DESC, quality_score DESC, updated_at DESC, id DESC) AS news_articles`;
+
+
 function parseBool(v) {
   if (v === true || v === 'true' || v === '1' || v === 1) return true;
   if (v === false || v === 'false' || v === '0' || v === 0) return false;
@@ -36,16 +44,16 @@ router.get('/', async (req, res) => {
       SELECT
         id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
         has_valid_image, is_publishable, quality_score
-      FROM news_articles
+      FROM ${publishedNews}
       WHERE ${where.join(' AND ')}
-      ORDER BY quality_score DESC, published_at DESC NULLS LAST, id DESC
+      ORDER BY published_at DESC NULLS LAST, quality_score DESC, id DESC
       LIMIT $${i++} OFFSET $${i++}
       `,
       [...params, limit, offset]
     );
 
     const count = await pool.query(
-      `SELECT COUNT(*)::int AS total FROM news_articles WHERE ${where.join(' AND ')}`,
+      `SELECT COUNT(*)::int AS total FROM ${publishedNews} WHERE ${where.join(' AND ')}`,
       params
     );
 
@@ -62,15 +70,15 @@ router.get('/featured', async (req, res) => {
   const limit = Math.min(12, Math.max(1, Number(req.query?.limit || 6) || 6));
 
   try {
-    const data = await cache.getOrSet(`news:featured:${limit}`, 1800, async () => {
+    const data = await cache.getOrSet(`news:featured:v2:${limit}`, 300, async () => {
       const featuredWithImage = await pool.query(
         `
         SELECT
           id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
           has_valid_image, is_publishable, quality_score
-        FROM news_articles
+        FROM ${publishedNews}
         WHERE is_active = true AND is_publishable = true AND is_featured = true AND has_valid_image = true
-        ORDER BY quality_score DESC, published_at DESC NULLS LAST, id DESC
+        ORDER BY published_at DESC NULLS LAST, quality_score DESC, id DESC
         LIMIT 1
         `
       );
@@ -80,9 +88,9 @@ router.get('/featured', async (req, res) => {
         SELECT
           id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
           has_valid_image, is_publishable, quality_score
-        FROM news_articles
+        FROM ${publishedNews}
         WHERE is_active = true AND is_publishable = true AND has_valid_image = true
-        ORDER BY is_featured DESC, quality_score DESC, published_at DESC NULLS LAST, id DESC
+        ORDER BY published_at DESC NULLS LAST, quality_score DESC, id DESC
         LIMIT 1
         `
       );
@@ -114,7 +122,7 @@ router.get('/featured', async (req, res) => {
         SELECT
           id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
           has_valid_image, is_publishable, quality_score
-        FROM news_articles
+        FROM ${publishedNews}
         WHERE is_active = true AND is_publishable = true
           AND ($1::text IS NULL OR slug <> $1)
         ORDER BY has_valid_image DESC, quality_score DESC, published_at DESC NULLS LAST, id DESC
@@ -143,9 +151,9 @@ router.get('/trending', async (req, res) => {
       SELECT
         id, title, slug, excerpt, source_name, image_url, published_at, category, tags, language, is_featured, external_url,
         has_valid_image, is_publishable, quality_score
-      FROM news_articles
+      FROM ${publishedNews}
       WHERE is_active = true AND is_publishable = true
-      ORDER BY is_featured DESC, quality_score DESC, published_at DESC NULLS LAST, id DESC
+      ORDER BY published_at DESC NULLS LAST, quality_score DESC, id DESC
       LIMIT 4
       `
     );

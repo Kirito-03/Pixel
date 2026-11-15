@@ -12,6 +12,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useImmersivePlayer } from '../hooks/useImmersivePlayer';
 import PlayerSystemBars from './PlayerSystemBars';
+import PlaybackChrome from './PlaybackChrome';
+import { episodePlaybackSources } from '../services/episodePlaybackSources';
 import { WebView } from 'react-native-webview';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -238,7 +240,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
             <TouchableOpacity
               accessibilityRole="button" accessibilityLabel={playing ? 'Pausar capítulo' : 'Reproducir capítulo'}
               onPress={() => { if (player.playing) player.pause(); else player.play(); resetControlsTimer(); }}
-              style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#E50914', justifyContent: 'center', alignItems: 'center' }}>
+              style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#344544', justifyContent: 'center', alignItems: 'center' }}>
               <Ionicons name={playing ? 'pause' : 'play'} size={30} color="#fff" />
             </TouchableOpacity>
             {hasNextEpisode && (
@@ -275,7 +277,9 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   hasNextEpisode = false,
   hasPreviousEpisode = false,
 }) => {
-  const [sources, setSources] = useState<VideoSource[]>([]);
+  const [sources, setSources] = useState<(VideoSource & { server?: string })[]>([]);
+  const [serverMenuOpen, setServerMenuOpen] = useState(false);
+  const serverMenuOpenRef = useRef(false);
   const [selectedSource, setSelectedSource] = useState<VideoSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [webViewLoading, setWebViewLoading] = useState(false);
@@ -487,6 +491,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
     setShowUI(true);
     Animated.timing(uiOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
     if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (serverMenuOpenRef.current) return;
     hideTimer.current = setTimeout(() => {
       Animated.timing(uiOpacity, { toValue: 0, duration: 500, useNativeDriver: true }).start(() =>
         setShowUI(false)
@@ -546,8 +551,9 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
       setLoading(true);
       setError(null);
       setCanControlEmbed(false);
-      if (episode.url) {
-        const directSources: VideoSource[] = [{ url: episode.url }];
+      setServerMenuOpen(false); serverMenuOpenRef.current = false;
+      const directSources = episodePlaybackSources(episode);
+      if (directSources.length) {
         setSources(directSources);
         setSelectedSource(directSources[0]);
         return;
@@ -704,41 +710,17 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
           )}
           {/* Interfaz Animada */}
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: uiOpacity }]} pointerEvents={showUI ? 'box-none' : 'none'}>
-            <LinearGradient
-              colors={['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.4)', 'transparent']}
-              style={styles.gradTop}
-              pointerEvents="none"
-            />
-            
-            {/* Top Bar */}
-            <View style={styles.topBar}>
-              <TouchableOpacity style={styles.backBtn} onPress={handleClose}>
-                <Ionicons name="arrow-back" size={20} color="#fff" />
-              </TouchableOpacity>
-              <View style={styles.titleBlock}>
-                <Text style={styles.animeTitleOverlay} numberOfLines={1}>{animeTitle}</Text>
-                <Text style={styles.episodeTitleOverlay} numberOfLines={1}>
-                  Ep. {episode.number} — {episode.title}
-                </Text>
-              </View>
-            </View>
+            <PlaybackChrome title={animeTitle} subtitle={`Temporada ${seasonNumber || 1} · Episodio ${episode.number}`}
+              onClose={handleClose} servers={sources} selectedIndex={Math.max(0, sources.indexOf(selectedSource!))}
+              menuOpen={serverMenuOpen} onMenuChange={open => { setServerMenuOpen(open); serverMenuOpenRef.current = open; showUITemporarily(); }}
+              onSelectServer={index => { flushLatestSnapshotRef.current(); setSelectedSource(sources[index]); setCanControlEmbed(false); setWebViewLoading(true); }}
+              onPrevious={hasPreviousEpisode ? handlePreviousEpisode : undefined} onNext={hasNextEpisode ? handleNextEpisode : undefined} />
 
             {canControlEmbed && <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? 'Pausar capítulo' : 'Reproducir capítulo'}
-              style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: -32, marginTop: -32, width: 64, height: 64, borderRadius: 32, backgroundColor: '#E50914', justifyContent: 'center', alignItems: 'center' }}
+              style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: -32, marginTop: -32, width: 64, height: 64, borderRadius: 32, backgroundColor: '#344544', justifyContent: 'center', alignItems: 'center' }}
               onPress={() => { webViewRef.current?.injectJavaScript('window.__pixelTogglePlayback && window.__pixelTogglePlayback(); true;'); showUITemporarily(); }}>
               <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color="#fff" />
             </TouchableOpacity>}
-            {/* Navigation Buttons */}
-            {hasPreviousEpisode && (
-              <TouchableOpacity style={[styles.floatNav, styles.floatNavLeft]} onPress={handlePreviousEpisode}>
-                <Ionicons name="chevron-back" size={28} color="#fff" />
-              </TouchableOpacity>
-            )}
-            {hasNextEpisode && (
-              <TouchableOpacity style={[styles.floatNav, styles.floatNavRight]} onPress={handleNextEpisode}>
-                <Ionicons name="chevron-forward" size={28} color="#fff" />
-              </TouchableOpacity>
-            )}
           </Animated.View>
         </View>
       );
@@ -759,7 +741,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
         onProgress={sendProgress}
       />
     );
-  }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds]);
+  }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds, serverMenuOpen, sources, seasonNumber]);
 
   // ── Loading / Error screens ──────────────────────────────────
   if (loading) {

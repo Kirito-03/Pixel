@@ -5,6 +5,7 @@ import EpisodePlayer from './EpisodePlayer';
 import { ContentItem, AnimeEpisode, AnimeSeason } from '../types';
 import { useProfile } from '../contexts/ProfileContext';
 import { canReachUrl } from '../services/connectivity';
+import { episodePlaybackSources } from '../services/episodePlaybackSources';
 import { offlineDownloads } from '../services/offlineDownloads';
 import { catalogService } from '../services/catalogService';
 
@@ -97,7 +98,7 @@ export default function AnimeSeriesModalWrapper({
     const episodeId = Number(episode.id);
 
     if (Platform.OS === 'android' && profileId && animeId && Number.isFinite(episodeId) && episodeId > 0) {
-      const online = await canReachUrl(String(episode.url || ''));
+      const online = await canReachUrl(episodePlaybackSources(episode)[0]?.url || '');
       if (!online) {
         const localUri = await offlineDownloads.getEpisodeUri(profileId, episodeId);
         if (!localUri) {
