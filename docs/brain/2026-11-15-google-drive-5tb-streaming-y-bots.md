@@ -120,8 +120,9 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
 ### A. Ajuste del Hero Carrusel en Web/Desktop (`components/AnimeArtwork.tsx` y `components/FeaturedMovie.tsx`)
 - **Causa identificada:** `utils/animeArtwork.ts` limita la escala horizontal/vertical a `<= 1.35x` para conservar la nitidez de los banners panorámicos de AniList (`~1900x350-400`), lo que da una altura renderizada de `472-540px`. Al tener `FeaturedMovie.tsx` una altura de contenedor de `680px` en escritorio y `alignTop` en `top: 0`, el banner dejaba `140-210px` de fondo negro vacío en la parte inferior donde flotaban los botones, mientras la parte superior quedaba parcialmente tapada por el navbar. Además, `infoButton` heredaba `flexBasis: 0` del estilo móvil y truncaba `"MÁS INFORMACIÓN"` a `"MÁS INFORMA..."`.
 - **Solución aplicada:**
-  - En `AnimeArtwork.tsx` se añadió `topOffset` y un contenedor recortado interior para iniciar la imagen exactamente debajo de la barra de navegación superior (`headerOffset = 68px` en web desktop) sin estirar la imagen por encima de `1.35x`.
-  - En `FeaturedMovie.tsx` se ajustó `heroHeight` en escritorio a `Math.min(540, Math.max(460, Math.round(height * 0.64)))` con `paddingBottom: 48` y gradientes alineados a `top: headerOffset`, ubicando título, sinopsis (`numberOfLines: 3`) y botones sobre la imagen.
+  - En `utils/animeArtwork.ts` se ajustó el tope de escala a `<= 1.5` para que los banners panorámicos cubran el alto completo sin deformarse.
+  - En `AnimeArtwork.tsx` se añadió `topOffset` con un contenedor recortado interior y anclaje fijo `top: 0` cuando `alignTop` está activo para iniciar exactamente debajo de la barra superior (`headerOffset = 72 px` en web desktop).
+  - En `FeaturedMovie.tsx` se ajustó `heroHeight` en escritorio a `Math.min(610, Math.max(585, Math.round(height * 0.78)))` con `position="50% 0%"`, `paddingBottom: 48` y gradientes alineados a `top: headerOffset`, ubicando título, sinopsis (`numberOfLines: 3`) y botones sobre la imagen.
   - En los botones desktop se estableció `flexBasis: 'auto'` y `minWidth: 210` en `infoButton` para mostrar `"MÁS INFORMACIÓN"` completo.
 
 ### B. Estabilización de `rclone`, Ingesta Automática en Cron y Botones en el Admin
@@ -138,7 +139,7 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
 - **Verificado en esta sesión:**
   - `node --check` sobre los 7 archivos JS/mjs modificados (exit 0).
   - `npx tsc --noEmit`: 0 errores en los archivos modificados (persisten 5 errores previos no relacionados en `components/Loader.tsx`, `hooks/useProfileManagement.ts` y `services/offlineDownloads.ts`).
-  - `npm run build:web` (con `tools/build-limited.mjs`): compilación web completada y desplegada en `arle`; `https://pixelnosekai.com/` sirve `index-fa4504c3bf9ddb8eff86328f51d00c97.js`.
+  - `npm run build:web` (con `tools/build-limited.mjs`): compilación web completada y desplegada en `arle`; `https://pixelnosekai.com/` sirve `index-229e6a2d534fad35b7bf8011bac32628.js`.
   - `curl -sI http://127.0.0.1:8086/Hentai/1/1/episode.mp4` en `arle`: `HTTP/1.1 200 OK` (`Content-Length: 80171512`).
   - `GET /api/admin/drive/inventory` autenticado contra `http://127.0.0.1:3001` en `arle`: `HTTP 200` con `totalDriveItems: 3` (`Anime: 1`, `Manga: 1`, `Hentai: 1`) y listas `pending` (`anime: 20`, `manga: 20`, `hentai: 20`).
   - Log de PM2 `pixel-backend`: tarea `- Google Drive Ingest Batch: Cada 4 horas (minuto 15)` registrada al iniciar.

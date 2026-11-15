@@ -9,7 +9,7 @@ export function artworkLayout(frame: { width: number; height: number }, image: {
     return { width, height, left: frame.width - width - Math.max(24, (frame.width - 1120) / 2), top: (frame.height - height) / 2 };
   }
   const requestedScale = Math.max(frame.width / image.width, frame.height / image.height);
-  const scale = Math.min(requestedScale, portrait ? 1.5 : 1.35);
+  const scale = Math.min(requestedScale, 1.5);
   const width = image.width * scale;
   const height = image.height * scale;
   const focal = position?.match(/^(\d{1,3})%\s+(\d{1,3})%$/);

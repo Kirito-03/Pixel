@@ -97,14 +97,14 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     ? ['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.3)', 'transparent']
     : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.5)', 'transparent'];
 
-  const headerOffset = isSmallScreen ? 0 : (isWeb ? 68 : 60);
+  const headerOffset = isSmallScreen ? 0 : (isWeb ? 72 : 64);
   const heroHeight = isSmallScreen
     ? Math.min(680, Math.max(500, height * 0.75))
-    : Math.min(540, Math.max(460, Math.round(height * 0.64)));
+    : Math.min(610, Math.max(585, Math.round(height * 0.78)));
 
   return (
     <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: heroHeight }]}>
-      <AnimeArtwork alignTop topOffset={headerOffset} banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "100% 40%"} />
+      <AnimeArtwork alignTop topOffset={headerOffset} banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "50% 0%"} />
 
       {/* Top vignette para navbar */}
       <LinearGradient

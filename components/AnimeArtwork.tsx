@@ -32,7 +32,7 @@ export default function AnimeArtwork({ banner, poster, position, alignTop = fals
             source={{ uri }}
             accessible={false}
             resizeMode="stretch"
-            style={[{ position: 'absolute' }, layout, alignTop && layout.height < innerHeight ? { top: 0 } : null]}
+            style={[{ position: 'absolute' }, layout, alignTop ? { top: 0 } : null]}
             onError={() => { if (uri === banner) setFailedBanner(true); }}
           />
         ) : null}
