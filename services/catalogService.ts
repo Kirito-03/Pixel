@@ -79,17 +79,27 @@ export const catalogService = {
   },
 
   async getHomeSections() {
-    const limit = 20;
-    const [airing, finished, upcoming] = await Promise.all([
-      http.get('/api/catalog/anime', { params: { status: 'Releasing', page: 1, limit } }),
-      http.get('/api/catalog/anime', { params: { status: 'Finished', page: 1, limit } }),
-      http.get('/api/catalog/anime', { params: { status: 'Not Yet Released', page: 1, limit } }),
+    const limit = 24;
+    // Lista de géneros con catálogo abundante para rotar en cada recarga
+    const rotatingGenres = ['Action', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Adventure', 'Sci-Fi', 'Slice of Life', 'Supernatural'];
+    const randomGenre = rotatingGenres[Math.floor(Math.random() * rotatingGenres.length)];
+
+    const [airing, finished, recommended, genreAnime] = await Promise.all([
+      http.get('/api/catalog/anime', { params: { status: 'Releasing', page: 1, limit, sort: 'random' } }),
+      http.get('/api/catalog/anime', { params: { status: 'Finished', page: 1, limit, sort: 'random' } }),
+      http.get('/api/catalog/anime', { params: { limit, sort: 'rating' } }),
+      http.get('/api/catalog/anime', { params: { genre: randomGenre, limit, sort: 'random' } }),
     ]);
 
     return {
       airing: (airing.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
       finished: (finished.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
-      upcoming: (upcoming.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
+      upcoming: (recommended.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
+      featuredGenre: {
+        genre: randomGenre,
+        title: `Populares de ${randomGenre}`,
+        items: (genreAnime.data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[],
+      },
     };
   },
 };

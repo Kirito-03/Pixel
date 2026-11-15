@@ -40,20 +40,13 @@ export default function HomeScreen({ navigation }: Props) {
     const scrollViewRef = useRef<ScrollView>(null);
     const { height: screenHeight } = Dimensions.get('window');
 
-    // INFINITE SCROLL STATE
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const loadingMoreRef = useRef<boolean>(false);
-    const loadedRowKeysRef = useRef<Set<string>>(new Set());
-    const [extraRows, setExtraRows] = useState<{ key: string; title: string; items: ContentItem[] }[]>([]);
-    const [genreSequenceIndex, setGenreSequenceIndex] = useState(0);
-
-    // List of dynamic genres to load infinitely (Netflix style)
-    const GENRE_POOL = ['Action', 'Romance', 'Comedy', 'Sci-Fi', 'Fantasy', 'Slice of Life', 'Drama', 'Adventure'];
+    // Fila dinámica de género destacado rotativo
+    const [featuredGenreRow, setFeaturedGenreRow] = useState<{ title: string; items: ContentItem[] } | null>(null);
 
     const CATEGORY_LABELS: Record<string, string> = {
         airing: 'En emisión',
         finished: 'Finalizados',
-        upcoming: 'Próximos lanzamientos',
+        upcoming: 'Recomendados',
     };
 
     // Accent colors por sección para variedad visual
@@ -62,6 +55,7 @@ export default function HomeScreen({ navigation }: Props) {
         featured: '#FFD700',             // dorado
         finished: '#00C853',             // verde
         upcoming: '#448AFF',             // azul
+        genre: '#E040FB',                // violeta
     };
 
     const mapCatalogAnimeToContentItem = (anime: CatalogAnime): ContentItem => ({
@@ -147,6 +141,15 @@ export default function HomeScreen({ navigation }: Props) {
                 upcoming: sections.upcoming.map(mapCatalogAnimeToContentItem),
             };
 
+            if (sections.featuredGenre && sections.featuredGenre.items?.length > 0) {
+                setFeaturedGenreRow({
+                    title: sections.featuredGenre.title,
+                    items: sections.featuredGenre.items.map(mapCatalogAnimeToContentItem),
+                });
+            } else {
+                setFeaturedGenreRow(null);
+            }
+
             const featuredBase = newContentSections.airing.length
                 ? sections.airing
                 : (sections.finished.length ? sections.finished : sections.upcoming);
@@ -195,15 +198,8 @@ export default function HomeScreen({ navigation }: Props) {
     };
 
     const handleScroll = (event: any) => {
-        const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+        const { contentOffset } = event.nativeEvent;
         setBlackHeader(contentOffset.y > 10);
-
-        // Infinite scroll logic
-        const paddingToBottom = 150;
-        const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-        if (isAtBottom && !isLoadingMore && contentFilter === 'anime') {
-            loadMoreGenres();
-        }
     };
 
     const handleContentPress = (item: ContentItem) => {
@@ -217,60 +213,6 @@ export default function HomeScreen({ navigation }: Props) {
     const handleFilterChange = (filter: 'series' | 'movies' | 'all' | 'anime') => {
         setContentFilter(filter);
         setSelectedCategory(null);
-        setExtraRows([]);
-        setGenreSequenceIndex(0);
-        loadedRowKeysRef.current = new Set();
-    };
-
-    // Load new genre rows infinitely
-    const loadMoreGenres = async () => {
-        try {
-            if (loadingMoreRef.current) return;
-            loadingMoreRef.current = true;
-            setIsLoadingMore(true);
-
-            if (genreSequenceIndex >= GENRE_POOL.length) {
-                // If we ran out of genres, maybe loop or stop
-                setIsLoadingMore(false);
-                return;
-            }
-
-            const batchSize = 2; // Load 2 genres at a time
-            const newExtraRows: { key: string; title: string; items: ContentItem[] }[] = [];
-
-            for (let i = 0; i < batchSize; i++) {
-                const currentIndex = genreSequenceIndex + i;
-                if (currentIndex >= GENRE_POOL.length) break;
-
-                const genre = GENRE_POOL[currentIndex];
-                const response = await catalogService.getAnimeList({ genre, limit: 15 });
-                const usedGenreIds = new Set([...extraRows, ...newExtraRows].flatMap(row => row.items.map(item => item.id)));
-                const items = (response?.data || []).map(mapCatalogAnimeToContentItem).filter(item => !usedGenreIds.has(item.id));
-
-                if (items.length > 0) {
-                    const rowKey = `genre_${genre}`;
-                    if (!loadedRowKeysRef.current.has(rowKey)) {
-                        newExtraRows.push({
-                            key: rowKey,
-                            title: `Animes de ${genre}`,
-                            items: items,
-                        });
-                        loadedRowKeysRef.current.add(rowKey);
-                    }
-                }
-            }
-
-            setGenreSequenceIndex(prev => prev + batchSize);
-
-            if (newExtraRows.length > 0) {
-                setExtraRows(prev => [...prev, ...newExtraRows]);
-            }
-        } catch (error) {
-            console.error('Error loading more genres:', error);
-        } finally {
-            setIsLoadingMore(false);
-            loadingMoreRef.current = false;
-        }
     };
 
 
@@ -463,17 +405,33 @@ export default function HomeScreen({ navigation }: Props) {
                             />
                         )}
 
-                    {/* Sección: Todo el catálogo (upcoming) */}
+                    {/* Sección: Recomendados (rating / destacados) */}
                     {shouldShowCategory('upcoming') &&
                         contentSections.upcoming?.length > 0 &&
                         filterContent(contentSections.upcoming).length > 0 && (
                             <MovieRow
                                 key="upcoming"
-                                title="Todo el catálogo"
+                                title="Recomendados"
                                 accentColor={SECTION_ACCENTS.upcoming}
                                 movies={filterContent(contentSections.upcoming)}
                                 onMoviePress={(id) => {
                                     const item = contentSections.upcoming.find(i => i.id === id);
+                                    if (item) handleContentNavigation(item);
+                                }}
+                            />
+                        )}
+
+                    {/* Sección: Género destacado rotativo (varía en cada actualización) */}
+                    {featuredGenreRow &&
+                        featuredGenreRow.items?.length > 0 &&
+                        filterContent(featuredGenreRow.items).length > 0 && (
+                            <MovieRow
+                                key="featured_genre"
+                                title={featuredGenreRow.title}
+                                accentColor={SECTION_ACCENTS.genre || '#E040FB'}
+                                movies={filterContent(featuredGenreRow.items)}
+                                onMoviePress={(id) => {
+                                    const item = featuredGenreRow.items.find(i => i.id === id);
                                     if (item) handleContentNavigation(item);
                                 }}
                             />
@@ -485,26 +443,6 @@ export default function HomeScreen({ navigation }: Props) {
                             <Text style={[styles.emptyTitle, { color: colors.text }]}>{loadError ? "No pudimos cargar el catálogo" : "Aún no hay anime disponible"}</Text>
                             <Text style={[styles.emptySubtitle, { color: colors.textMuted || 'rgba(255,255,255,0.5)' }]}>{loadError ? "Comprueba tu conexión o vuelve a intentarlo en unos momentos." : "Agrega contenido desde el panel de administrador."}</Text>
                             {loadError && <Pressable accessibilityRole="button" onPress={loadContent}><Text style={{ color: colors.primary, marginTop: 16 }}>Reintentar</Text></Pressable>}
-                        </View>
-                    )}
-
-                    {/* Infinite Scroll Genre Rows */}
-                    {extraRows.map((row) => (
-                        <MovieRow
-                            key={row.key}
-                            title={row.title}
-                            accentColor={colors.primary}
-                            movies={filterContent(row.items)}
-                            onMoviePress={(id) => {
-                                const item = row.items.find(i => i.id === id);
-                                if (item) handleContentNavigation(item);
-                            }}
-                        />
-                    ))}
-
-                    {isLoadingMore && (
-                        <View style={styles.loadingMore}>
-                            <ActivityIndicator size="small" color={colors.primary} />
                         </View>
                     )}
                 </View>

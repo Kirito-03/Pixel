@@ -58,6 +58,8 @@ router.get('/anime', async (req, res) => {
       orderBy = 'ORDER BY rating DESC NULLS LAST, created_at DESC';
     } else if (sort === 'title') {
       orderBy = 'ORDER BY title ASC';
+    } else if (sort === 'random') {
+      orderBy = 'ORDER BY RANDOM()';
     }
 
     const listQuery = `

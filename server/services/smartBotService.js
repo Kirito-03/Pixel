@@ -317,8 +317,8 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
         }
 
         // --- PREVENCIÓN DE DUPLICADOS ---
-        // Obtener títulos oficiales de AniList para buscar en BD de forma robusta
-        let titlesToCheck = [titleQuery];
+        // Obtener títulos oficiales de AniList y variaciones limpias para buscar en BD de forma robusta
+        let titlesToCheck = [titleQuery, ...buildTitleSearchCandidates(titleQuery)];
         if (extractedMalId) {
           try {
             const aniListMeta = await searchAniListByMalId(extractedMalId);
@@ -335,7 +335,7 @@ async function runSyncAllCatalogJob(job, startPage, endPage) {
         // Buscar si ya existe por cualquiera de las variaciones del título
         for (const t of titlesToCheck) {
           const existCheck = await pool.query(
-            `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
+            `SELECT id FROM anime_content WHERE is_active = true AND (title ILIKE $1 OR title_english ILIKE $1) LIMIT 1`,
             [`%${t}%`]
           );
           if (existCheck.rows.length > 0) {
@@ -430,7 +430,7 @@ async function runSyncAiringJob(job) {
         }
 
         // --- PREVENCIÓN DE DUPLICADOS ---
-        let titlesToCheck = [titleQuery];
+        let titlesToCheck = [titleQuery, ...buildTitleSearchCandidates(titleQuery)];
         if (extractedMalId) {
           try {
             const aniListMeta = await searchAniListByMalId(extractedMalId);
@@ -446,7 +446,7 @@ async function runSyncAiringJob(job) {
 
         for (const t of titlesToCheck) {
           const existCheck = await pool.query(
-            `SELECT id FROM anime_content WHERE title ILIKE $1 OR title_english ILIKE $1 LIMIT 1`,
+            `SELECT id FROM anime_content WHERE is_active = true AND (title ILIKE $1 OR title_english ILIKE $1) LIMIT 1`,
             [`%${t}%`]
           );
           if (existCheck.rows.length > 0) {
@@ -585,10 +585,18 @@ async function runMetadataJob(job, animeId, forceMalId = null) {
       release_date: metadata.release_date,
     };
 
-    // Actualizar título siempre si AniList nos devuelve uno mejor (distinto al de búsqueda)
+    // Actualizar título si AniList nos devuelve uno mejor, validando que no duplique otro anime
     if (metadata.title && anime.title !== metadata.title) {
-      updates.push(`title = $${paramIndex++}`);
-      values.push(metadata.title);
+      const duplicateTitleCheck = await pool.query(
+        `SELECT id FROM anime_content WHERE id != $1 AND is_active = true AND LOWER(TRIM(title)) = LOWER(TRIM($2)) LIMIT 1`,
+        [animeId, metadata.title]
+      );
+      if (duplicateTitleCheck.rows.length === 0) {
+        updates.push(`title = $${paramIndex++}`);
+        values.push(metadata.title);
+      } else {
+        console.warn(`[SmartBot] Título AniList "${metadata.title}" ya existe en ID ${duplicateTitleCheck.rows[0].id}. Evitando duplicado en ID ${animeId}.`);
+      }
     }
 
     for (const [field, newValue] of Object.entries(fieldMap)) {
