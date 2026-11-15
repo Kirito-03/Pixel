@@ -53,3 +53,7 @@ Actualización1.0.9/código10: archivo de Drive priorizado sobre proveedores ext
 Actualización1.0.10/código11: corrección del acceso al VideoPlayer liberado que cerraba la interfaz; barra de reproducción para elegir minuto; historial de búsquedas sincronizado por cuenta/perfil, con migración local y suscripción en vivo. APK124243470bytes; SHA256ae74223135accbff3fd284b70106e284eb0c55ee8bbc36d4592bd6c4447c9bc2. Instalada en el Samsung conectado; pendiente confirmación del usuario sobre salida/capítulo anterior. Ver docs/brain/2026-11-15-player-release-timeline-sync.md.
 
 Confirmación del usuario sobre1.0.10: al probar anterior/flecha de salida ya no aparece pantalla gris. La validación de la barra y del historial se documenta en docs/brain/2026-11-15-player-release-timeline-sync.md.
+
+Actualización1.0.11/código12: Emisión y Buscar rediseñados para web/Android con menos rojo y marcos; resultados con filtros accesibles, calendario con disponibilidad real y mejor encuadre de arte en Inicio. APK124243066bytes; SHA2564698e0b5306c9318dd7e7669f05863ea8e9145fe39e43ae898dab8d51718f1b8. Ver docs/brain/2026-11-15-emision-busqueda-imagenes.md para validaciones y limitaciones.
+
+APK1.0.11 instalada por actualización en el Samsung conectado; dumpsys confirma1.0.11/código12. Manifiesto, SHA256 y descarga parcial206 verificados. Pendiente revisión visual nativa del usuario.

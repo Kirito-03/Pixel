@@ -8,7 +8,7 @@ export type UniversalSearchResult =
   | { kind: 'manga'; key: string; title: string; poster: string; manga: Manga };
 export type UniversalSearchResponse = { items: UniversalSearchResult[]; unavailable: ('anime' | 'manga')[] };
 
-export function animeSearchResult(anime: any): UniversalSearchResult {
+export function animeSearchResult(anime: any): Extract<UniversalSearchResult, { kind: 'anime' }> {
   const content: ContentItem = {
     id: Number(anime.id), type: 'anime', title: anime.title || 'Sin título',
     overview: anime.description || '', poster_path: anime.poster_url || '',

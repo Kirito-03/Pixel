@@ -1,559 +1,111 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  Image,
-  Dimensions,
-  useWindowDimensions,
-  Platform,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, ScrollView, useWindowDimensions, Platform, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme';
 import { catalogService, CatalogAnime } from '../services/catalogService';
-import { getCurrentBaseURL } from '../services/databaseService';
-import { animeToContentItem } from '../services/api';
+import { backendClient } from '../services/backendClient';
+import { animeSearchResult } from '../services/universalSearch';
+import { isPublicCatalogItem } from '../utils/publicCatalog';
 import Header from '../components/Header';
+import DiscoveryCard from '../components/DiscoveryCard';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import MovieModal from '../components/MovieModal';
 import { ContentItem } from '../types';
-import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
 
-export default function AiringScreen({ navigation }: any) {
+const DAYS = [{ id: 'monday', label: 'Lunes', short: 'Lun' }, { id: 'tuesday', label: 'Martes', short: 'Mar' }, { id: 'wednesday', label: 'Miércoles', short: 'Mié' }, { id: 'thursday', label: 'Jueves', short: 'Jue' }, { id: 'friday', label: 'Viernes', short: 'Vie' }, { id: 'saturday', label: 'Sábado', short: 'Sáb' }, { id: 'sunday', label: 'Domingo', short: 'Dom' }];
+const normalize = (text: string) => text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export default function AiringScreen() {
   const { colors, theme } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const isWeb = Platform.OS === 'web';
-  const isSmallScreen = width < 768;
-  const headerHeight = isWeb ? 90 : (56 + insets.top);
-  const gap = 12;
-  const desiredItemWidth = width < 768 ? (width * 0.3) : 160;
-  const numColumns = Math.max(width < 420 ? 2 : 3, Math.floor((width - 40) / (desiredItemWidth + gap)));
-  const itemWidth = (width - 40 - gap * (numColumns - 1)) / numColumns;
-
+  const native = Platform.OS === 'android';
+  const compact = width < 768;
+  const contentWidth = Math.min(1280, width - (compact ? 32 : 80));
+  const columns = compact ? (width < 520 ? 2 : 3) : width < 1050 ? 4 : 6;
+  const gap = compact ? 14 : 24;
+  const itemWidth = (contentWidth - gap * (columns - 1)) / columns;
   const { navigateByLabel } = useTabNavigation();
-  const [activeTab, setActiveTab] = useState<'local' | 'calendar'>('local');
-  const [animes, setAnimes] = useState<CatalogAnime[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const currentDayStr = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date().getDay()];
-  const [calendarDay, setCalendarDay] = useState<string>(currentDayStr);
-  const [calendarData, setCalendarData] = useState<any[]>([]);
-  const [calendarLoading, setCalendarLoading] = useState(false);
-
+  const [tab, setTab] = useState<'local' | 'calendar'>('local');
+  const [day, setDay] = useState(() => new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'Asia/Tokyo' }).format(new Date()).toLowerCase());
+  const [local, setLocal] = useState<CatalogAnime[]>([]), [calendar, setCalendar] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true), [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const generation = useRef(0);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-
+  const scheduleGeneration = useRef(0);
+  const [schedule, setSchedule] = useState<any>(null), [resolving, setResolving] = useState(false), [availability, setAvailability] = useState('');
   useEffect(() => {
-    if (activeTab === 'local') {
-      fetchAiringAnimes();
-    } else {
-      fetchCalendar(calendarDay);
-    }
-  }, [activeTab, calendarDay]);
-
-  const fetchCalendar = async (day: string) => {
-    try {
-      setCalendarLoading(true);
-      setCalendarData([]); // Clear previous data immediately
-
-      // Llamamos al backend proxy para evitar CORS en web
-      const baseURL = getCurrentBaseURL() || 'http://localhost:3001';
-      const res = await axios.get(`${baseURL}/api/schedules?filter=${day}`);
-
-      const rawData = res.data?.data || [];
-
-      // Deduplicate by mal_id
-      const uniqueItems: any[] = [];
-      const seenMalIds = new Set<number>();
-      for (const item of rawData) {
-        if (!seenMalIds.has(item.mal_id)) {
-          seenMalIds.add(item.mal_id);
-          uniqueItems.push(item);
+    const request = ++generation.current;
+    setLoading(true); setError('');
+    const run = async () => {
+      try {
+        if (tab === 'local') {
+          const response = await catalogService.getAnimeList({ status: 'Airing', limit: 100 });
+          if (generation.current === request) setLocal([...new Map(response.data.map(item => [String(item.id), item])).values()]);
+        } else {
+          const { data } = await backendClient.get('/api/schedules', { params: { filter: day } });
+          const rows = (Array.isArray(data?.data) ? data.data : []).filter(isPublicCatalogItem);
+          if (generation.current === request) setCalendar([...new Map(rows.map((item: any) => [String(item.mal_id), item])).values()]);
         }
-      }
-
-      setCalendarData(uniqueItems);
-    } catch (err) {
-      console.error('[AiringScreen] Error cargando calendario:', err);
-      setCalendarData([]); // Ensure it's cleared on error
-    } finally {
-      setCalendarLoading(false);
-    }
-  };
-
-  const fetchAiringAnimes = async () => {
+      } catch { if (generation.current === request) setError('No pudimos cargar esta sección. Comprueba tu conexión e inténtalo otra vez.'); }
+      finally { if (generation.current === request) setLoading(false); }
+    };
+    void run();
+    return () => { generation.current++; };
+  }, [tab, tab === 'calendar' ? day : '', retry]);
+  const closeCalendar = () => { scheduleGeneration.current++; setSchedule(null); setResolving(false); };
+  const openCalendar = (item: any) => { scheduleGeneration.current++; setSchedule(item); setAvailability(''); setResolving(false); };
+  const findLocal = async () => {
+    const current = schedule; if (!current || resolving) return;
+    const request = ++scheduleGeneration.current;
+    setResolving(true); setAvailability('');
     try {
-      setLoading(true);
-      setError(null);
-      const res = await catalogService.getAnimeList({ status: 'Airing', limit: 100 });
-      // Deduplicate by id
-      const uniqueAnimes: CatalogAnime[] = [];
-      const seenIds = new Set<string>();
-      for (const item of (res.data || [])) {
-        if (!seenIds.has(item.id)) {
-          seenIds.add(item.id);
-          uniqueAnimes.push(item);
-        }
-      }
-      setAnimes(uniqueAnimes);
-    } catch (err: any) {
-      setError(err.message || 'Error cargando animes en emisión');
-    } finally {
-      setLoading(false);
-    }
+      const rows = await catalogService.searchAnime(current.title);
+      if (request !== scheduleGeneration.current) return;
+      const match = rows.find(row => [row.title, row.title_english, row.title_japanese].some(title => title && normalize(title) === normalize(current.title)));
+      if (match) { closeCalendar(); setSelectedContent(animeSearchResult(match).content); }
+      else setAvailability('Este título todavía no está disponible en el catálogo de Pixel.');
+    } catch { if (request === scheduleGeneration.current) setAvailability('No se pudo comprobar la disponibilidad. Inténtalo de nuevo.'); }
+    finally { if (request === scheduleGeneration.current) setResolving(false); }
   };
-
-  const mapCatalogAnimeToContentItem = (anime: CatalogAnime): ContentItem => ({
-    id: Number(anime.id),
-    type: 'anime',
-    title: anime.title || 'Sin título',
-    overview: anime.description || '',
-    poster_path: anime.poster_url || '',
-    backdrop_path: anime.banner_url || anime.poster_url || '',
-    release_date: anime.release_date || '',
-    vote_average: typeof anime.rating === 'number' ? anime.rating : 0,
-    source: 'anilist',
-    genres: Array.isArray(anime.genres) ? anime.genres : [],
-    status: anime.status || '',
-  });
-
-  const handleMoviePress = (anime: CatalogAnime) => {
-    const item = mapCatalogAnimeToContentItem(anime);
-    setSelectedContent(item);
-    setModalVisible(true);
-  };
-
-  const mapJikanToContentItem = (item: any): ContentItem => ({
-    id: Number(item.mal_id),
-    type: 'anime',
-    title: item.title || 'Sin título',
-    overview: item.synopsis || '',
-    poster_path: item.images?.jpg?.large_image_url || '',
-    backdrop_path: item.images?.jpg?.large_image_url || '',
-    release_date: '',
-    vote_average: item.score || 0,
-    source: 'jikan',
-    genres: [],
-    status: item.status || '',
-  });
-
-  const handleCalendarPress = (item: any) => {
-    const content = mapJikanToContentItem(item);
-    setSelectedContent(content);
-    setModalVisible(true);
-  };
-
-  const renderItem = ({ item }: { item: CatalogAnime }) => {
-    return (
-      <TouchableOpacity
-        style={[styles.card, { width: itemWidth, marginRight: gap }]}
-        activeOpacity={0.8}
-        onPress={() => handleMoviePress(item)}
-      >
-        <View style={[styles.posterBox, { height: itemWidth * 1.5 }]}>
-          <Image
-            source={{ uri: item.poster_url || 'https://via.placeholder.com/300x450' }}
-            style={styles.poster}
-            resizeMode="cover"
-          />
-          <View style={styles.badgeTopLeft}>
-            <Text style={styles.badgeText}>SUB</Text>
-          </View>
-          <View style={styles.badgeTopRight}>
-            <Ionicons name="star" size={10} color="#fff" style={{ marginRight: 2 }} />
-            <Text style={styles.badgeText}>{typeof item.rating === 'number' ? (item.rating / 10).toFixed(1) : 'N/A'}</Text>
-          </View>
-          <View style={styles.badgeBottomLeft}>
-            <Text style={styles.epText}>{item.total_episodes ? `Ep ${item.total_episodes}` : 'Emisión'}</Text>
-          </View>
-        </View>
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>Emisión actual</Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderCalendarItem = ({ item }: { item: any }) => {
-    return (
-      <TouchableOpacity
-        style={[styles.card, { width: itemWidth, marginRight: gap }]}
-        activeOpacity={0.8}
-        onPress={() => handleCalendarPress(item)}
-      >
-        <View style={[styles.posterBox, { height: itemWidth * 1.5 }]}>
-          <Image
-            source={{ uri: item.images?.jpg?.large_image_url || 'https://via.placeholder.com/300x450' }}
-            style={styles.poster}
-            resizeMode="cover"
-          />
-          <View style={styles.badgeTopLeft}>
-            <Text style={styles.badgeText}>SUB</Text>
-          </View>
-          <View style={styles.badgeTopRight}>
-            <Ionicons name="star" size={10} color="#fff" style={{ marginRight: 2 }} />
-            <Text style={styles.badgeText}>{item.score ? item.score.toFixed(1) : 'N/A'}</Text>
-          </View>
-          <View style={styles.badgeBottomLeft}>
-            <Text style={styles.epText}>{item.broadcast?.time || '00:00'}</Text>
-          </View>
-        </View>
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>{item.broadcast?.string || 'Emisión semanal'}</Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const DAYS = [
-    { id: 'monday', label: 'Lun' },
-    { id: 'tuesday', label: 'Mar' },
-    { id: 'wednesday', label: 'Mié' },
-    { id: 'thursday', label: 'Jue' },
-    { id: 'friday', label: 'Vie' },
-    { id: 'saturday', label: 'Sáb' },
-    { id: 'sunday', label: 'Dom' },
-  ];
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header
-        activeSection="Emisión"
-        onNavPress={navigateByLabel}
-        onSearchPress={() => navigateByLabel('Buscar')}
-        onProfilePress={() => navigateByLabel('Perfil')}
-      />
-
-      {/* Espacio extra en la parte superior porque Header es absoluto */}
-      <View style={{ height: headerHeight }} />
-
-      <View style={styles.headerTitleContainer}>
-        <View style={styles.titleRow}>
-          <Text style={[styles.pageTitleWhite, { color: colors.text }, isSmallScreen && { fontSize: 36 }]}>EMI</Text>
-          <Text style={[styles.pageTitleRed, isSmallScreen && { fontSize: 36 }]}>SIÓN</Text>
-        </View>
-        <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>CALENDARIO DE EMISIÓN SEMANAL</Text>
-      </View>
-
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'local' && styles.tabBtnActive, { backgroundColor: activeTab === 'local' ? '#E50914' : (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') }]}
-          onPress={() => setActiveTab('local')}
-        >
-          <Ionicons name="list" size={16} color={activeTab === 'local' ? '#fff' : (theme === 'dark' ? '#666' : '#999')} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabText, activeTab === 'local' && styles.tabTextActive]}>VER DISPONIBLES</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'calendar' && styles.tabBtnActiveCalendar, { backgroundColor: activeTab === 'calendar' ? '#E50914' : (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') }]}
-          onPress={() => setActiveTab('calendar')}
-        >
-          <Ionicons name="calendar-outline" size={16} color={activeTab === 'calendar' ? '#fff' : (theme === 'dark' ? '#666' : '#999')} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive, !activeTab && { color: theme === 'dark' ? '#666' : '#999' }]}>CALENDARIO GLOBAL</Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'calendar' && (
-        <View style={[styles.daysContainer, { borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-          {DAYS.map(d => (
-            <TouchableOpacity
-              key={d.id}
-              style={[styles.dayBtn, calendarDay === d.id && styles.dayBtnActive]}
-              onPress={() => {
-                setActiveTab('calendar');
-                setCalendarDay(d.id);
-              }}
-            >
-              <Text style={[styles.dayText, calendarDay === d.id && styles.dayTextActive, calendarDay !== d.id && { color: theme === 'dark' ? '#666' : '#999' }]}>{d.label.toUpperCase()}</Text>
-              {calendarDay === d.id && <View style={styles.activeDayDot} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Indicador del Día / Sección Hoy */}
-      <View style={styles.sectionHeaderBox}>
-        <View style={styles.sectionHeaderDot} />
-        <Text style={styles.sectionHeaderText}>
-          {activeTab === 'calendar'
-            ? DAYS.find(d => d.id === calendarDay)?.label.toUpperCase()
-            : 'HOY'}
-        </Text>
-      </View>
-
-      {activeTab === 'local' && (
-        loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : error ? (
-          <View style={styles.center}>
-            <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
-            <Text style={[styles.errorText, { color: colors.textMuted }]}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={fetchAiringAnimes}>
-              <Text style={[styles.retryText, { color: colors.text }]}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
-        ) : animes.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="tv-outline" size={48} color={colors.textMuted} />
-            <Text style={[styles.errorText, { color: colors.textMuted }]}>No hay animes en emisión actualmente.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={animes}
-            renderItem={renderItem}
-            key={numColumns}
-            keyExtractor={(item) => item.id.toString()}
-            numColumns={numColumns}
-            contentContainerStyle={styles.gridContainer}
-            showsVerticalScrollIndicator={false}
-          />
-        )
-      )}
-
-      {activeTab === 'calendar' && (
-        calendarLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={'#E50914'} />
-          </View>
-        ) : calendarData.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="calendar-outline" size={48} color={theme === 'dark' ? '#666' : '#999'} />
-            <Text style={[styles.errorText, { color: colors.textMuted }]}>No hay animes programados para este día.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={calendarData}
-            renderItem={renderCalendarItem}
-            key={numColumns} // Force re-render on resize
-            keyExtractor={(item) => item.mal_id?.toString() || Math.random().toString()}
-            numColumns={numColumns}
-            contentContainerStyle={styles.gridContainer}
-            showsVerticalScrollIndicator={false}
-          />
-        )
-      )}
-
-      {selectedContent && (
-        <MovieModal
-          visible={modalVisible}
-          content={selectedContent}
-          onClose={() => setModalVisible(false)}
-        />
-      )}
+  const data = tab === 'local' ? local : calendar;
+  const listHeader = <>
+    <View style={[s.heading, native && { paddingTop: 16, marginBottom: 22 }]}>
+      <View style={{ flex: 1 }}><Text style={[s.eyebrow, { color: colors.textMuted }]}>{native ? 'TU AGENDA DE ANIME' : 'SIGUE TUS SERIES CADA SEMANA'}</Text><Text style={[s.title, { color: colors.text, fontSize: compact ? 30 : 42 }]}>En emisión</Text>{!native && <Text style={[s.subtitle, { color: colors.textMuted }]}>Encuentra qué ver y consulta los próximos estrenos.</Text>}</View>
+      {!compact && <Ionicons name="radio-outline" size={34} color={colors.textMuted} />}
     </View>
-  );
+    <View style={[s.tabs, { backgroundColor: colors.card, alignSelf: compact ? 'stretch' : 'flex-start' }]}>
+      {(['local', 'calendar'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="tab" accessibilityLabel={value === 'local' ? 'Disponibles en Pixel' : 'Calendario semanal'} accessibilityState={{ selected: tab === value }} onPress={() => setTab(value)} style={[s.tab, compact && { flex: 1 }, tab === value && { backgroundColor: theme === 'dark' ? '#283432' : '#dce8e5' }]}>
+        <Ionicons name={value === 'local' ? 'play-circle-outline' : 'calendar-outline'} size={17} color={tab === value ? colors.text : colors.textMuted} /><Text style={{ color: tab === value ? colors.text : colors.textMuted, fontSize: 13, fontWeight: '600' }}>{value === 'local' ? 'Disponibles' : 'Calendario'}</Text>
+      </TouchableOpacity>)}
+    </View>
+    {tab === 'calendar' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.days}>{DAYS.map(value => <TouchableOpacity key={value.id} accessibilityRole="button" accessibilityState={{ selected: day === value.id }} onPress={() => setDay(value.id)} style={[s.day, { borderBottomColor: day === value.id ? colors.text : 'transparent' }]}><Text style={{ color: day === value.id ? colors.text : colors.textMuted, fontSize: 13, fontWeight: day === value.id ? '700' : '400' }}>{compact ? value.short : value.label}</Text></TouchableOpacity>)}</ScrollView>}
+    <View style={s.section}><Text style={[s.sectionTitle, { color: colors.text }]}>{tab === 'local' ? 'Para seguir esta temporada' : DAYS.find(value => value.id === day)?.label}</Text><Text style={[s.count, { color: colors.textMuted }]}>{tab === 'calendar' ? 'Horario de Japón' : `${local.length} títulos`}</Text></View>
+  </>;
+  return <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <Header black={theme === 'dark'} activeSection="Emisión" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} />
+    <View style={{ height: Platform.OS === 'web' ? 90 : 56 + insets.top }} />
+    <FlatList key={`${columns}:${tab}`} data={loading || error ? [] : data} numColumns={columns} keyExtractor={(item: any) => String(tab === 'local' ? item.id : item.mal_id)} ListHeaderComponent={listHeader}
+      style={{ width: contentWidth, alignSelf: 'center' }} contentContainerStyle={{ paddingBottom: 110 }} columnWrapperStyle={{ gap }} showsVerticalScrollIndicator={false}
+      renderItem={({ item }: any) => <DiscoveryCard width={itemWidth} title={item.title} poster={tab === 'local' ? item.poster_url : item.images?.jpg?.large_image_url || item.images?.webp?.large_image_url}
+        rating={Number(tab === 'local' ? item.rating : item.score) || undefined} caption={tab === 'local' ? (item.total_episodes ? `${item.total_episodes} ${Number(item.total_episodes) === 1 ? 'episodio' : 'episodios'} · En emisión` : 'En emisión') : item.broadcast?.time ? `${item.broadcast.time} · Japón` : 'Horario por confirmar'}
+        onPress={() => tab === 'local' ? setSelectedContent(animeSearchResult(item).content) : openCalendar(item)} />}
+      ListEmptyComponent={<View style={s.empty}>{loading ? <ActivityIndicator color={colors.textMuted} /> : <><Ionicons name={error ? 'cloud-offline-outline' : 'calendar-outline'} size={32} color={colors.textMuted} /><Text style={{ color: colors.textMuted, textAlign: 'center', lineHeight: 22 }}>{error || 'No hay títulos para mostrar en esta selección.'}</Text>{!!error && <TouchableOpacity accessibilityRole="button" onPress={() => setRetry(value => value + 1)} style={[s.retry, { backgroundColor: colors.card }]}><Text style={{ color: colors.text }}>Reintentar</Text></TouchableOpacity>}</>}</View>} />
+    <MovieModal content={selectedContent} visible={!!selectedContent} onClose={() => setSelectedContent(null)} />
+    <Modal visible={!!schedule} transparent animationType="fade" onRequestClose={closeCalendar}>
+      <View style={s.backdrop}><View style={[s.schedule, { backgroundColor: colors.card, width: Math.min(600, width - 32) }]}>
+        <View style={s.section}><Text style={[s.eyebrow, { color: colors.textMuted }]}>CALENDARIO · JAPÓN</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar información del calendario" onPress={closeCalendar} style={{ padding: 10 }}><Ionicons name="close" size={23} color={colors.text} /></TouchableOpacity></View>
+        <ScrollView><Text style={[s.sectionTitle, { color: colors.text, fontSize: 24 }]}>{schedule?.title}</Text><Text style={{ color: colors.textMuted, marginTop: 12, lineHeight: 23 }}>{schedule?.synopsis || 'Sin descripción disponible.'}</Text></ScrollView>
+        {!!availability && <Text style={{ color: colors.textMuted, lineHeight: 20, marginTop: 16 }}>{availability}</Text>}
+        <TouchableOpacity accessibilityRole="button" disabled={resolving} accessibilityState={{ busy: resolving }} onPress={findLocal} style={[s.retry, { backgroundColor: theme === 'dark' ? '#283432' : '#dce8e5', marginTop: 20 }]}>{resolving ? <ActivityIndicator color={colors.text} /> : <Text style={{ color: colors.text, fontWeight: '600' }}>Buscar en el catálogo de Pixel</Text>}</TouchableOpacity>
+      </View></View>
+    </Modal>
+  </View>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerTitleContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E50914',
-    marginLeft: 20,
-    paddingLeft: 16,
-  },
-  superTitle: {
-    color: '#E50914',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 4,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  pageTitleWhite: {
-    color: '#FFFFFF',
-    fontSize: 48,
-    fontWeight: '900',
-    letterSpacing: -1,
-  },
-  pageTitleRed: {
-    color: '#E50914',
-    fontSize: 48,
-    fontWeight: '900',
-    letterSpacing: -1,
-  },
-  pageSubtitle: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    gap: 12,
-  },
-  tabBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  tabBtnActive: {
-    backgroundColor: '#E50914',
-  },
-  tabBtnActiveCalendar: {
-    backgroundColor: '#E50914',
-  },
-  tabText: {
-    color: '#666',
-    fontWeight: '800',
-    fontSize: 11,
-    letterSpacing: 1,
-  },
-  tabTextActive: {
-    color: '#fff',
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  dayBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    position: 'relative',
-  },
-  dayBtnActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#E50914',
-  },
-  dayText: {
-    color: '#666',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  dayTextActive: {
-    color: '#fff',
-  },
-  activeDayDot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 4,
-    height: 4,
-    backgroundColor: '#E50914',
-  },
-  sectionHeaderBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  sectionHeaderDot: {
-    width: 6,
-    height: 6,
-    backgroundColor: '#E50914',
-    marginRight: 8,
-  },
-  sectionHeaderText: {
-    color: '#E50914',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  gridContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  card: {
-    marginBottom: 24,
-  },
-  posterBox: {
-    width: '100%',
-    backgroundColor: '#000',
-    position: 'relative',
-    marginBottom: 8,
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  badgeTopLeft: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    backgroundColor: '#E50914',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeTopRight: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeBottomLeft: {
-    position: 'absolute',
-    bottom: 6,
-    left: 6,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  epText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: colors.textGray,
-    fontSize: 16,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: colors.card,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.cardLight,
-  },
-  retryText: {
-    color: colors.text,
-    fontWeight: '600',
-  },
+const s = StyleSheet.create({
+  heading: { paddingTop: 28, marginBottom: 28, flexDirection: 'row', alignItems: 'center', gap: 20 }, eyebrow: { fontSize: 10, letterSpacing: 1.5, fontWeight: '600' }, title: { fontWeight: '700', letterSpacing: -1, marginTop: 8 }, subtitle: { fontSize: 13, lineHeight: 20, marginTop: 8 },
+  tabs: { flexDirection: 'row', padding: 4, gap: 4, borderRadius: 4, marginBottom: 22 }, tab: { minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 3 },
+  days: { gap: 16, paddingBottom: 16 }, day: { paddingVertical: 12, minWidth: 40, alignItems: 'center', borderBottomWidth: 2 }, section: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20 }, sectionTitle: { fontSize: 18, fontWeight: '600', flexShrink: 1 }, count: { fontSize: 11 }, empty: { padding: 38, alignItems: 'center', gap: 18 }, retry: { paddingHorizontal: 20, paddingVertical: 14, alignItems: 'center', borderRadius: 3, minHeight: 44 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }, schedule: { padding: 24, maxHeight: '80%', borderRadius: 6 },
 });

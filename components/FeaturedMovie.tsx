@@ -3,6 +3,7 @@ import { View, Image, Text, TouchableOpacity, StyleSheet, useWindowDimensions, A
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { MovieDetail, AnimeDetail } from '../types';
+import AnimeArtwork from './AnimeArtwork';
 import { getImageUrl } from '../services/api';
 import { getAnimeImageUrl, getAnimeTitle, getAnimeYear, getAnimeScore } from '../services/anilistService';
 import { colors as staticColors, spacing, typography, gradients, badgeStyles } from '../theme';
@@ -79,13 +80,10 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
 
   const title = isAnime ? getAnimeTitle((movie as AnimeDetail).title) : movie.title;
   const description = isAnime ? stripHtml((movie as any).description) : stripHtml((movie as any).overview);
-  const imageUri = isAnime
-    ? getAnimeImageUrl(
-        isSmallScreen 
-          ? (((movie as AnimeDetail).coverImage as any)?.extraLarge || (movie as AnimeDetail).coverImage?.large || (movie as AnimeDetail).bannerImage)
-          : ((movie as AnimeDetail).bannerImage || (movie as AnimeDetail).coverImage?.large)
-      )
-    : getImageUrl(isSmallScreen ? (movie.poster_path || movie.backdrop_path) : movie.backdrop_path, 'original');
+  const posterUri = isAnime
+    ? getAnimeImageUrl(((movie as AnimeDetail).coverImage as any)?.extraLarge || (movie as AnimeDetail).coverImage?.large || (movie as AnimeDetail).bannerImage || '')
+    : getImageUrl(movie.poster_path || movie.backdrop_path, 'original');
+  const bannerUri = isSmallScreen ? undefined : isAnime ? (movie as AnimeDetail).bannerImage || undefined : getImageUrl(movie.backdrop_path, 'original');
 
   const heroTopColors = theme === 'dark' 
     ? ['rgba(0,0,0,0.5)', 'transparent'] 
@@ -100,12 +98,8 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.5)', 'transparent'];
 
   return (
-    <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: isSmallScreen ? height * 0.75 : height * 0.9 }]}>
-      <Image
-        source={{ uri: imageUri }}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
-      />
+    <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: isSmallScreen ? Math.min(680, Math.max(500, height * 0.75)) : Math.min(680, Math.max(480, height * 0.8)) }]}>
+      <AnimeArtwork banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "100% 40%"} />
 
       {/* Top vignette para navbar */}
       <LinearGradient

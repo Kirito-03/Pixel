@@ -1,11 +1,10 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, Image, useWindowDimensions, BackHandler, ScrollView } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, useWindowDimensions, BackHandler, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import MovieCard from '../components/MovieCard';
+import DiscoveryCard from '../components/DiscoveryCard';
 import MovieModal from '../components/MovieModal';
-import { colors, spacing, shadows, borderRadius } from '../theme';
 import { ContentItem } from '../types';
 import { useProfile } from '../contexts/ProfileContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,9 +23,9 @@ export default function SearchScreen() {
   const historyScopeRef = useRef(historyScope);
   historyScopeRef.current = historyScope;
   const [historyNotice, setHistoryNotice] = useState('');
+  const [kind, setKind] = useState<'all' | 'anime' | 'manga'>('all');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UniversalSearchResult[]>([]);
-  const [suggestions, setSuggestions] = useState<UniversalSearchResult[]>([]);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -106,7 +105,6 @@ export default function SearchScreen() {
     setSearchError('');
     setSearchNotice('');
     setSelectedGenre(null);
-    setSuggestions([]);
     setResults([]);
     if (typingTimer.current) {
       clearTimeout(typingTimer.current);
@@ -121,7 +119,6 @@ export default function SearchScreen() {
     let active = true;
     setSearchError('');
     setSearchNotice('');
-    setSuggestions([]);
     setResults([]);
     if (text.length < 2) { setLoading(false); return; }
     setLoading(true);
@@ -130,7 +127,6 @@ export default function SearchScreen() {
         const response = await universalSearch(text);
         if (!active || searchRequestRef.current !== requestId) return;
         setResults(response.items);
-        setSuggestions(response.items.slice(0, 8));
         setSearchNotice(response.unavailable.length ? `No se pudo consultar ${response.unavailable.join(' y ')}. Mostrando los resultados disponibles.` : '');
       } catch (error) {
         if (!active || searchRequestRef.current !== requestId) return;
@@ -148,7 +144,6 @@ export default function SearchScreen() {
     const requestId = ++searchRequestRef.current;
     setQuery('');
     setSelectedGenre(genre);
-    setSuggestions([]);
     setResults([]);
     setSearchError('');
     setSearchNotice('');
@@ -164,7 +159,6 @@ export default function SearchScreen() {
   };
 
   const handleResultPress = (item: UniversalSearchResult) => {
-    setSuggestions([]);
     setIsFocused(false);
     if (query.trim()) recordRecentSearch(query);
     if (item.kind === 'manga') {
@@ -174,8 +168,6 @@ export default function SearchScreen() {
     setSelectedContent(item.content);
     setModalVisible(true);
   };
-
-  const handleSuggestionPress = (item: UniversalSearchResult) => handleResultPress(item);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -191,481 +183,70 @@ export default function SearchScreen() {
     return () => subscription.remove();
   }, [selectedGenre, query, modalVisible]);
 
-  const renderHighlight = (text: string, highlight: string) => {
-    if (!highlight.trim()) return <Text style={[styles.suggestionText, { color: colors.text, flex: 1 }]} numberOfLines={2}>{text}</Text>;
-    // Escapar caracteres especiales para regex
-    const escapedHighlight = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escapedHighlight})`, 'gi');
-    const parts = text.split(regex);
-    return (
-      <Text style={[styles.suggestionText, { color: colors.text, flex: 1 }]} numberOfLines={2}>
-        {parts.map((part, i) =>
-          regex.test(part) ? (
-            <Text key={i} style={{ color: '#E50914', fontWeight: 'bold' }}>
-              {part}
-            </Text>
-          ) : (
-            part
-          )
-        )}
-      </Text>
-    );
-  };
-
   // En web usamos outlineStyle none. En native lo ignoramos
   const inputPlatformStyles = Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } : {};
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';
-  const hPad = isWeb ? 40 : 16;
+  const native = Platform.OS === 'android';
+  const hPad = width < 768 ? 16 : 40;
+  const contentWidth = Math.min(1200, width - hPad * 2);
   const numCols = width < 540 ? 2 : width < 900 ? 3 : 5;
-  // Calculamos el ancho de cada tarjeta restando el padding horizontal y los gaps
-  const gap = 15;
-  const availableWidth = width - (hPad * 2);
-  const totalGapSpace = gap * (numCols - 1);
-  const cardWidth = (availableWidth - totalGapSpace) / numCols;
-
-  const inputSize = width >= 768 ? 36 : 24;
-  // En Android: paddingTop = insets.top (altura status bar) + 12 extra
-  const headerPaddingTop = isWeb ? 30 : insets.top + 12;
+  const gap = width < 768 ? 14 : 24;
+  const cardWidth = (contentWidth - gap * (numCols - 1)) / numCols;
+  const filteredResults = results.filter(item => selectedGenre || kind === 'all' || item.kind === kind);
+  const genreLabels: Record<string, string> = { Action: 'Acción', 'Sci-Fi': 'Ciencia ficción', Fantasy: 'Fantasía', Adventure: 'Aventura', Drama: 'Drama', Sports: 'Deportes', 'Slice of Life': 'Vida cotidiana', Horror: 'Terror', Mystery: 'Misterio', Supernatural: 'Sobrenatural', Romance: 'Romance', Comedy: 'Comedia' };
+  const headerPaddingTop = isWeb ? 24 : insets.top + 12;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* SafeAreaView solo en web; en Android controlamos el padding manualmente con insets */}
-      <View style={{ zIndex: 100, elevation: 100 }}>
-        <View style={[styles.megaHeaderContainer, { paddingHorizontal: hPad, paddingTop: headerPaddingTop }]}>
-          {/* Top mini-bar — solo en web */}
-          {isWeb && (
-            <View style={styles.topMiniBar}>
-              <View style={styles.logoRow}>
-                <Ionicons name="play" size={14} color="#E50914" style={{ marginRight: 6 }} />
-                <Text style={styles.logoText}>
-                  PIXEL <Text style={[styles.logoTextWhite, { color: colors.text }]}>NO SEKAI</Text>
-                </Text>
-              </View>
-              <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-                <Ionicons name="close" size={12} color="#888" style={{ marginRight: 4 }} />
-                <Text style={styles.closeBtnText}>CERRAR</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Giant Input */}
-          <View style={styles.giantInputWrapper}>
-            <Ionicons name="search" size={isWeb ? 32 : 22} color="#E50914" style={{ marginRight: isWeb ? 20 : 12 }} />
-            <TextInput
-              style={[styles.giantInput, { fontSize: inputSize, color: colors.text }, inputPlatformStyles as any]}
-              placeholder="Buscar anime y manga..."
-              accessibilityLabel="Buscar anime y manga"
-              placeholderTextColor={colors.textMuted || '#555'}
-              value={query}
-              onChangeText={handleSearch}
-              onSubmitEditing={({ nativeEvent }) => recordRecentSearch(nativeEvent.text)}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              autoFocus
-            />
-            {loading && <ActivityIndicator size="small" color="#E50914" style={{ marginLeft: 10 }} />}
-            {query.length > 0 && !loading && (
-              <TouchableOpacity onPress={clearSearch} style={{ padding: 10 }}>
-                <Ionicons name="close-circle" size={24} color={colors.textLight || "#444"} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <View style={styles.redDivider} />
-
-          {/* Sugerencias — solo absolute en web */}
-          {isWeb && suggestions.length > 0 && (
-            <ScrollView style={[styles.suggestionsDropdown, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#222' : '#ddd' }]} keyboardShouldPersistTaps="handled">
-              {suggestions.map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={styles.suggestionItemRow}
-                  onPress={() => handleSuggestionPress(item)}
-                >
-                  <View style={styles.suggestionLeft}>
-                    {item.poster ? (
-                      <Image source={{ uri: item.poster }} style={styles.suggestionThumb} />
-                    ) : (
-                      <View style={styles.suggestionThumbFallback} />
-                    )}
-                    <Ionicons name="search" size={14} color={colors.textMuted || "#555"} style={{ marginHorizontal: 12 }} />
-                    {renderHighlight(item.title, query)}
-                  </View>
-                  <View style={styles.suggestionBadge}>
-                    <Text style={styles.suggestionBadgeText}>{item.kind === 'manga' ? 'MANGA' : 'ANIME'}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+      <View style={[styles.header, { width: contentWidth, paddingTop: headerPaddingTop }]}>
+        <View style={styles.headingRow}>
+          <View style={{ flex: 1 }}><Text style={[styles.eyebrow, { color: colors.textMuted }]}>{native ? 'ENCUENTRA TU PRÓXIMA HISTORIA' : 'DESCUBRE EN PIXEL'}</Text><Text style={[styles.pageTitle, { color: colors.text, fontSize: native ? 27 : width < 768 ? 30 : 38 }]}>{native ? 'Explorar' : 'Buscar anime y manga'}</Text></View>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar búsqueda" onPress={() => navigation.goBack()} style={[styles.closeBtn, { backgroundColor: colors.card }]}><Ionicons name={native ? 'arrow-back' : 'close'} size={21} color={colors.text} /></TouchableOpacity>
         </View>
+        <View style={[styles.inputBox, { backgroundColor: isFocused ? (theme === 'dark' ? '#1d2826' : '#e4eeeb') : colors.card, minHeight: native ? 52 : 64 }]}>
+          <Ionicons name="search-outline" size={22} color={colors.textMuted} />
+          <TextInput style={[styles.input, { color: colors.text, fontSize: native ? 17 : 22 }, inputPlatformStyles as any]}
+            placeholder="Título, personaje o una nueva historia…" accessibilityLabel="Buscar anime y manga" placeholderTextColor={colors.textMuted}
+            value={query} onChangeText={handleSearch} onSubmitEditing={({ nativeEvent }) => recordRecentSearch(nativeEvent.text)} onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)} autoFocus={!native} returnKeyType="search" />
+          {loading ? <ActivityIndicator size="small" color={colors.textMuted} /> : query.length > 0 && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar búsqueda" onPress={clearSearch} style={{ padding: 8 }}><Ionicons name="close-circle" size={20} color={colors.textMuted} /></TouchableOpacity>}
+        </View>
+
       </View>
-
-
-
-
-
-      {!!historyNotice && <Text accessibilityRole="alert" style={{ color: colors.textMuted, paddingHorizontal: hPad, paddingVertical: 10 }}>{historyNotice}</Text>}
-      {/* Main Content Area (Scrollable) */}
-      <FlatList
-        data={results}
-        numColumns={numCols}
-        key={`search-${numCols}`}
-        contentContainerStyle={[styles.mainContentScroll, { paddingHorizontal: hPad }]}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <>
-            {searchError ? <Text accessibilityRole="alert" style={{ color: '#ff8080', marginBottom: 16 }}>{searchError}</Text> : null}
-            {searchNotice ? <Text style={{ color: colors.textMuted, marginBottom: 16 }}>{searchNotice}</Text> : null}
-            {searchError || searchNotice ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar búsqueda" disabled={loading} onPress={() => selectedGenre ? handleGenrePress(selectedGenre) : setRetryIndex(value => value + 1)} style={{ paddingVertical: 12 }}><Text style={{ color: colors.primary }}>Reintentar</Text></TouchableOpacity> : null}
-            {/* Sugerencias en Android - Dentro de la lista para que scrollee natural sin desbordarse */}
-            {!isWeb && suggestions.length > 0 && (
-              <View style={[styles.suggestionsNative, { backgroundColor: theme === 'dark' ? '#0a0a0a' : '#fff', borderColor: theme === 'dark' ? '#1a1a1a' : '#ddd', marginBottom: 20 }]}>
-                {suggestions.map((item) => (
-                  <TouchableOpacity
-                    key={item.key}
-                    style={styles.suggestionItemRow}
-                    onPress={() => handleSuggestionPress(item)}
-                  >
-                    <View style={styles.suggestionLeft}>
-                      {item.poster ? (
-                        <Image source={{ uri: item.poster }} style={styles.suggestionThumb} />
-                      ) : (
-                        <View style={styles.suggestionThumbFallback} />
-                      )}
-                      <Ionicons name="search" size={14} color={colors.textMuted || "#555"} style={{ marginHorizontal: 12 }} />
-                      {renderHighlight(item.title, query)}
-                    </View>
-                    <View style={styles.suggestionBadge}>
-                      <Text style={styles.suggestionBadgeText}>{item.kind === 'manga' ? 'MANGA' : 'ANIME'}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {recentQueries.length > 0 && !selectedGenre && query.length === 0 && (
-              <View style={styles.sectionBlock}>
-                <View style={styles.sectionHeaderRow}>
-                  <View style={styles.sectionHeaderLeft}>
-                    <View style={styles.redBar} />
-                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ÚLTIMAS BÚSQUEDAS</Text>
-                  </View>
-                  <TouchableOpacity onPress={clearRecent}>
-                    <Text style={styles.clearRecentText}>BORRAR</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.recentChipsContainer}>
-                  {recentQueries.map((text, idx) => (
-                    <TouchableOpacity
-                      key={`${text}-${idx}`}
-                      style={styles.recentChip}
-                      onPress={() => {
-                        setQuery(text);
-                        setSelectedGenre(null);
-                        setSuggestions([]);
-                        handleSearch(text);
-                        recordRecentSearch(text);
-                      }}
-                    >
-                      <Ionicons name="time-outline" size={14} color={colors.textMuted || "#666"} style={{ marginRight: 8 }} />
-                      <Text style={[styles.recentChipText, { color: colors.text }]}>{text}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {!selectedGenre && query.length === 0 && (
-              <View style={styles.sectionBlock}>
-                <View style={styles.sectionHeaderRow}>
-                  <View style={styles.sectionHeaderLeft}>
-                    <View style={styles.redBar} />
-                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>EXPLORAR POR GÉNERO</Text>
-                  </View>
-                </View>
-                <View style={styles.genresGrid}>
-                  {ALL_GENRES.map((genre) => (
-                    <TouchableOpacity
-                      key={genre}
-                      style={styles.genreCard}
-                      onPress={() => handleGenrePress(genre)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.genreCardText, { color: colors.text }]}>{genre}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {results.length > 0 && (
-              <View style={styles.sectionHeaderRow}>
-                <View style={styles.sectionHeaderLeft}>
-                  <View style={styles.redBar} />
-                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                    {selectedGenre ? `RESULTADOS PARA: ${selectedGenre.toUpperCase()}` : 'RESULTADOS'}
-                  </Text>
-                </View>
-                {selectedGenre && (
-                  <TouchableOpacity onPress={() => clearSearch()} style={{ padding: 6, backgroundColor: 'rgba(229,9,20,0.1)', borderRadius: 6, borderWidth: 1, borderColor: 'rgba(229,9,20,0.2)' }}>
-                    <Text style={{ color: '#E50914', fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>VOLVER A GÉNEROS</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </>
-        }
-        keyExtractor={(item) => item.key}
-        renderItem={({ item }) => (
-          item.kind === 'anime'
-            ? <MovieCard movie={item.content} onPress={() => handleResultPress(item)} cardWidth={cardWidth} />
-            : <MangaSearchCard item={item} width={cardWidth} color={colors.text} onPress={() => handleResultPress(item)} />
-        )}
-        columnWrapperStyle={results.length > 0 ? { gap: 15, marginBottom: 20 } : undefined}
-        ListEmptyComponent={
-          ((query.trim().length >= 2 || selectedGenre) && !loading && !searchError && results.length === 0) ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color={theme === 'dark' ? "#222" : "#ddd"} style={{ marginBottom: 16 }} />
-              <Text style={[styles.emptyText, { color: colors.textMuted || '#444' }]}>No se encontraron resultados</Text>
+      {!!historyNotice && <Text accessibilityRole="alert" style={[styles.notice, { color: colors.textMuted, width: contentWidth }]}>{historyNotice}</Text>}
+      <FlatList data={filteredResults} numColumns={numCols} key={`search-${numCols}`} style={{ width: contentWidth, alignSelf: 'center' }}
+        contentContainerStyle={{ paddingTop: native ? 24 : 32, paddingBottom: 110 + insets.bottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={<>
+          {!!searchError && <Text accessibilityRole="alert" style={[styles.notice, { color: colors.text }]}>{searchError}</Text>}
+          {!!searchNotice && <Text style={[styles.notice, { color: colors.textMuted }]}>{searchNotice}</Text>}
+          {(searchError || searchNotice) && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar búsqueda" onPress={() => selectedGenre ? handleGenrePress(selectedGenre) : setRetryIndex(value => value + 1)} style={[styles.retry, { backgroundColor: colors.card }]}><Text style={{ color: colors.text }}>Reintentar</Text></TouchableOpacity>}
+          {!selectedGenre && !query.length && <>
+            {recentQueries.length > 0 && <View style={styles.sectionBlock}><View style={styles.sectionHeading}><Text style={[styles.sectionTitle, { color: colors.text }]}>Búsquedas recientes</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Borrar búsquedas del perfil" onPress={clearRecent} style={{ padding: 10 }}><Text style={[styles.small, { color: colors.textMuted }]}>Borrar</Text></TouchableOpacity></View>
+              <View style={styles.chips}>{recentQueries.map(text => <TouchableOpacity key={text} onPress={() => { handleSearch(text); recordRecentSearch(text); }} style={[styles.chip, { backgroundColor: colors.card }]}><Ionicons name="time-outline" size={15} color={colors.textMuted} /><Text style={{ color: colors.text, fontSize: 13 }}>{text}</Text></TouchableOpacity>)}</View>
+            </View>}
+            <View style={styles.sectionBlock}><View style={styles.sectionHeading}><Text style={[styles.sectionTitle, { color: colors.text }]}>Explora por género</Text>{!native && <Text style={[styles.small, { color: colors.textMuted }]}>Algo para cada estado de ánimo</Text>}</View>
+              <View style={[styles.genresGrid, { gap: 12 }]}>{ALL_GENRES.map(genre => <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Explorar ${genreLabels[genre] || genre}`} key={genre} activeOpacity={0.7} onPress={() => handleGenrePress(genre)}
+                style={[styles.genre, { backgroundColor: colors.card, width: (contentWidth - (width < 768 ? 12 : 36)) / (width < 768 ? 2 : 4), minHeight: native ? 58 : 68 }]}>
+                <Text numberOfLines={1} style={{ color: colors.text, fontSize: native ? 13 : 14, fontWeight: '500', flex: 1 }}>{genreLabels[genre] || genre}</Text><Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
+              </TouchableOpacity>)}</View>
             </View>
-          ) : null
-        }
-      />
-
-      <MovieModal
-        content={selectedContent}
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-      />
+          </>}
+          {!!results.length && <>
+            <View style={styles.sectionHeading}><Text style={[styles.sectionTitle, { color: colors.text }]}>{selectedGenre ? genreLabels[selectedGenre] || selectedGenre : 'Resultados'}</Text><Text style={[styles.small, { color: colors.textMuted }]}>{filteredResults.length} títulos</Text></View>
+            {!selectedGenre ? <View style={styles.filters}>{(['all', 'anime', 'manga'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: kind === value }} onPress={() => setKind(value)} style={[styles.filter, { borderBottomColor: kind === value ? colors.text : 'transparent' }]}><Text style={{ color: kind === value ? colors.text : colors.textMuted, fontSize: 13, fontWeight: kind === value ? '700' : '400' }}>{value === 'all' ? 'Todo' : value === 'anime' ? 'Anime' : 'Manga'}</Text></TouchableOpacity>)}</View>
+              : <TouchableOpacity accessibilityRole="button" onPress={clearSearch} style={styles.backGenres}><Ionicons name="arrow-back" size={15} color={colors.textMuted} /><Text style={{ color: colors.textMuted, fontSize: 12 }}>Volver a géneros</Text></TouchableOpacity>}
+          </>}
+        </>}
+        keyExtractor={item => item.key} renderItem={({ item }) => <DiscoveryCard width={cardWidth} title={item.title} poster={item.poster} type={item.kind === 'manga' ? 'Manga' : 'Anime'} caption={item.kind === 'manga' ? 'Manga · Leer capítulos' : 'Anime · Ver detalles'} onPress={() => handleResultPress(item)} />}
+        columnWrapperStyle={{ gap }} ListEmptyComponent={(query.trim().length >= 2 || selectedGenre) && !loading && !searchError ? <View style={styles.empty}><Ionicons name="search-outline" size={36} color={colors.textMuted} /><Text style={{ color: colors.textMuted }}>No encontramos títulos con esta selección.</Text></View> : null} />
+      <MovieModal content={selectedContent} visible={modalVisible} onClose={() => setModalVisible(false)} />
     </View>
   );
 }
-
-function MangaSearchCard({ item, width, color, onPress }: { item: Extract<UniversalSearchResult, { kind: 'manga' }>; width: number; color: string; onPress: () => void }) {
-  const [failed, setFailed] = useState(false);
-  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Leer detalles de ${item.title}`} onPress={onPress} style={{ width, marginBottom: 12 }}>
-    <View style={{ width, height: width * 1.5, backgroundColor: '#181818', justifyContent: 'center', alignItems: 'center' }}>
-      {item.poster && !failed ? <Image source={{ uri: item.poster }} onError={() => setFailed(true)} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Ionicons name="book-outline" size={32} color="#888" />}
-    </View>
-    <Text style={{ color: '#E50914', fontSize: 10, fontWeight: '700', marginTop: 8 }}>MANGA</Text>
-    <Text style={{ color, fontSize: 13, marginTop: 4 }} numberOfLines={2}>{item.title}</Text>
-  </TouchableOpacity>;
-}
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#050505',
-  },
-  megaHeaderContainer: {
-    paddingHorizontal: 40,
-    paddingTop: 30,
-    position: 'relative',
-    zIndex: 100,
-  },
-  topMiniBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoText: {
-    color: '#E50914',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  logoTextWhite: {
-    color: '#CCC',
-  },
-  closeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 2,
-  },
-  closeBtnText: {
-    color: '#888',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  giantInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingBottom: 15,
-  },
-  giantInput: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 36,
-    fontWeight: '700',
-    padding: 0,
-    margin: 0,
-  },
-  redDivider: {
-    height: 1,
-    backgroundColor: '#E50914',
-    width: '100%',
-    shadowColor: '#E50914',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  suggestionsDropdown: {
-    position: 'absolute',
-    top: '100%' as any,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(10,10,10,0.99)',
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: '#222',
-    maxHeight: 320,
-    zIndex: 999,
-    elevation: 20,
-  },
-  suggestionsNative: {
-    backgroundColor: '#0a0a0a',
-    borderBottomWidth: 1,
-    borderColor: '#1a1a1a',
-  },
-  suggestionItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#111',
-  },
-  suggestionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  suggestionThumb: {
-    width: 24,
-    height: 36,
-    borderRadius: 2,
-    backgroundColor: '#111',
-  },
-  suggestionThumbFallback: {
-    width: 24,
-    height: 36,
-    borderRadius: 2,
-    backgroundColor: '#111',
-  },
-  suggestionText: {
-    color: '#DDD',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  suggestionBadge: {
-    borderWidth: 1,
-    borderColor: 'rgba(229, 9, 20, 0.3)',
-    backgroundColor: 'rgba(229, 9, 20, 0.05)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 2,
-  },
-  suggestionBadgeText: {
-    color: '#E50914',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  mainContentScroll: {
-    paddingHorizontal: 40,
-    paddingTop: 40,
-    paddingBottom: 80,
-  },
-  sectionBlock: {
-    marginBottom: 40,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  redBar: {
-    width: 3,
-    height: 14,
-    backgroundColor: '#E50914',
-    marginRight: 10,
-  },
-  sectionTitle: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  clearRecentText: {
-    color: '#666',
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  recentChipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  recentChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#222',
-    borderRadius: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  recentChipText: {
-    color: '#CCC',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  genresGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  genreCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(150,150,150,0.2)',
-  },
-  genreCardText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 100,
-  },
-  emptyText: {
-    color: '#444',
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '500',
-  },
+  container: { flex: 1 }, header: { alignSelf: 'center', zIndex: 100, paddingBottom: 4 }, headingRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 22 }, eyebrow: { fontSize: 9, fontWeight: '600', letterSpacing: 1.4 }, pageTitle: { fontWeight: '600', letterSpacing: -0.8, marginTop: 8 },
+  closeBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 4 }, inputBox: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, borderRadius: 4 }, input: { flex: 1, paddingVertical: 12, minWidth: 0 },
+  small: { fontSize: 11 }, notice: { alignSelf: 'center', paddingVertical: 12, fontSize: 13, lineHeight: 20 }, retry: { alignSelf: 'flex-start', paddingHorizontal: 18, paddingVertical: 12, marginBottom: 20, borderRadius: 3 }, sectionBlock: { marginBottom: 32 }, sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }, sectionTitle: { fontSize: 18, fontWeight: '600' }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, chip: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 3 },
+  genresGrid: { flexDirection: 'row', flexWrap: 'wrap' }, genre: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderRadius: 3 }, filters: { flexDirection: 'row', gap: 28, marginBottom: 22 }, filter: { paddingVertical: 12, borderBottomWidth: 2 }, backGenres: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, marginBottom: 20 }, empty: { paddingTop: 50, alignItems: 'center', gap: 16 },
 });

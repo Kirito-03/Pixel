@@ -5,6 +5,7 @@ import { HomeStackParamList, MovieDetail, ContentItem, AnimeDetail } from '../ty
 import { useTheme } from '../contexts/ThemeContext';
 import Header from '../components/Header';
 import FeaturedCarousel from '../components/FeaturedCarousel';
+import { prioritizeFeaturedArtwork } from '../utils/featuredArtwork';
 import MovieRow from '../components/MovieRow';
 import MovieModal from '../components/MovieModal';
 import { getResumeTarget } from '../services/resumeTarget';
@@ -152,7 +153,7 @@ export default function HomeScreen({ navigation }: Props) {
 
             // Barajar aleatoriamente para que siempre sean diferentes
             const shuffledFeatured = [...featuredBase].sort(() => 0.5 - Math.random());
-            setFeaturedMovies(shuffledFeatured.slice(0, 5).map(mapCatalogAnimeToAnimeDetail));
+            setFeaturedMovies(prioritizeFeaturedArtwork(shuffledFeatured).slice(0, 5).map(mapCatalogAnimeToAnimeDetail));
 
             // Construir sección Destacados
             const featured = buildFeaturedItems(
