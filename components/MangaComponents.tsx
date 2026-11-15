@@ -36,6 +36,7 @@ export interface MangaItemUI {
   status: MangaStatus;
   chapters: number | string;
   updatedAt: string;
+  publicationType?: string;
   year?: number | null;
   popular?: boolean;
 }
@@ -85,7 +86,7 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6 }).start();
 
   const formattedDate = formatMangaDate(item.updatedAt);
-  const metaText = formattedDate || (item.year ? String(item.year) : '');
+  const metaText = [item.publicationType || 'Lectura', formattedDate || (item.year ? String(item.year) : '')].filter(Boolean).join(' · ');
   const chapterLabel = item.chapters ? `Cap. ${item.chapters}` : 'Leer';
 
   return (
@@ -108,7 +109,7 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
           ]}
         >
           {!item.image || imageError ? (
-            <PremiumCoverFallback label="MANGA" status={item.status} />
+            <PremiumCoverFallback label={item.publicationType || 'LECTURA'} status={item.status} />
           ) : (
             <Image
               source={{ uri: item.image }}
@@ -202,7 +203,7 @@ export function MangaRankingItem({ item, onPress, isTop: propIsTop }: MangaRanki
       >
         <View style={styles.rankThumbBox}>
           {!item.image || imageError ? (
-            <PremiumCoverFallback label="MANGA" status={item.status} />
+            <PremiumCoverFallback label={item.publicationType || 'LECTURA'} status={item.status} />
           ) : (
             <Image
               source={{ uri: item.image }}
@@ -219,7 +220,7 @@ export function MangaRankingItem({ item, onPress, isTop: propIsTop }: MangaRanki
           </Text>
           {item.chapters ? (
             <Text style={[styles.rankChapters, { color: colors.textMuted }]} numberOfLines={1}>
-              Cap. {item.chapters}
+              {item.publicationType || 'Lectura'} · Cap. {item.chapters}
             </Text>
           ) : null}
           <View style={[styles.rankStatusPill, { backgroundColor: statusColor + '26' }]}>

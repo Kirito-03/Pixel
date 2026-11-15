@@ -9,11 +9,11 @@ export default function DiscoveryCard({ title, poster, width, caption, type = 'A
   const { colors } = useTheme();
   const [failed, setFailed] = useState(false), [hovered, setHovered] = useState(false);
   React.useEffect(() => setFailed(false), [poster]);
-  return <Pressable accessibilityRole="button" accessibilityLabel={`${type === 'Manga' ? 'Leer detalles de' : 'Ver'} ${title}`} onPress={onPress}
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${type !== 'Anime' ? 'Leer detalles de' : 'Ver'} ${title}`} onPress={onPress}
     onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} style={[s.card, { width }, hovered && Platform.OS === 'web' && { transform: [{ translateY: -3 }] }]}>
     <View style={[s.art, { height: width * 1.42, backgroundColor: colors.card }]}>
       {poster && !failed ? <Image source={{ uri: poster }} onError={() => setFailed(true)} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        : <Ionicons name={type === 'Manga' ? 'book-outline' : 'film-outline'} size={30} color={colors.textMuted} />}
+        : <Ionicons name={type !== 'Anime' ? 'book-outline' : 'film-outline'} size={30} color={colors.textMuted} />}
       {!!rating && rating > 0 && <View style={s.score}><Ionicons name="star" size={10} color="#d8caa3" /><Text style={s.scoreText}>{rating.toFixed(1)}</Text></View>}
     </View>
     <Text numberOfLines={2} style={[s.title, { color: colors.text }]}>{title}</Text>

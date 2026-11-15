@@ -1,3 +1,4 @@
+import { extractPublicationType } from './mangaFormat.js';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import { SocksProxyAgent } from 'socks-proxy-agent';
@@ -284,7 +285,7 @@ async function queryMangaCache(pool, { page, limit, status, search, order }) {
   const rows = await pool.query(
     `
     SELECT
-      manga_id, title, description, cover_url, status, tags, content_rating, year,
+      manga_id, title, description, cover_url, status, publication_type, tags, content_rating, year,
       chapter_count, latest_chapter, author, artist, md_updated_at, cached_at, popularity_score
     FROM manga_cache
     WHERE ${where.join(' AND ')}
@@ -306,6 +307,7 @@ async function queryMangaCache(pool, { page, limit, status, search, order }) {
       description: r.description,
       cover_url: r.cover_url,
       status: r.status,
+      publication_type: r.publication_type || null,
       tags: Array.isArray(r.tags) ? r.tags : [],
       content_rating: r.content_rating,
       year: r.year,
@@ -323,15 +325,16 @@ export async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
   await pool.query(
     `
     INSERT INTO manga_cache
-      (manga_id, title, description, cover_url, status, tags, content_rating, year, chapter_count, latest_chapter, author, artist, md_updated_at, cached_at, popularity_score, is_active)
+      (manga_id, title, description, cover_url, status, publication_type, tags, content_rating, year, chapter_count, latest_chapter, author, artist, md_updated_at, cached_at, popularity_score, is_active)
     VALUES
-      ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,CURRENT_TIMESTAMP,$14,true)
+      ($1,$2,$3,$4,$5,$15,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,CURRENT_TIMESTAMP,$14,true)
     ON CONFLICT (manga_id)
     DO UPDATE SET
       title = EXCLUDED.title,
       description = COALESCE(NULLIF(EXCLUDED.description, ''), manga_cache.description),
       cover_url = COALESCE(NULLIF(EXCLUDED.cover_url, ''), manga_cache.cover_url),
       status = COALESCE(NULLIF(EXCLUDED.status, ''), manga_cache.status),
+      publication_type = COALESCE(EXCLUDED.publication_type, manga_cache.publication_type),
       tags = EXCLUDED.tags,
       content_rating = EXCLUDED.content_rating,
       year = EXCLUDED.year,
@@ -359,6 +362,7 @@ export async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
       manga.artist || null,
       manga.updated_at ? new Date(manga.updated_at) : null,
       Number(popularityScore || 0),
+      manga.publication_type || null,
     ]
   );
 }
@@ -398,6 +402,7 @@ export async function scrapeMangaList(url) {
     items.push({
       id,
       title,
+      publication_type: extractPublicationType($, $(el)),
       cover_url,
       status,
       latest_chapter,
@@ -461,7 +466,7 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
   const cached = await pool.query(
     `
     SELECT
-      manga_id, title, description, cover_url, status, tags, content_rating, year,
+      manga_id, title, description, cover_url, status, publication_type, tags, content_rating, year,
       chapter_count, latest_chapter, author, artist, md_updated_at
     FROM manga_cache
     WHERE is_active = true
@@ -479,6 +484,7 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
         description: r.description,
         cover_url: r.cover_url,
         status: r.status,
+      publication_type: r.publication_type || null,
         tags: Array.isArray(r.tags) ? r.tags : [],
         content_rating: r.content_rating,
         year: r.year,
@@ -508,7 +514,7 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
   const refreshed = await pool.query(
     `
     SELECT
-      manga_id, title, description, cover_url, status, tags, content_rating, year,
+      manga_id, title, description, cover_url, status, publication_type, tags, content_rating, year,
       chapter_count, latest_chapter, author, artist, md_updated_at
     FROM manga_cache
     WHERE is_active = true
@@ -525,6 +531,7 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
       description: r.description,
       cover_url: r.cover_url,
       status: r.status,
+      publication_type: r.publication_type || null,
       tags: Array.isArray(r.tags) ? r.tags : [],
       content_rating: r.content_rating,
       year: r.year,
@@ -547,7 +554,7 @@ export async function getMangaDetail(pool, id) {
   const cached = await pool.query(
     `
     SELECT
-      manga_id, title, description, cover_url, status, tags, content_rating, year,
+      manga_id, title, description, cover_url, status, publication_type, tags, content_rating, year,
       chapter_count, latest_chapter, author, artist, md_updated_at, cached_at
     FROM manga_cache
     WHERE manga_id = $1 AND is_active = true
@@ -565,6 +572,7 @@ export async function getMangaDetail(pool, id) {
         description: r.description,
         cover_url: r.cover_url,
         status: r.status,
+      publication_type: r.publication_type || null,
         tags: Array.isArray(r.tags) ? r.tags : [],
         content_rating: r.content_rating,
         year: r.year,
@@ -619,6 +627,7 @@ export async function getMangaDetail(pool, id) {
     const mapped = {
       id: mangaId,
       title,
+      publication_type: extractPublicationType($),
       description: description || '',
       cover_url,
       status,

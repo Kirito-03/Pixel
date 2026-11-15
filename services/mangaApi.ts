@@ -28,6 +28,7 @@ export type Manga = {
   id: string;
   title: string;
   description: string;
+  publication_type?: string | null;
   cover_url: string | null;
   status: MangaStatus;
   tags: string[];

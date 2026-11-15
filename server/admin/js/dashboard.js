@@ -17,6 +17,9 @@ async function loadDashboardStats() {
 
         // Load recent anime
         loadRecentAnime(stats.recentAnime || []);
+
+        // Load Google Drive Inventory
+        loadDriveInventory();
     } catch (error) {
         console.error('Error loading dashboard stats:', error);
         showError('Error al cargar estadísticas');
@@ -86,6 +89,97 @@ function escapeHtml(text) {
 
 function showError(message) {
     alert(message); // TODO: Replace with better notification system
+}
+
+async function loadDriveInventory() {
+    const tbody = document.getElementById('drive-inventory-table');
+    if (!tbody) return;
+
+    try {
+        const inv = await api.getDriveInventory();
+        const items = [];
+
+        // Anime items
+        (inv.anime || []).forEach(a => {
+            const sizeMb = a.file_size ? `${(a.file_size / (1024 * 1024)).toFixed(1)} MB` : 'En Drive';
+            items.push({
+                type: 'Anime',
+                title: a.title,
+                epInfo: `Episodio ${a.episode_number}`,
+                size: sizeMb,
+                url: a.stream_url,
+            });
+        });
+
+        // Manga items
+        (inv.manga || []).forEach(m => {
+            const match = (m.chapter_url || '').match(/manga\/([^/]+)\/([^/]+)/);
+            const title = match ? match[1].replace(/-/g, ' ') : 'Manga';
+            const cap = match ? match[2].replace(/-/g, ' ') : 'Capítulo';
+            items.push({
+                type: 'Manga',
+                title: title,
+                epInfo: `${cap} (${m.page_count || 0} págs)`,
+                size: 'Imágenes',
+                url: m.chapter_url,
+            });
+        });
+
+        // Hentai items
+        (inv.hentai || []).forEach(h => {
+            items.push({
+                type: 'Hentai',
+                title: h.title,
+                epInfo: `Episodio ${h.episode_number}`,
+                size: 'VIP 720p',
+                url: h.stream_url,
+            });
+        });
+
+        if (items.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 2rem; color: #888;">
+                        No hay archivos sincronizados en Google Drive aún.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => `
+            <tr>
+                <td>
+                    <span style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; ${
+                        item.type === 'Anime' ? 'background: #1976d2; color: #fff;' :
+                        item.type === 'Manga' ? 'background: #7b1fa2; color: #fff;' :
+                        'background: #c2185b; color: #fff;'
+                    }">
+                        ${item.type}
+                    </span>
+                </td>
+                <td><strong>${escapeHtml(item.title)}</strong></td>
+                <td>${escapeHtml(item.epInfo)}</td>
+                <td><small style="color: #aaa;">${item.size}</small></td>
+                <td>
+                    ${item.url ? `
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; text-decoration: none;">
+                            Ver Stream
+                        </a>
+                    ` : '—'}
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Error cargando inventario de Drive:', e);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 1.5rem; color: #e57373;">
+                    Error al cargar el inventario de Drive.
+                </td>
+            </tr>
+        `;
+    }
 }
 
 // Initialize dashboard

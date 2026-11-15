@@ -10,6 +10,8 @@ import {
     ActivityIndicator,
     RefreshControl,
     useWindowDimensions,
+    Modal,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +46,22 @@ export default function AdminDashboardScreen() {
     const [loadError, setLoadError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+    const [driveModalVisible, setDriveModalVisible] = useState(false);
+    const [driveInventory, setDriveInventory] = useState<any>(null);
+    const [loadingDrive, setLoadingDrive] = useState(false);
+
+    const openDriveInventory = async () => {
+        setDriveModalVisible(true);
+        try {
+            setLoadingDrive(true);
+            const data = await adminApiService.getDriveInventory();
+            setDriveInventory(data);
+        } catch (err) {
+            console.error('Error fetching drive inventory:', err);
+        } finally {
+            setLoadingDrive(false);
+        }
+    };
 
     useEffect(() => {
         loadStats();
@@ -164,7 +182,13 @@ export default function AdminDashboardScreen() {
                                         <StatTile title="Anime" value={stats?.totalAnime || 0} icon="film-outline" compact={isCompact} />
                                         <StatTile title="Episodios" value={stats?.totalEpisodes || 0} icon="play-circle-outline" compact={isCompact} />
                                         {typeof stats?.totalNews === 'number' && <StatTile title="Noticias" value={stats.totalNews} icon="newspaper-outline" compact={isCompact} />}
-                                        <StatTile title="Episodios en Drive" value={(stats?.storageStats || []).filter(item => item.storage_type === 'gdrive').reduce((total, item) => total + Number(item.count || 0), 0)} icon="cloud-outline" compact={isCompact} />
+                                        <StatTile 
+                                            title="Episodios en Drive" 
+                                            value={(stats?.storageStats || []).filter(item => item.storage_type === 'gdrive').reduce((total, item) => total + Number(item.count || 0), 0)} 
+                                            icon="cloud-outline" 
+                                            compact={isCompact} 
+                                            onPress={openDriveInventory}
+                                        />
 
                                     </View>
                                 </View>
@@ -211,6 +235,12 @@ export default function AdminDashboardScreen() {
                                                         console.error('Error refreshing news:', e);
                                                     }
                                                 }}
+                                            />
+                                            <QuickAction
+                                                title="Google Drive (5TB)"
+                                                subtitle="Inventario Anime, Manga y Hentai VIP"
+                                                icon="cloud-done-outline"
+                                                onPress={openDriveInventory}
                                                 isLast
                                             />
                                         </View>
@@ -260,12 +290,127 @@ export default function AdminDashboardScreen() {
                     </View>
                 </ScrollView>
             </SafeAreaView>
+
+            {/* Modal de Inventario Google Drive */}
+            <Modal
+                visible={driveModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setDriveModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalBox, isWide && { maxWidth: 640 }]}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="cloud-done" size={22} color="#2e7d32" />
+                                <Text style={styles.modalTitle}>Google Drive (5TB) - Inventario</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setDriveModalVisible(false)} style={styles.modalCloseBtn}>
+                                <Ionicons name="close" size={20} color={adminColors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {loadingDrive ? (
+                            <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+                                <ActivityIndicator size="large" color={adminColors.primary} />
+                                <Text style={{ color: adminColors.textSecondary, marginTop: 12 }}>Consultando inventario en Google Drive...</Text>
+                            </View>
+                        ) : (
+                            <ScrollView style={{ maxHeight: 460, paddingHorizontal: 16 }}>
+                                {/* Resumen */}
+                                <View style={{ flexDirection: 'row', gap: 10, marginVertical: 12 }}>
+                                    <View style={[styles.miniStat, { backgroundColor: 'rgba(25, 118, 210, 0.1)', borderColor: '#1976d2' }]}>
+                                        <Text style={[styles.miniStatNum, { color: '#42a5f5' }]}>{driveInventory?.summary?.totalAnimeEpisodes || 0}</Text>
+                                        <Text style={styles.miniStatLabel}>Anime (Eps)</Text>
+                                    </View>
+                                    <View style={[styles.miniStat, { backgroundColor: 'rgba(123, 31, 162, 0.1)', borderColor: '#7b1fa2' }]}>
+                                        <Text style={[styles.miniStatNum, { color: '#ba68c8' }]}>{driveInventory?.summary?.totalMangaChapters || 0}</Text>
+                                        <Text style={styles.miniStatLabel}>Manga (Caps)</Text>
+                                    </View>
+                                    <View style={[styles.miniStat, { backgroundColor: 'rgba(194, 24, 91, 0.1)', borderColor: '#c2185b' }]}>
+                                        <Text style={[styles.miniStatNum, { color: '#f06292' }]}>{driveInventory?.summary?.totalHentaiEpisodes || 0}</Text>
+                                        <Text style={styles.miniStatLabel}>Hentai (Eps)</Text>
+                                    </View>
+                                </View>
+
+                                {/* Anime */}
+                                <Text style={styles.invSectionTitle}>Anime en Drive</Text>
+                                {(driveInventory?.anime || []).length ? (
+                                    driveInventory.anime.map((a: any) => (
+                                        <View key={`a-${a.episode_id}`} style={styles.invRow}>
+                                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                                <Text style={styles.invRowTitle} numberOfLines={1}>{a.title}</Text>
+                                                <Text style={styles.invRowSub}>Episodio {a.episode_number} • {a.file_size ? `${(a.file_size / (1024 * 1024)).toFixed(1)} MB` : 'VIP'}</Text>
+                                            </View>
+                                            <TouchableOpacity 
+                                                style={styles.invStreamBtn}
+                                                onPress={() => a.stream_url && Linking.openURL(a.stream_url)}
+                                            >
+                                                <Text style={styles.invStreamBtnText}>Ver Stream</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))
+                                ) : (
+                                    <Text style={styles.invEmpty}>No hay episodios de anime en Drive.</Text>
+                                )}
+
+                                {/* Manga */}
+                                <Text style={styles.invSectionTitle}>Manga en Drive</Text>
+                                {(driveInventory?.manga || []).length ? (
+                                    driveInventory.manga.map((m: any, idx: number) => {
+                                        const match = (m.chapter_url || '').match(/manga\/([^/]+)\/([^/]+)/);
+                                        const title = match ? match[1].replace(/-/g, ' ') : 'Manga';
+                                        const cap = match ? match[2].replace(/-/g, ' ') : 'Capítulo';
+                                        return (
+                                            <View key={`m-${idx}`} style={styles.invRow}>
+                                                <View style={{ flex: 1, paddingRight: 8 }}>
+                                                    <Text style={styles.invRowTitle} numberOfLines={1}>{title}</Text>
+                                                    <Text style={styles.invRowSub}>{cap} • {m.page_count || 0} páginas</Text>
+                                                </View>
+                                                <TouchableOpacity 
+                                                    style={styles.invStreamBtn}
+                                                    onPress={() => m.chapter_url && Linking.openURL(m.chapter_url)}
+                                                >
+                                                    <Text style={styles.invStreamBtnText}>Abrir</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })
+                                ) : (
+                                    <Text style={styles.invEmpty}>No hay capítulos de manga en Drive.</Text>
+                                )}
+
+                                {/* Hentai */}
+                                <Text style={styles.invSectionTitle}>Hentai en Drive</Text>
+                                {(driveInventory?.hentai || []).length ? (
+                                    driveInventory.hentai.map((h: any) => (
+                                        <View key={`h-${h.episode_id}`} style={styles.invRow}>
+                                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                                <Text style={styles.invRowTitle} numberOfLines={1}>{h.title}</Text>
+                                                <Text style={styles.invRowSub}>Episodio {h.episode_number} • VIP 720p</Text>
+                                            </View>
+                                            <TouchableOpacity 
+                                                style={styles.invStreamBtn}
+                                                onPress={() => h.stream_url && Linking.openURL(h.stream_url)}
+                                            >
+                                                <Text style={styles.invStreamBtnText}>Ver Stream</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))
+                                ) : (
+                                    <Text style={styles.invEmpty}>No hay episodios Hentai en Drive.</Text>
+                                )}
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </AdminShell>
     );
 }
 
-function StatTile({ title, value, icon, compact }: { title: string; value: number; icon: string; compact: boolean }) {
-    return (
+function StatTile({ title, value, icon, compact, onPress }: { title: string; value: number; icon: string; compact: boolean; onPress?: () => void }) {
+    const tile = (
         <View style={[styles.statTile, compact && styles.statTileCompact]}>
             <View style={styles.statTop}>
                 <Text style={styles.statValue}>{value}</Text>
@@ -274,6 +419,15 @@ function StatTile({ title, value, icon, compact }: { title: string; value: numbe
             <Text style={styles.statLabel} numberOfLines={1}>{title}</Text>
         </View>
     );
+
+    if (onPress) {
+        return (
+            <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={{ flex: 1, minWidth: compact ? '48%' : 150 }}>
+                {tile}
+            </TouchableOpacity>
+        );
+    }
+    return tile;
 }
 
 function QuickAction({ title, subtitle, icon, onPress, primary, isLast }: any) {
@@ -549,5 +703,98 @@ const styles = StyleSheet.create({
     },
     pressed: {
         opacity: 0.85,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 16,
+    },
+    modalBox: {
+        width: '100%',
+        backgroundColor: adminColors.surface,
+        borderRadius: 12,
+        paddingBottom: 20,
+        borderWidth: 1,
+        borderColor: adminColors.border,
+        overflow: 'hidden',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: adminColors.border,
+    },
+    modalTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: adminColors.text,
+    },
+    modalCloseBtn: {
+        padding: 4,
+    },
+    miniStat: {
+        flex: 1,
+        padding: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    miniStatNum: {
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    miniStatLabel: {
+        fontSize: 11,
+        color: adminColors.textSecondary,
+        marginTop: 2,
+    },
+    invSectionTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: adminColors.primary,
+        marginTop: 14,
+        marginBottom: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    invRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: adminColors.border,
+    },
+    invRowTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: adminColors.text,
+    },
+    invRowSub: {
+        fontSize: 11,
+        color: adminColors.textSecondary,
+        marginTop: 2,
+    },
+    invStreamBtn: {
+        backgroundColor: adminColors.primary,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 4,
+    },
+    invStreamBtnText: {
+        fontSize: 11,
+        color: '#FFFFFF',
+        fontWeight: '600',
+    },
+    invEmpty: {
+        fontSize: 12,
+        color: adminColors.textSecondary,
+        fontStyle: 'italic',
+        paddingVertical: 6,
     },
 });

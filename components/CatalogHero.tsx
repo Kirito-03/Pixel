@@ -10,6 +10,7 @@ export interface CatalogHeroItem {
   poster?: string;
   banner?: string;
   description?: string;
+  label?: string;
 }
 
 export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DESTACADOS' }: { items: CatalogHeroItem[]; onOpen: (key: string) => void; eyebrow?: string }) {
@@ -44,7 +45,7 @@ export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DES
     <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
     <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.12)', '#080808']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
     <View style={[styles.copy, { left: gutter, right: compact ? 20 : undefined, bottom: compact ? 84 : 94, maxWidth: compact ? undefined : 650 }]}>
-      <Text style={styles.eyebrow}>{eyebrow}</Text>
+      <Text style={styles.eyebrow}>{item.label ? `${item.label.toUpperCase()} · DESTACADOS` : eyebrow}</Text>
       <Text style={[styles.title, { fontSize: compact ? 28 : 44, lineHeight: compact ? 34 : 50 }]} numberOfLines={2}>{item.title}</Text>
       {item.description ? <Text style={styles.description} numberOfLines={compact ? 2 : 3}>{item.description}</Text> : null}
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Más información de ${item.title}`} style={styles.action} onPress={() => onOpen(item.key)}>

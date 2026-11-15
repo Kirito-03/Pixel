@@ -99,7 +99,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
 
   return (
     <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: isSmallScreen ? Math.min(680, Math.max(500, height * 0.75)) : Math.min(680, Math.max(480, height * 0.8)) }]}>
-      <AnimeArtwork banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "100% 40%"} />
+      <AnimeArtwork alignTop banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "100% 40%"} />
 
       {/* Top vignette para navbar */}
       <LinearGradient

@@ -87,6 +87,81 @@ const importM3uUpload = multer({
     }
 });
 
+/**
+ * GET /api/admin/drive/inventory
+ * Retorna todo el contenido sincronizado en Google Drive: Anime, Manga, Hentai
+ */
+router.get('/drive/inventory', async (req, res) => {
+    try {
+        // 1. Anime en Drive
+        const animeRes = await pool.query(`
+            SELECT 
+                ac.id AS anime_id,
+                ac.title,
+                ac.poster_url,
+                ae.id AS episode_id,
+                ae.episode_number,
+                ae.stream_url,
+                ae.file_size,
+                ae.storage_type
+            FROM anime_episodes ae
+            JOIN anime_content ac ON ac.id = ae.anime_id
+            WHERE ae.stream_url LIKE '%/api/stream/%' OR ae.storage_type = 'gdrive'
+            ORDER BY ac.title ASC, ae.episode_number ASC
+        `);
+
+        // 2. Manga en Drive
+        const mangaRes = await pool.query(`
+            SELECT 
+                chapter_url,
+                jsonb_array_length(pages) AS page_count,
+                fetched_at
+            FROM manga_page_cache
+            WHERE pages::text LIKE '%/api/stream/Manga/%'
+            ORDER BY fetched_at DESC
+        `);
+
+        // 3. Hentai en Drive
+        const hentaiRes = await pool.query(`
+            SELECT 
+                hc.id AS hentai_id,
+                hc.title,
+                hc.slug,
+                hc.poster_url,
+                he.id AS episode_id,
+                he.episode_number,
+                (
+                    SELECT elem->>'url'
+                    FROM jsonb_array_elements(he.video_servers) elem
+                    WHERE elem->>'server' = 'Pixel VIP (Drive)'
+                    LIMIT 1
+                ) AS stream_url
+            FROM hentai_episodes he
+            JOIN hentai_content hc ON hc.id = he.hentai_id
+            WHERE he.video_servers::text LIKE '%Pixel VIP (Drive)%'
+            ORDER BY hc.title ASC, he.episode_number ASC
+        `);
+
+        res.json({
+            summary: {
+                totalAnimeEpisodes: animeRes.rows.length,
+                totalMangaChapters: mangaRes.rows.length,
+                totalHentaiEpisodes: hentaiRes.rows.length,
+                totalDriveItems: animeRes.rows.length + mangaRes.rows.length + hentaiRes.rows.length,
+            },
+            anime: animeRes.rows,
+            manga: mangaRes.rows,
+            hentai: hentaiRes.rows,
+        });
+    } catch (error) {
+        console.error('Error obteniendo inventario de Drive:', error);
+        res.status(500).json({
+            message: 'Error al obtener inventario de Google Drive',
+            error: error.message,
+        });
+    }
+});
+
 // ========================================
 // TMDB Integration
 // ========================================

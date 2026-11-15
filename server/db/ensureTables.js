@@ -93,6 +93,7 @@ export async function ensurePixelNoSekaiTables() {
   `);
   await pool.query(`ALTER TABLE manga_cache ADD COLUMN IF NOT EXISTS cover_url TEXT;`);
   await pool.query(`ALTER TABLE manga_cache ADD COLUMN IF NOT EXISTS status TEXT;`);
+  await pool.query(`ALTER TABLE manga_cache ADD COLUMN IF NOT EXISTS publication_type TEXT;`);
   await pool.query(`ALTER TABLE manga_cache ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb;`);
   await pool.query(`ALTER TABLE manga_cache ADD COLUMN IF NOT EXISTS content_rating TEXT;`);
   await pool.query(`ALTER TABLE manga_cache ADD COLUMN IF NOT EXISTS year INTEGER;`);

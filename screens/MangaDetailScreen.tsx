@@ -1,5 +1,6 @@
 import { useReaderImage } from '../hooks/useReaderImage';
 import { mangaChapterKey, rememberMangaReader } from '../utils/mangaChapterNavigation';
+import { readingFormat } from '../utils/readingFormat';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -240,6 +241,8 @@ export default function MangaDetailScreen() {
                 <Text style={styles.title}>{manga.title}</Text>
 
                 <View style={styles.metaRow}>
+                  <Text style={styles.metaText}>{readingFormat(manga).toUpperCase()}</Text>
+                  <Text style={styles.metaDot}>•</Text>
                   {manga.status ? (
                     <Text style={styles.metaText}>{String(manga.status).toUpperCase()}</Text>
                   ) : null}

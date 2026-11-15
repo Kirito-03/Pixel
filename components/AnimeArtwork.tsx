@@ -4,7 +4,7 @@ import { artworkLayout } from '../utils/animeArtwork';
 
 const dimensions = new Map<string, { width: number; height: number }>();
 
-export default function AnimeArtwork({ banner, poster, position }: { banner?: string; poster?: string; position?: string }) {
+export default function AnimeArtwork({ banner, poster, position, alignTop = false }: { banner?: string; poster?: string; position?: string; alignTop?: boolean }) {
   const [failedBanner, setFailedBanner] = useState(false);
   const uri = !failedBanner && banner ? banner : poster || '';
   const [frame, setFrame] = useState({ width: 0, height: 0 });
@@ -24,6 +24,6 @@ export default function AnimeArtwork({ banner, poster, position }: { banner?: st
   }, [uri, banner]);
   const layout = intrinsic?.uri === uri ? artworkLayout(frame, intrinsic, position) : null;
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor: '#101016' }]} onLayout={event => setFrame(event.nativeEvent.layout)}>
-    {uri && layout ? <Image source={{ uri }} accessible={false} resizeMode="stretch" style={[{ position: 'absolute' }, layout]} onError={() => { if (uri === banner) setFailedBanner(true); }} /> : null}
+    {uri && layout ? <Image source={{ uri }} accessible={false} resizeMode="stretch" style={[{ position: 'absolute' }, layout, alignTop && layout.height < frame.height ? { top: 0 } : null]} onError={() => { if (uri === banner) setFailedBanner(true); }} /> : null}
   </View>;
 }

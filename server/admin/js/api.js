@@ -59,6 +59,10 @@ class AdminAPI {
         return this.request('/api/admin/stats');
     }
 
+    async getDriveInventory() {
+        return this.request('/api/admin/drive/inventory');
+    }
+
     // Anime endpoints
     async getAnime(params = {}) {
         const queryString = new URLSearchParams(params).toString();

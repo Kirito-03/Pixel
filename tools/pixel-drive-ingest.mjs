@@ -229,7 +229,7 @@ export async function ingestEpisode(episodeId) {
     console.log(`[DriveIngest] ✓ Subido a Drive: ${driveRemoteTarget}`);
 
     // 5. Update Database
-    await updateDatabaseRecord(episodeId, publicStreamUrl);
+    await updateDatabaseRecord(episodeId, publicStreamUrl, optStats.size);
     return true;
   } catch (err) {
     console.error(`[DriveIngest] Fallo en episodio ${episodeId}:`, err.message);
@@ -240,13 +240,15 @@ export async function ingestEpisode(episodeId) {
   }
 }
 
-/** Add Pixel VIP (Drive) to external_servers and set stream_url */
-async function updateDatabaseRecord(episodeId, streamUrl) {
+/** Add Pixel VIP (Drive) to external_servers and set stream_url + storage_type = 'gdrive' */
+async function updateDatabaseRecord(episodeId, streamUrl, fileSize = null) {
   const vipServer = { server: 'Pixel VIP (Drive)', url: streamUrl };
   await pool.query(
     `
       UPDATE anime_episodes
       SET stream_url = $1,
+          storage_type = 'gdrive',
+          file_size = COALESCE($4, file_size),
           external_servers = jsonb_insert(
             COALESCE(
               (
@@ -261,9 +263,9 @@ async function updateDatabaseRecord(episodeId, streamUrl) {
           )
       WHERE id = $3
     `,
-    [streamUrl, JSON.stringify(vipServer), episodeId]
+    [streamUrl, JSON.stringify(vipServer), episodeId, fileSize]
   );
-  console.log(`[DriveIngest] ✓ Base de datos actualizada para Ep ${episodeId}: Servidor VIP disponible.`);
+  console.log(`[DriveIngest] ✓ Base de datos actualizada para Ep ${episodeId}: Servidor VIP disponible (GDrive).`);
 }
 
 /** CLI entrypoint */

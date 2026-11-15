@@ -249,6 +249,24 @@ class AdminApiService {
         return response.data;
     }
 
+    /**
+     * Get Google Drive inventory (Anime, Manga, Hentai)
+     */
+    async getDriveInventory(): Promise<{
+        summary: {
+            totalAnimeEpisodes: number;
+            totalMangaChapters: number;
+            totalHentaiEpisodes: number;
+            totalDriveItems: number;
+        };
+        anime: Array<any>;
+        manga: Array<any>;
+        hentai: Array<any>;
+    }> {
+        const response = await this.axiosInstance.get('/api/admin/drive/inventory');
+        return response.data;
+    }
+
     async importAnime(payload: any) {
         const response = await this.axiosInstance.post('/api/admin/import/anime', payload);
         return response.data;

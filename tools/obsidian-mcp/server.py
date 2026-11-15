@@ -44,7 +44,10 @@ class VaultError(Exception):
 
 
 def default_vault_root() -> Path:
-    """Return the default vault directory (<repo_root>/docs/brain)."""
+    """Return the default vault directory."""
+    candidate = Path("/run/media/arle/Reze/Users/ASUS/My Documents/Projects")
+    if candidate.exists() and candidate.is_dir():
+        return candidate
     repo_root = Path(__file__).resolve().parents[2]
     return repo_root / "docs" / "brain"
 
@@ -351,17 +354,153 @@ class ObsidianVault:
             "total_bytes": existing_size + len(to_write),
         }
 
+    def write_note(
+        self,
+        path: str,
+        content: str,
+        *,
+        overwrite: bool = True,
+    ) -> dict[str, Any]:
+        """Write or overwrite explicit plain-text content to a .md note."""
+        if not isinstance(content, str):
+            raise VaultError("write_note requires explicit string content.")
+        if not isinstance(overwrite, bool):
+            raise VaultError("overwrite must be a boolean.")
+
+        payload_bytes = content.encode("utf-8")
+        if len(payload_bytes) > self.max_note_bytes:
+            raise VaultError(
+                f"Content exceeds maximum note size ({self.max_note_bytes} bytes)."
+            )
+
+        target = resolve_markdown_path(
+            self.root,
+            path,
+            must_exist=False,
+        )
+        root_resolved = self.root.resolve(strict=True)
+
+        if target.exists() and not overwrite:
+            raise VaultError(f"Note already exists and overwrite is False: {path}")
+
+        parent = target.parent
+        if not parent.exists():
+            rel_parent_parts = parent.relative_to(root_resolved).parts
+            cur = root_resolved
+            for part in rel_parent_parts:
+                cur = cur / part
+                if cur.is_symlink():
+                    raise VaultError(f"Symlinks are not allowed: {part}")
+                if not cur.exists():
+                    cur.mkdir(mode=0o755)
+                elif not cur.is_dir():
+                    raise VaultError("Parent path component is not a directory.")
+
+        to_write = payload_bytes
+        if not to_write.endswith(b"\n") and to_write:
+            to_write += b"\n"
+
+        try:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(target, flags, 0o644)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(to_write)
+                handle.flush()
+        except OSError as exc:
+            raise VaultError(f"Failed to write note: {exc}") from exc
+
+        rel_path = target.resolve(strict=True).relative_to(root_resolved).as_posix()
+        return {
+            "path": rel_path,
+            "written_bytes": len(to_write),
+        }
+
+    def search_notes(
+        self,
+        query: str,
+        *,
+        subdir: str | None = None,
+        case_sensitive: bool = False,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Search markdown notes for a query string, returning snippets with line numbers."""
+        if not isinstance(query, str) or not query.strip():
+            raise VaultError("Query must be a non-empty string.")
+
+        list_res = self.list_notes(subdir=subdir, limit=MAX_LIST_NOTES)
+        notes = list_res["notes"]
+        effective_limit = max(1, min(limit, 200))
+        results = []
+
+        q = query if case_sensitive else query.lower()
+
+        for item in notes:
+            note_path = item["path"]
+            try:
+                data = self.read_note(note_path)
+                lines = data["content"].splitlines()
+                matches = []
+                for idx, line in enumerate(lines, start=1):
+                    target_line = line if case_sensitive else line.lower()
+                    if q in target_line:
+                        matches.append({
+                            "line": idx,
+                            "text": line.strip()[:200],
+                        })
+                        if len(matches) >= 5:
+                            break
+                if matches:
+                    results.append({
+                        "path": note_path,
+                        "match_count": len(matches),
+                        "matches": matches,
+                    })
+                    if len(results) >= effective_limit:
+                        break
+            except Exception:
+                continue
+
+        return {
+            "query": query,
+            "count": len(results),
+            "results": results,
+        }
+
+    def get_vault_stats(self) -> dict[str, Any]:
+        """Return summary statistics of the vault."""
+        list_res = self.list_notes(limit=MAX_LIST_NOTES)
+        notes = list_res["notes"]
+        total_size = sum(n["size_bytes"] for n in notes)
+        root_resolved = self.root.resolve(strict=True)
+
+        top_dirs = []
+        try:
+            for entry in sorted(root_resolved.iterdir()):
+                if entry.is_dir() and not entry.is_symlink() and not entry.name.startswith("."):
+                    top_dirs.append(entry.name)
+        except Exception:
+            pass
+
+        return {
+            "vault_root": str(root_resolved),
+            "total_notes": len(notes),
+            "total_bytes": total_size,
+            "top_level_folders": top_dirs,
+        }
+
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "name": "list_notes",
-        "description": "List Markdown (.md) notes inside the confined docs/brain vault.",
+        "description": "List Markdown (.md) notes inside the Obsidian vault.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "subdir": {
                     "type": "string",
-                    "description": "Optional relative subdirectory inside docs/brain.",
+                    "description": "Optional relative subdirectory inside the vault (e.g. 'Pixel' or 'Muvixo').",
                 },
                 "limit": {
                     "type": "integer",
@@ -375,13 +514,13 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "name": "read_note",
-        "description": "Read a Markdown (.md) note inside docs/brain within size limits.",
+        "description": "Read a Markdown (.md) note inside the vault.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Relative path to a .md note inside docs/brain.",
+                    "description": "Relative path to a .md note inside the vault (e.g. '00_CENTRO_DE_PROYECTOS.md' or 'Pixel/00_PIXEL.md').",
                 },
             },
             "required": ["path"],
@@ -389,17 +528,37 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
-        "name": "append_note",
-        "description": (
-            "Append explicit plain-text Markdown content to a .md note inside docs/brain. "
-            "Content is stored verbatim and never executed."
-        ),
+        "name": "write_note",
+        "description": "Create or overwrite a Markdown (.md) note inside the vault. Creates subdirectories automatically.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Relative path to a .md note inside docs/brain.",
+                    "description": "Relative path to a .md note inside the vault.",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Full Markdown content to write.",
+                },
+                "overwrite": {
+                    "type": "boolean",
+                    "description": "Whether to overwrite if the file already exists (default true).",
+                },
+            },
+            "required": ["path", "content"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "append_note",
+        "description": "Append text content to a Markdown (.md) note inside the vault.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Relative path to a .md note inside the vault.",
                 },
                 "content": {
                     "type": "string",
@@ -411,6 +570,42 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 },
             },
             "required": ["path", "content"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "search_notes",
+        "description": "Search notes inside the vault by keyword, returning matching paths, lines and text snippets.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search text to look for.",
+                },
+                "subdir": {
+                    "type": "string",
+                    "description": "Optional subdirectory to narrow the search.",
+                },
+                "case_sensitive": {
+                    "type": "boolean",
+                    "description": "Whether the search is case-sensitive (default false).",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max matching notes to return (default 50).",
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_vault_stats",
+        "description": "Get summary statistics of the Obsidian vault (total notes, size, top-level folders).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
             "additionalProperties": False,
         },
     },
@@ -426,7 +621,10 @@ class MCPServer:
         self._tool_handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "list_notes": self._call_list_notes,
             "read_note": self._call_read_note,
+            "write_note": self._call_write_note,
             "append_note": self._call_append_note,
+            "search_notes": self._call_search_notes,
+            "get_vault_stats": self._call_get_vault_stats,
         }
 
     def _call_list_notes(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -448,6 +646,21 @@ class MCPServer:
             raise VaultError("Missing required argument: path")
         return self.vault.read_note(args["path"])
 
+    def _call_write_note(self, args: dict[str, Any]) -> dict[str, Any]:
+        allowed = {"path", "content", "overwrite"}
+        extra = set(args.keys()) - allowed
+        if extra:
+            raise VaultError(f"Unexpected arguments: {', '.join(sorted(extra))}")
+        if "path" not in args:
+            raise VaultError("Missing required argument: path")
+        if "content" not in args:
+            raise VaultError("Missing required argument: content")
+        return self.vault.write_note(
+            args["path"],
+            args["content"],
+            overwrite=args.get("overwrite", True),
+        )
+
     def _call_append_note(self, args: dict[str, Any]) -> dict[str, Any]:
         allowed = {"path", "content", "create_if_missing"}
         extra = set(args.keys()) - allowed
@@ -462,6 +675,25 @@ class MCPServer:
             args["content"],
             create_if_missing=args.get("create_if_missing", True),
         )
+
+    def _call_search_notes(self, args: dict[str, Any]) -> dict[str, Any]:
+        allowed = {"query", "subdir", "case_sensitive", "limit"}
+        extra = set(args.keys()) - allowed
+        if extra:
+            raise VaultError(f"Unexpected arguments: {', '.join(sorted(extra))}")
+        if "query" not in args:
+            raise VaultError("Missing required argument: query")
+        return self.vault.search_notes(
+            args["query"],
+            subdir=args.get("subdir"),
+            case_sensitive=args.get("case_sensitive", False),
+            limit=args.get("limit", 50),
+        )
+
+    def _call_get_vault_stats(self, args: dict[str, Any]) -> dict[str, Any]:
+        if args:
+            raise VaultError("get_vault_stats accepts no arguments.")
+        return self.vault.get_vault_stats()
 
     @staticmethod
     def _error_response(req_id: Any, code: int, message: str) -> dict[str, Any]:

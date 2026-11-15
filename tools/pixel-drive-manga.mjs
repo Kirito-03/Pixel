@@ -168,21 +168,36 @@ export async function ingestChapter(chapterUrl) {
 }
 
 /** Ingest all chapters for a given manga slug */
-export async function ingestManga(mangaId, limit = 10) {
-  console.log(`[MangaIngest] Buscando capítulos de manga "${mangaId}"...`);
-  const { rows } = await pool.query(
+export async function ingestManga(mangaId, limit = 50) {
+  console.log(`[MangaIngest] Buscando capítulos de manga "${mangaId}" en catálogo...`);
+  let { rows } = await pool.query(
     `
-      SELECT chapter_url
-      FROM manga_page_cache
-      WHERE chapter_url LIKE $1
-      ORDER BY chapter_url ASC
+      SELECT external_url AS chapter_url
+      FROM manga_chapters_cache
+      WHERE manga_id = $1 AND external_url IS NOT NULL
+      ORDER BY NULLIF(regexp_replace(chapter, '[^0-9.]', '', 'g'), '')::numeric ASC NULLS LAST
       LIMIT $2
     `,
-    [`%${mangaId}%`, limit]
+    [mangaId, limit]
   );
 
   if (!rows.length) {
-    console.log(`[MangaIngest] No se encontraron capítulos registrados en cache para ${mangaId}.`);
+    // Fallback a manga_page_cache
+    const fallback = await pool.query(
+      `
+        SELECT chapter_url
+        FROM manga_page_cache
+        WHERE chapter_url LIKE $1
+        ORDER BY chapter_url ASC
+        LIMIT $2
+      `,
+      [`%${mangaId}%`, limit]
+    );
+    rows = fallback.rows;
+  }
+
+  if (!rows.length) {
+    console.log(`[MangaIngest] No se encontraron capítulos registrados para ${mangaId}.`);
     return;
   }
 

@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { readingFormat } from '../utils/readingFormat';
 import Header from '../components/Header';
 import CatalogHero, { CatalogHeroItem } from '../components/CatalogHero';
 import { MangaCard, MangaRankingItem, MangaFilterChips, MangaFilter, MangaItemUI } from '../components/MangaComponents';
@@ -57,6 +58,7 @@ export default function MangaScreen() {
     return {
       id: m.id,
       title: m.title,
+      publicationType: readingFormat(m),
       image: m.cover_url || '',
       status: m.status,
       chapters: chapterNum,
@@ -140,6 +142,7 @@ export default function MangaScreen() {
         key: p.id,
         title: p.title,
         poster: p.cover_url || undefined,
+        label: readingFormat(p),
         description:
           p.description ||
           'Explora los capítulos disponibles y continúa tu lectura al instante.',
@@ -172,7 +175,7 @@ export default function MangaScreen() {
       >
         {showHero ? (
           <CatalogHero
-            eyebrow="MANGA  ·  DESTACADOS"
+            eyebrow="LECTURAS DESTACADAS"
             items={heroItems}
             onOpen={(id) => navigation.navigate('MangaDetail', { id })}
           />
@@ -191,9 +194,9 @@ export default function MangaScreen() {
             ]}
           >
             <View style={styles.titleRow}>
-              <Text style={[styles.title, { color: colors.text }]}>MANGA</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Manga y más</Text>
               <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.badgeText}>LECTURA</Text>
+                <Text style={styles.badgeText}>MANHWA · MANHUA · MANGA</Text>
               </View>
             </View>
 

@@ -95,6 +95,7 @@ export default function ProfileScreen() {
                 <Row label="Inicio de sesión" detail={providerLabel} />
                 <Row label="Perfil activo" detail={p.currentProfile?.name || 'Sin perfil'}><Action title="Cambiar perfil" onPress={p.handleChangeProfile} /></Row>
                 <Row label="Foto de perfil" detail="JPG o PNG, hasta 5 MB"><Action title="Cambiar foto" onPress={p.handleChangeAvatar} busy={p.updatingAvatar} /></Row>
+                {isAdmin && !wide && <Row label="Administración" detail="Gestiona el catálogo y la plataforma."><Action title="Abrir administrador" onPress={p.handleAdminAccess} /></Row>}
               </> : section === 'preferences' ? <>
                 <Row label="Tema" detail={`Modo ${theme === 'dark' ? 'oscuro' : 'claro'}. Se guarda en este dispositivo.`} />
                 <Row label="Contenido para adultos" detail="Habilita la sección +18 en este perfil.">
@@ -102,13 +103,14 @@ export default function ProfileScreen() {
                     trackColor={{ false: colors.textGray, true: colors.primary }} thumbColor="#fff" />
                 </Row>
                 <Row label="Idioma" detail="Español" />
+                <Row label="Términos y condiciones" detail="Consulta las condiciones de uso de Pixel."><Action title="Ver términos" onPress={() => (p.navigation as any).navigate('LegalScreen', { type: 'terms' })} /></Row>
+                <Row label="Privacidad" detail="Cómo se usan y protegen tus datos."><Action title="Ver privacidad" onPress={() => (p.navigation as any).navigate('LegalScreen', { type: 'privacy' })} /></Row>
               </> : <>
                 <Row label="Correo" detail={auth.currentUser?.emailVerified ? 'Verificado' : 'Pendiente de verificar'}>
                   {!auth.currentUser?.emailVerified && <Action title="Verificar correo" onPress={p.handleEmailVerification} />}
                 </Row>
                 {password ? <Row label="Contraseña" detail="Recibe un enlace para restablecerla."><Action title="Enviar enlace" onPress={p.handlePasswordReset} /></Row> :
                   <Row label="Acceso con Google" detail="La contraseña y la seguridad de este acceso se gestionan en tu cuenta de Google." />}
-                <Row label="Sesión actual" detail="Cierra tu sesión en este dispositivo."><Action title="Cerrar sesión" onPress={() => p.setLogoutVisible(true)} /></Row>
               </>}
             </View>
             {section === 'preferences' && Platform.OS === 'android' && <View style={[styles.surface, { backgroundColor: colors.card }]}>
@@ -124,12 +126,9 @@ export default function ProfileScreen() {
               {updates.error ? <Text accessibilityRole="alert" style={[styles.releaseNotice, { color: colors.primary }]}>{updates.error}</Text> : null}
             </View>}
             <View style={styles.footer}>
-              <Action title="Términos y condiciones" onPress={() => (p.navigation as any).navigate('LegalScreen', { type: 'terms' })} />
-              <Action title="Privacidad" onPress={() => (p.navigation as any).navigate('LegalScreen', { type: 'privacy' })} />
-              {isAdmin && !wide && <Action title="Abrir administrador" onPress={p.handleAdminAccess} />}
-              {section !== 'security' && <TouchableOpacity accessibilityRole="button" style={styles.footerAction} onPress={() => p.setLogoutVisible(true)}>
+              <TouchableOpacity accessibilityRole="button" style={styles.footerAction} onPress={() => p.setLogoutVisible(true)}>
                 <Ionicons name="log-out-outline" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.primary }]}>Cerrar sesión</Text>
-              </TouchableOpacity>}
+              </TouchableOpacity>
             </View>
           </View>
         </View>

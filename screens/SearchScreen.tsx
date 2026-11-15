@@ -1,3 +1,4 @@
+import { readingFormat } from '../utils/readingFormat';
 import React, { useRef, useState, useEffect } from 'react';
 import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, useWindowDimensions, BackHandler, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -238,7 +239,7 @@ export default function SearchScreen() {
               : <TouchableOpacity accessibilityRole="button" onPress={clearSearch} style={styles.backGenres}><Ionicons name="arrow-back" size={15} color={colors.textMuted} /><Text style={{ color: colors.textMuted, fontSize: 12 }}>Volver a géneros</Text></TouchableOpacity>}
           </>}
         </>}
-        keyExtractor={item => item.key} renderItem={({ item }) => <DiscoveryCard width={cardWidth} title={item.title} poster={item.poster} type={item.kind === 'manga' ? 'Manga' : 'Anime'} caption={item.kind === 'manga' ? 'Manga · Leer capítulos' : 'Anime · Ver detalles'} onPress={() => handleResultPress(item)} />}
+        keyExtractor={item => item.key} renderItem={({ item }) => <DiscoveryCard width={cardWidth} title={item.title} poster={item.poster} type={item.kind === 'manga' ? readingFormat(item.manga) : 'Anime'} caption={item.kind === 'manga' ? `${readingFormat(item.manga)} · Leer capítulos` : 'Anime · Ver detalles'} onPress={() => handleResultPress(item)} />}
         columnWrapperStyle={{ gap }} ListEmptyComponent={(query.trim().length >= 2 || selectedGenre) && !loading && !searchError ? <View style={styles.empty}><Ionicons name="search-outline" size={36} color={colors.textMuted} /><Text style={{ color: colors.textMuted }}>No encontramos títulos con esta selección.</Text></View> : null} />
       <MovieModal content={selectedContent} visible={modalVisible} onClose={() => setModalVisible(false)} />
     </View>
