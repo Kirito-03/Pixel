@@ -89,3 +89,26 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
 - **Poster Anime:** `https://pixelnosekai.com/api/stream/Anime/59/poster.jpg` (HTTP 200, 122 KB).
 - **Trailer Anime:** `https://pixelnosekai.com/api/stream/Anime/5/trailer.mp4` (HTTP 200, ~8.6 MB).
 - **Página Manhwa:** `https://pixelnosekai.com/api/stream/Manga/la-companera-de-clase-de-al-lado/chapters/capitulo-1/001.jpg` (HTTP 200, 426 KB).
+
+
+---
+
+## 4. Limpieza de Duplicados y Filas Dinámicas en Inicio
+
+### A. Deduplicación de Animes
+- **Causa identificada:** Los scrapers automáticos externos (como AnimeAV1) creaban entradas con sufijos de año (ej. `devil-may-cry-2026`). El bot no encontraba coincidencia de título e insertaba una nueva fila en `anime_content`. Luego, AniList normalizaba el título al oficial (`Devil May Cry`), generando múltiples registros idénticos en la base de datos (5 copias de *Devil May Cry*, 4 de *Super no Ura de Yani Suu Futari*, 2 de *BASTARD!!*, 2 de *Shingeki no Kyojin*).
+- **Acción ejecutada:** El script `tools/pixel-dedup-animes.mjs` eliminó 75 episodios y 9 fichas duplicadas conservando la original con su ID principal. Base de datos ahora tiene **0 duplicados**.
+- **Blindaje del bot:** Se actualizó `server/services/smartBotService.js` con normalización previa de candidatos y validación de colisiones contra títulos canónicos de AniList.
+
+### B. Optimización de Filas de Inicio (`HomeScreen.tsx`)
+- **Eliminación del Scroll Infinito:** Se removió la función que agregaba infinitas filas de géneros (`extraRows` / `loadMoreGenres`) que dejaban filas cortadas o semivacías.
+- **Estructura fija y limpia:**
+  1. Hero Carousel (5 animes rotativos).
+  2. Continuar viendo (si hay progreso).
+  3. Mi Lista (si hay favoritos).
+  4. En emisión (Airing).
+  5. Destacados (Top).
+  6. Finalizados (Muestra aleatoria entre los 840+ animes).
+  7. Recomendados (Top rating).
+  8. Fila temática rotativa (ej. *Populares de Acción*, *Populares de Comedia*, etc. con catálogo completo).
+- **Variación en cada recarga:** Se añadió soporte `sort=random` en `/api/catalog/anime`. Cada vez que el usuario abre o actualiza la app, la selección de títulos y el orden varían automáticamente.
