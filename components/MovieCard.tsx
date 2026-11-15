@@ -40,6 +40,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
   const saved = isInMyList(movie.id, listType);
   const saving = localSaving || listLoading || isUpdatingMyList(movie.id, listType);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewFallbackId, setPreviewFallbackId] = useState<string | undefined>(undefined);
   const [previewClosed, setPreviewClosed] = useState(false);
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
@@ -128,6 +129,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
 
   useEffect(() => {
     setPreviewId(null);
+    setPreviewFallbackId(undefined);
     setPreviewClosed(false);
     if (!hovered || listType !== 'anime') return;
     let active = true;
@@ -135,7 +137,13 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
       try {
         const hasTrailerMetadata = 'trailer_checked_at' in movie && movie.trailer_checked_at;
         const detail = hasTrailerMetadata ? movie as ContentItem : await catalogService.getAnimeById(movie.id);
-        if (active && detail.trailer_site?.toLowerCase() === 'youtube' && detail.trailer_id && /^[A-Za-z0-9_-]{11}$/.test(detail.trailer_id)) setPreviewId(detail.trailer_id);
+        const site = detail.trailer_site?.toLowerCase();
+        if (active && site === 'gdrive') {
+          setPreviewId(`https://pixelnosekai.com/api/stream/Anime/${detail.id}/trailer.mp4`);
+          setPreviewFallbackId(detail.trailer_id || undefined);
+        } else if (active && site === 'youtube' && detail.trailer_id && /^[A-Za-z0-9_-]{11}$/.test(detail.trailer_id)) {
+          setPreviewId(detail.trailer_id);
+        }
       } catch { /* Poster remains if trailer metadata is unavailable. */ }
     }, 4500); // Card opens after 500ms: trailer starts at >=5s total hover.
     return () => { active = false; clearTimeout(timer); };
@@ -276,7 +284,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
         >
           {/* Imagen del anime en grande */}
           <View style={{ width: '100%', height: POPUP_IMG_HEIGHT, overflow: 'hidden' as any }}>
-            {previewId && !previewClosed ? <TrailerPreview id={previewId} onEnded={() => setPreviewClosed(true)} /> : <><Image
+            {previewId && !previewClosed ? <TrailerPreview id={previewId} fallbackYoutubeId={previewFallbackId} onEnded={() => setPreviewClosed(true)} /> : <><Image
               source={{ uri: getImageSource() }}
               style={{ width: '100%', height: '100%' } as any}
               resizeMode="cover"

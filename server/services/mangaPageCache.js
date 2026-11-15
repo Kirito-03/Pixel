@@ -64,7 +64,7 @@ export function createChapterPageLoader({ fetchHtml, now = Date.now }) {
     const request = (async () => {
       try {
         const cached = await pool?.query(
-          'SELECT pages FROM manga_page_cache WHERE chapter_url = $1 AND fetched_at > NOW() - INTERVAL \'6 hours\'', [url]);
+          'SELECT pages FROM manga_page_cache WHERE chapter_url = $1 AND (fetched_at > NOW() - INTERVAL \'6 hours\' OR pages::text LIKE \'%/api/stream/Manga/%\')', [url]);
         if (Array.isArray(cached?.rows?.[0]?.pages) && cached.rows[0].pages.length) {
           return remember({ baseUrl: '', pages: cached.rows[0].pages, chapterId: url, meta: { source: 'db', cache_hit: true } });
         }
@@ -75,7 +75,7 @@ export function createChapterPageLoader({ fetchHtml, now = Date.now }) {
       if (!pages.length) return data;
       try {
         await pool?.query(`INSERT INTO manga_page_cache (chapter_url, pages, fetched_at) VALUES ($1, $2::jsonb, NOW())
-          ON CONFLICT (chapter_url) DO UPDATE SET pages = EXCLUDED.pages, fetched_at = NOW()`, [url, JSON.stringify(pages)]);
+          ON CONFLICT (chapter_url) DO UPDATE SET pages = CASE WHEN manga_page_cache.pages::text LIKE '%/api/stream/Manga/%' THEN manga_page_cache.pages ELSE EXCLUDED.pages END, fetched_at = NOW()`, [url, JSON.stringify(pages)]);
         await pool?.query('UPDATE manga_chapters_cache SET pages = $1 WHERE chapter_id = $2', [pages.length, url]);
       } catch { /* The in-memory cache still prevents duplicate origin requests. */ }
       return remember(data);

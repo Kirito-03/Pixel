@@ -144,5 +144,46 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
   - `GET /api/admin/drive/inventory` autenticado contra `http://127.0.0.1:3001` en `arle`: `HTTP 200` con `totalDriveItems: 3` (`Anime: 1`, `Manga: 1`, `Hentai: 1`) y listas `pending` (`anime: 20`, `manga: 20`, `hentai: 20`).
   - Log de PM2 `pixel-backend`: tarea `- Google Drive Ingest Batch: Cada 4 horas (minuto 15)` registrada al iniciar.
 - **Pendiente de verificación visual / externa:**
-  - Comprobación visual en navegador web del nuevo encuadre del Hero Carrusel y de los botones en el Admin UI tras limpiar caché del navegador.
+  - Comprobación visual en navegador web del nuevo encuadre del Hero Carrusel, cabecera oscura `#050505`, flechas laterales ampliadas y reproducción directa de tráilers desde Drive tras limpiar caché del navegador.
   - Sincronización de esta nota con la bóveda de Obsidian (`/run/media/arle/Reze/Users/ASUS/My Documents/Projects/`), ya que el disco externo `/run/media/arle/Reze` no se encuentra montado actualmente.
+
+---
+
+## 6. Tráilers en Drive, Verificación Real, Blindaje Anti-Sobrescritura y Ajustes Visuales
+
+### A. Bots Controlados y Verificación Real de Integridad en Google Drive
+- **Limitación de recursos y estabilidad de red:**
+  - En `tools/pixel-drive-ingest.mjs` y `tools/pixel-drive-hentai.mjs` se limitó `ffmpeg` a `-threads 2` y `rclone copyto` a `--transfers 1 --checkers 2 --bwlimit 8M`; se añadió `--force-ipv4`, `--socket-timeout 20`, `--retries 2` y `--no-playlist` en `yt-dlp` para evitar bloqueos por IPv6 en `arle`.
+  - En `tools/pixel-drive-manga.mjs` se limitó `rclone copy` con `--transfers 2 --checkers 2 --bwlimit 8M`, con verificación de existencia HTTP real (`> 500` bytes en primera y última página) incluso sobre capítulos cacheados previamente con URLs de Drive.
+- **Verificación real post-subida y auto-reparación (`tools/pixel-drive-verify.mjs --repair`):**
+  - Antes de actualizar PostgreSQL, cada bot verifica el tamaño real del archivo subido vía `http://127.0.0.1:8086/...` (con respaldo `rclone ls`): episodio/hentai `>= 95%` del tamaño local optimizado y `> 102,400` bytes; tráiler `>= 95%` del local y `> 10,240` bytes; manga `> 500` bytes.
+  - `pixel-drive-verify.mjs --repair` aborta sin modificar PostgreSQL si `127.0.0.1:8086` no responde, y en caso contrario limpia vínculos rotos/incompletos para re-encolarlos en Anime, Tráilers, Manga y Hentai.
+- **Tráilers descargados a Drive (`--trailers`) y ciclo automático (`server/cron.js` + `server/routes/admin.js`):**
+  - `syncAnimeImages` e `ingestBatchTrailers` en `tools/pixel-drive-ingest.mjs` descargan `Anime/<id>/trailer.mp4`, verifican integridad y actualizan `anime_content.trailer_site = 'gdrive'` manteniendo `trailer_id` como respaldo.
+  - `server/cron.js` ejecuta secuencialmente cada `45` minutos (`*/45 * * * *`, más arranque a los `45 s`) `verify --repair`, `ingest --batch --limit 1`, `ingest --trailers --limit 2`, `hentai --batch --limit 1` y `manga --batch --limit 1` con exclusión mutua (`isDriveIngestRunning`).
+  - `GET /api/admin/drive/inventory` suma `totalAnimeTrailers` al inventario y `POST /api/admin/drive/sync` (`type: 'batch'`) incluye `verify --repair` e ingesta de tráilers.
+
+### B. Blindaje Anti-Sobrescritura en Scrapers y Caché
+- **`server/services/hentaiBotService.js`:** `upsertEpisodesForHentai` conserva al inicio del array `video_servers` cualquier servidor `'Pixel VIP (Drive)'` ya vinculado cuando HentaiBot re-sincroniza episodios.
+- **`server/services/smartBotService.js`:** al actualizar episodios existentes en `anime_episodes`, conserva `storage_type = 'gdrive'`, `stream_url` de Drive y el servidor `'Pixel VIP (Drive)'` al inicio de `external_servers`.
+- **`server/services/mangaPageCache.js`:** las filas con URLs `/api/stream/Manga/` ya no caducan a las 6 horas ni son sobrescritas al consultar el capítulo.
+
+### C. Reproducción Directa de Tráilers en Web/App y Ajustes de Inicio
+- **Reproductores de tráiler (`components/TrailerPreview.web.tsx`, `components/TrailerPreview.tsx`, `components/MovieCard.tsx`, `components/anime-modal/useAnimeModal.ts`):**
+  - Detectan URLs directas `https://pixelnosekai.com/api/stream/Anime/<id>/trailer.mp4` (`trailer_site === 'gdrive'`) para reproducirlas con `<video>` HTML5 nativo (control de silencio y desbloqueo por política de autoplay), con respaldo automático a `fallbackYoutubeId` si fallara el stream.
+- **Más elementos al usar la flecha lateral y menú en negro oscuro:**
+  - `services/catalogService.ts` eleva `limit` en `getHomeSections()` de `24` a `48`.
+  - `screens/HomeScreen.tsx` eleva **Destacados** (`buildFeaturedItems`) de `12` a `28` títulos y evita recortar secciones por debajo de `28` elementos al deduplicar contra Destacados.
+  - `components/AnimeArtwork.tsx` y `components/Header.tsx` cambian la franja/fondo superior de `#08080c` / transparente con tinte a negro `#050505` / `rgba(5, 5, 5, 0.88..0.96)`.
+
+### D. Validaciones Reales de Esta Fase
+- `node --check` sobre los 9 archivos backend/scripts modificados: exit `0`.
+- `npx tsc --noEmit` filtrado sobre `TrailerPreview`, `MovieCard`, `useAnimeModal`, `AnimeHeroSection`, `HomeScreen`, `catalogService`, `AnimeArtwork`, `Header`: `0` errores.
+- `node --test server/tests/trailers.test.mjs tests/trailerPreview.test.mjs tests/mangaReaderReliability.test.mjs`: `14/14` tests en verde.
+- `npm run build:web` (vía `tools/build-limited.mjs`) desplegado en `arle`; `https://pixelnosekai.com/` sirve `index-50668512b64368e412c928e70726bfee.js`.
+- En `arle`:
+  - `Anime/5/trailer.mp4` (`8,982,620` B), `Anime/2/trailer.mp4` (`4,835,731` B) y `Anime/3/trailer.mp4` (`5,793,940` B) respondieron `HTTP/2 200` (`content-type: video/mp4`) en `https://pixelnosekai.com/api/stream/...`, y `/api/catalog/anime/5` devolvió `trailer_site: 'gdrive'`.
+  - `Hentai/1/1/episode.mp4` (`80,171,512` B) respondió `HTTP/2 200` y quedó re-vinculado con `'Pixel VIP (Drive)'`.
+  - `node tools/pixel-drive-verify.mjs --repair` finalizó en `0` con `Anime Episodios: 1/1`, `Anime Trailers: 3/3`, `Manga Capítulos: 1/1` y `Hentai Episodios: 1/1` íntegros (`0` rotos).
+- **Nota:** Después de validar `build:web`, se aplicaron únicamente cambios de servidor (`hentaiBotService.js`, `smartBotService.js`, `mangaPageCache.js`) desplegados directamente en `arle` y reiniciados con `pm2 restart pixel-backend --update-env` (el bundle web no cambió respecto a `index-50668512b64368e412c928e70726bfee.js`).
+

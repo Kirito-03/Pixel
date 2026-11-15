@@ -25,7 +25,7 @@ export default function AnimeArtwork({ banner, poster, position, alignTop = fals
   const innerHeight = Math.max(0, frame.height - topOffset);
   const layout = intrinsic?.uri === uri ? artworkLayout({ width: frame.width, height: innerHeight }, intrinsic, position) : null;
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor: '#08080c' }]} onLayout={event => setFrame(event.nativeEvent.layout)}>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor: '#050505' }]} onLayout={event => setFrame(event.nativeEvent.layout)}>
       <View style={{ position: 'absolute', top: topOffset, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
         {uri && layout ? (
           <Image

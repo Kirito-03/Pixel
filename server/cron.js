@@ -39,12 +39,14 @@ async function runDriveIngestBatch() {
     return;
   }
   isDriveIngestRunning = true;
-  console.log('[CronDrive] Iniciando lote automático de respaldo a Google Drive (Anime + Hentai + Manga)...');
+  console.log('[CronDrive] Iniciando verificación e ingesta controlada a Google Drive (Anime + Trailers + Hentai + Manga)...');
   try {
-    await runScript('tools/pixel-drive-ingest.mjs', ['--batch', '--limit', '2']);
+    await runScript('tools/pixel-drive-verify.mjs', ['--repair']);
+    await runScript('tools/pixel-drive-ingest.mjs', ['--batch', '--limit', '1']);
+    await runScript('tools/pixel-drive-ingest.mjs', ['--trailers', '--limit', '2']);
     await runScript('tools/pixel-drive-hentai.mjs', ['--batch', '--limit', '1']);
-    await runScript('tools/pixel-drive-manga.mjs', ['--batch', '--limit', '2']);
-    console.log('[CronDrive] ✓ Lote automático a Google Drive finalizado.');
+    await runScript('tools/pixel-drive-manga.mjs', ['--batch', '--limit', '1']);
+    console.log('[CronDrive] ✓ Ciclo automático a Google Drive finalizado.');
   } catch (e) {
     console.error('[CronDrive] Error en lote automático:', e.message);
   } finally {
@@ -138,8 +140,8 @@ export function startBotSchedulers() {
     }
   });
 
-  // Tarea 9: Respaldo Automático a Google Drive (Cada 4 horas al minuto 15)
-  cron.schedule('15 */4 * * *', async () => {
+  // Tarea 9: Verificación e Ingesta Controlada a Google Drive (Cada 45 minutos, secuencial sin saturar CPU/red)
+  cron.schedule('*/45 * * * *', async () => {
     try {
       await runDriveIngestBatch();
     } catch (e) {
@@ -156,7 +158,14 @@ export function startBotSchedulers() {
   console.log(' - Manga Bot Catálogo Incremental: Cada 20 minutos');
   console.log(' - Hentai Bot (/hub): Cada 30 minutos');
   console.log(' - Hentai Bot Catálogo Incremental: Cada 15 minutos');
-  console.log(' - Google Drive Ingest Batch: Cada 4 horas (minuto 15)');
+  console.log(' - Google Drive Ingest & Verify: Cada 45 minutos (+ arranque inicial)');
+
+  // Primer ciclo suave de verificación/ingesta a Drive 45s después del arranque
+  setTimeout(() => {
+    runDriveIngestBatch().catch((e) => {
+      console.error('[CronDrive] Error en ciclo inicial:', e.message);
+    });
+  }, 45000);
 
   // Inicialización automática si la BD está vacía
   setTimeout(async () => {

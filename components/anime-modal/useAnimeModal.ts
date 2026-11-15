@@ -216,6 +216,9 @@ export function useAnimeModal({
           studios: { nodes: [] },
           characters: { nodes: [] },
           recommendations: { nodes: [] },
+          trailer: anime.trailer_site?.toLowerCase() === 'gdrive'
+            ? { id: `https://pixelnosekai.com/api/stream/Anime/${anime.id}/trailer.mp4`, site: 'gdrive' }
+            : (anime.trailer_id ? { id: anime.trailer_id, site: anime.trailer_site || 'youtube' } : undefined),
         } as any;
       } else {
         details = await getMovieDetails(currentContent.id);
@@ -229,7 +232,8 @@ export function useAnimeModal({
       
       if (currentContent.type === 'anime' && 'trailer' in details && (details as AnimeDetail).trailer) {
         const t = (details as AnimeDetail).trailer;
-        if (t && t.site && t.site.toLowerCase() === 'youtube' && t.id) {
+        const site = t?.site?.toLowerCase();
+        if (t && (site === 'youtube' || site === 'gdrive') && t.id) {
           setTrailerKey(String(t.id));
         } else {
           setTrailerKey(null);
@@ -621,18 +625,23 @@ export function useAnimeModal({
     });
   };
 
-  // Fallback para Web: abrir el trailer directamente en YouTube si el iframe falla
+  // Fallback para Web: abrir el trailer directamente en Drive o YouTube si el iframe falla
   const openExternalTrailer = (key?: string | null) => {
     if (!key) return;
+    const targetUrl = /^https?:\/\//i.test(key)
+      ? key
+      : key.startsWith('/')
+        ? `https://pixelnosekai.com${key}`
+        : `https://www.youtube.com/watch?v=${key}`;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       try {
-        window.open(`https://www.youtube.com/watch?v=${key}`, '_blank');
+        window.open(targetUrl, '_blank');
       } catch (e) {
         
       }
     } else {
       try {
-        Linking.openURL(`https://www.youtube.com/watch?v=${key}`);
+        Linking.openURL(targetUrl);
       } catch (e) {
         
       }

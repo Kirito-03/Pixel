@@ -7,13 +7,31 @@ interface TrailerPreviewProps {
   id: string;
   onEnded?: () => void;
   initialMuted?: boolean;
+  fallbackYoutubeId?: string;
 }
 
-export default function TrailerPreview({ id, onEnded, initialMuted = false }: TrailerPreviewProps) {
-  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
+const isDirectStreamUrl = (value?: string | null): boolean =>
+  Boolean(value && /^(https?:\/\/|\/api\/stream\/)/i.test(value.trim()));
 
+const isYoutubeId = (value?: string | null): boolean =>
+  Boolean(value && /^[A-Za-z0-9_-]{11}$/.test(value.trim()));
+
+export default function TrailerPreview({ id, onEnded, initialMuted = false, fallbackYoutubeId }: TrailerPreviewProps) {
+  const [activeId, setActiveId] = useState(id);
   const [isMuted, setIsMuted] = useState(initialMuted);
   const webViewRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    setActiveId(id);
+    setIsMuted(initialMuted);
+  }, [id, initialMuted]);
+
+  const directUrl = isDirectStreamUrl(activeId)
+    ? (activeId.trim().startsWith('/') ? `https://pixelnosekai.com${activeId.trim()}` : activeId.trim())
+    : null;
+  const youtubeId = !directUrl && isYoutubeId(activeId) ? activeId.trim() : null;
+
+  if (!directUrl && !youtubeId) return null;
 
   const toggleSound = () => {
     const nextMuted = !isMuted;
@@ -21,13 +39,17 @@ export default function TrailerPreview({ id, onEnded, initialMuted = false }: Tr
     if (webViewRef.current) {
       if (nextMuted) {
         webViewRef.current.injectJavaScript(`
-          if (window.player && window.player.mute) { window.player.mute(); }
+          var v = document.querySelector('video');
+          if (v) { v.muted = true; }
+          else if (window.player && window.player.mute) { window.player.mute(); }
           else { document.querySelector('iframe')?.contentWindow?.postMessage('{"event":"command","func":"mute"}', '*'); }
           true;
         `);
       } else {
         webViewRef.current.injectJavaScript(`
-          if (window.player && window.player.unMute) { window.player.unMute(); window.player.setVolume(100); window.player.playVideo(); }
+          var v = document.querySelector('video');
+          if (v) { v.muted = false; v.volume = 1; v.play().catch(function(){}); }
+          else if (window.player && window.player.unMute) { window.player.unMute(); window.player.setVolume(100); window.player.playVideo(); }
           else { 
             document.querySelector('iframe')?.contentWindow?.postMessage('{"event":"command","func":"unMute"}', '*'); 
             document.querySelector('iframe')?.contentWindow?.postMessage('{"event":"command","func":"setVolume","args":[100]}', '*'); 
@@ -38,7 +60,44 @@ export default function TrailerPreview({ id, onEnded, initialMuted = false }: Tr
     }
   };
 
-  const html = `
+  const html = directUrl
+    ? `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+        <style>
+          * { margin:0; padding:0; box-sizing:border-box; }
+          body, html { width:100%; height:100%; background:#000; overflow:hidden; }
+          #player { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; background:#000; }
+        </style>
+      </head>
+      <body>
+        <video id="player" playsinline autoplay ${initialMuted ? 'muted' : ''}></video>
+        <script>
+          (function() {
+            var v = document.getElementById('player');
+            v.src = ${JSON.stringify(directUrl)};
+            v.addEventListener('ended', function() {
+              if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('ENDED');
+            });
+            v.addEventListener('error', function() {
+              if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('STREAM_ERROR');
+            });
+            var p = v.play();
+            if (p && p.catch) {
+              p.catch(function() {
+                v.muted = true;
+                if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('BLOCKED');
+                v.play().catch(function(){});
+              });
+            }
+          })();
+        </script>
+      </body>
+    </html>
+  `
+    : `
     <!DOCTYPE html>
     <html>
       <head>
@@ -53,7 +112,7 @@ export default function TrailerPreview({ id, onEnded, initialMuted = false }: Tr
       <body>
         <div class="wrap">
           <iframe id="player"
-            src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=${initialMuted ? 1 : 0}&playsinline=1&controls=0&fs=0&rel=0&iv_load_policy=3&cc_load_policy=0&disablekb=1&enablejsapi=1" 
+            src="https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&mute=${initialMuted ? 1 : 0}&playsinline=1&controls=0&fs=0&rel=0&iv_load_policy=3&cc_load_policy=0&disablekb=1&enablejsapi=1" 
             allow="autoplay; encrypted-media" 
             allowfullscreen>
           </iframe>
@@ -87,6 +146,9 @@ export default function TrailerPreview({ id, onEnded, initialMuted = false }: Tr
         scalesPageToFit
         onMessage={(event) => {
           if (event.nativeEvent.data === 'BLOCKED') setIsMuted(true);
+          if (event.nativeEvent.data === 'STREAM_ERROR' && fallbackYoutubeId && isYoutubeId(fallbackYoutubeId)) {
+            setActiveId(fallbackYoutubeId);
+          }
           if (event.nativeEvent.data === 'ENDED') {
             onEnded?.();
           }

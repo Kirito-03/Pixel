@@ -59,7 +59,7 @@ function getRemoteFileSize(remotePath) {
     const httpCheck = spawnSync('curl', ['-sI', '-f', '--max-time', '4', `http://127.0.0.1:8086/${encodedRel}`], { encoding: 'utf8' });
     if (httpCheck.status === 0) {
       const lenMatch = (httpCheck.stdout || '').match(/Content-Length:\s*(\d+)/i);
-      const bytes = lenMatch ? Number(lenMatch[1]) : 1;
+      const bytes = lenMatch ? Number(lenMatch[1]) : 0;
       if (bytes > 0) return bytes;
     }
   } catch {}
@@ -67,7 +67,7 @@ function getRemoteFileSize(remotePath) {
     const out = runCapture(RCLONE_BIN, ['ls', remotePath]);
     if (!out) return 0;
     const match = out.match(/^\s*(\d+)\s+/);
-    return match ? Number(match[1]) : 1;
+    return match ? Number(match[1]) : 0;
   } catch {
     return 0;
   }
@@ -78,13 +78,15 @@ function remoteFileExists(remotePath) {
   return getRemoteFileSize(remotePath) > 0;
 }
 
+const RCLONE_THROTTLE = ['--transfers', '1', '--checkers', '2', '--bwlimit', '8M'];
+
 /** Download poster, banner & trailer if not already in Drive */
-async function syncAnimeImages(animeId) {
+export async function syncAnimeImages(animeId) {
   const { rows } = await pool.query(
-    'SELECT id, title, poster_url, banner_url, trailer_id FROM anime_content WHERE id = $1',
+    'SELECT id, title, poster_url, banner_url, trailer_id, trailer_site FROM anime_content WHERE id = $1',
     [animeId]
   );
-  if (!rows.length) return;
+  if (!rows.length) return false;
   const anime = rows[0];
 
   const posterRemote = `${RCLONE_REMOTE}/Anime/${animeId}/poster.jpg`;
@@ -92,9 +94,13 @@ async function syncAnimeImages(animeId) {
     console.log(`[DriveIngest] Sincronizando portada de anime ${animeId} (${anime.title})...`);
     const tmpPoster = join(INGEST_DIR, `tmp_poster_${animeId}.jpg`);
     try {
-      await runCommand('curl', ['-sS', '-L', anime.poster_url, '-o', tmpPoster]);
-      await runCommand(RCLONE_BIN, ['copyto', tmpPoster, posterRemote]);
-      console.log(`[DriveIngest] ✓ Portada subida a Drive: ${posterRemote}`);
+      await runCommand('curl', ['-sS', '-L', '--max-time', '60', anime.poster_url, '-o', tmpPoster]);
+      if (existsSync(tmpPoster) && statSync(tmpPoster).size > 500) {
+        await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpPoster, posterRemote]);
+        if (getRemoteFileSize(posterRemote) > 500) {
+          console.log(`[DriveIngest] ✓ Portada subida a Drive: ${posterRemote}`);
+        }
+      }
     } catch (e) {
       console.error(`[DriveIngest] Error subiendo portada:`, e.message);
     } finally {
@@ -107,9 +113,13 @@ async function syncAnimeImages(animeId) {
     console.log(`[DriveIngest] Sincronizando banner de anime ${animeId}...`);
     const tmpBanner = join(INGEST_DIR, `tmp_banner_${animeId}.jpg`);
     try {
-      await runCommand('curl', ['-sS', '-L', anime.banner_url, '-o', tmpBanner]);
-      await runCommand(RCLONE_BIN, ['copyto', tmpBanner, bannerRemote]);
-      console.log(`[DriveIngest] ✓ Banner subido a Drive: ${bannerRemote}`);
+      await runCommand('curl', ['-sS', '-L', '--max-time', '60', anime.banner_url, '-o', tmpBanner]);
+      if (existsSync(tmpBanner) && statSync(tmpBanner).size > 500) {
+        await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpBanner, bannerRemote]);
+        if (getRemoteFileSize(bannerRemote) > 500) {
+          console.log(`[DriveIngest] ✓ Banner subido a Drive: ${bannerRemote}`);
+        }
+      }
     } catch (e) {
       console.error(`[DriveIngest] Error subiendo banner:`, e.message);
     } finally {
@@ -118,24 +128,55 @@ async function syncAnimeImages(animeId) {
   }
 
   const trailerRemote = `${RCLONE_REMOTE}/Anime/${animeId}/trailer.mp4`;
-  if (anime.trailer_id && !remoteFileExists(trailerRemote)) {
-    console.log(`[DriveIngest] Sincronizando trailer de anime ${animeId} (${anime.trailer_id})...`);
-    const tmpTrailer = join(INGEST_DIR, `tmp_trailer_${animeId}.mp4`);
-    const ytDlpCmd = existsSync(YTDLP_BIN) ? YTDLP_BIN : 'yt-dlp';
-    try {
-      await runCommand(ytDlpCmd, [
-        '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best',
-        '--merge-output-format', 'mp4',
-        `https://www.youtube.com/watch?v=${anime.trailer_id}`,
-        '-o', tmpTrailer,
-      ]);
-      await runCommand(RCLONE_BIN, ['copyto', tmpTrailer, trailerRemote]);
-      console.log(`[DriveIngest] ✓ Trailer subido a Drive: ${trailerRemote}`);
-    } catch (e) {
-      console.error(`[DriveIngest] Error subiendo trailer:`, e.message);
-    } finally {
-      if (existsSync(tmpTrailer)) unlinkSync(tmpTrailer);
+  if (!anime.trailer_id) return false;
+
+  const existingTrailerSize = getRemoteFileSize(trailerRemote);
+  if (existingTrailerSize > 10240) {
+    if (String(anime.trailer_site || '').toLowerCase() !== 'gdrive') {
+      await pool.query(
+        `UPDATE anime_content SET trailer_site = 'gdrive', updated_at = NOW() WHERE id = $1`,
+        [animeId]
+      );
+      console.log(`[DriveIngest] ✓ Trailer ya existía en Drive (${existingTrailerSize} bytes); BD vinculada (Anime ${animeId}).`);
     }
+    return true;
+  }
+
+  console.log(`[DriveIngest] Descargando trailer de anime ${animeId} (${anime.trailer_id})...`);
+  const tmpTrailer = join(INGEST_DIR, `tmp_trailer_${animeId}.mp4`);
+  const ytDlpCmd = existsSync(YTDLP_BIN) ? YTDLP_BIN : 'yt-dlp';
+  try {
+    await runCommand(ytDlpCmd, [
+      '--force-ipv4',
+      '--socket-timeout', '20',
+      '--retries', '2',
+      '--no-playlist',
+      '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best',
+      '--merge-output-format', 'mp4',
+      `https://www.youtube.com/watch?v=${anime.trailer_id}`,
+      '-o', tmpTrailer,
+    ]);
+    const localSize = existsSync(tmpTrailer) ? statSync(tmpTrailer).size : 0;
+    if (localSize <= 10240) {
+      throw new Error(`Trailer descargado inválido o vacío (${localSize} bytes)`);
+    }
+    await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpTrailer, trailerRemote]);
+    const remoteSize = getRemoteFileSize(trailerRemote);
+    if (remoteSize <= 10240 || remoteSize < Math.floor(localSize * 0.95)) {
+      throw new Error(`Verificación de trailer en Drive falló (${remoteSize} / ${localSize} bytes)`);
+    }
+    await pool.query(
+      `UPDATE anime_content SET trailer_site = 'gdrive', trailer_checked_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      [animeId]
+    );
+    console.log(`[DriveIngest] ✓ Trailer verificado y vinculado en Drive (${remoteSize} bytes): ${trailerRemote}`);
+    return true;
+  } catch (e) {
+    await pool.query(`UPDATE anime_content SET trailer_checked_at = NOW() WHERE id = $1`, [animeId]).catch(() => {});
+    console.error(`[DriveIngest] Error subiendo trailer (Anime ${animeId}):`, e.message);
+    return false;
+  } finally {
+    if (existsSync(tmpTrailer)) unlinkSync(tmpTrailer);
   }
 }
 
@@ -151,7 +192,7 @@ function resolveVideoUrl(externalServers) {
 
   try {
     const ytDlpCmd = existsSync(YTDLP_BIN) ? YTDLP_BIN : 'yt-dlp';
-    const directUrl = runCapture(ytDlpCmd, ['-g', supported.url]);
+    const directUrl = runCapture(ytDlpCmd, ['--force-ipv4', '--socket-timeout', '20', '-g', supported.url]);
     if (directUrl && /^https?:\/\//i.test(directUrl)) {
       return { directUrl, referer: supported.url, serverName: supported.server };
     }
@@ -180,11 +221,11 @@ export async function ingestEpisode(episodeId) {
   const driveRemoteTarget = `${RCLONE_REMOTE}/Anime/${animeId}/${epNum}/episode.mp4`;
   const publicStreamUrl = `${BASE_STREAM_URL}/Anime/${animeId}/${epNum}/episode.mp4`;
 
-  // 1. Check if already uploaded
+  // 1. Check if already uploaded (must be > 100 KB)
   const existingSize = getRemoteFileSize(driveRemoteTarget);
-  if (existingSize > 0) {
-    console.log(`[DriveIngest] Episodio ${episodeId} (Anime ${animeId} Ep ${epNum}) ya existe en Drive.`);
-    await updateDatabaseRecord(episodeId, publicStreamUrl, existingSize > 1 ? existingSize : null);
+  if (existingSize > 102400) {
+    console.log(`[DriveIngest] Episodio ${episodeId} (Anime ${animeId} Ep ${epNum}) ya existe en Drive (${existingSize} bytes).`);
+    await updateDatabaseRecord(episodeId, publicStreamUrl, existingSize);
     return true;
   }
 
@@ -224,9 +265,10 @@ export async function ingestEpisode(episodeId) {
         tmpProcessed,
       ]);
     } else {
-      console.log(`[DriveIngest] Comprimiendo a 720p Ultra-Liviano (CRF 26 + tune animation)...`);
+      console.log(`[DriveIngest] Comprimiendo a 720p Ultra-Liviano (CRF 26 + tune animation, 2 hilos)...`);
       await runCommand(FFMPEG_BIN, [
         '-y', '-i', tmpDownload,
+        '-threads', '2',
         '-vf', 'scale=1280:-2',
         '-c:v', 'libx264',
         '-crf', '26',
@@ -243,12 +285,16 @@ export async function ingestEpisode(episodeId) {
     const optSizeMb = optStats.size / (1024 * 1024);
     console.log(`[DriveIngest] Archivo optimizado: ${optSizeMb.toFixed(1)} MB. Subiendo a Google Drive...`);
 
-    // 4. Upload to Drive
-    await runCommand(RCLONE_BIN, ['copyto', tmpProcessed, driveRemoteTarget]);
-    console.log(`[DriveIngest] ✓ Subido a Drive: ${driveRemoteTarget}`);
+    // 4. Upload to Drive (throttled) and verify integrity
+    await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpProcessed, driveRemoteTarget]);
+    const verifiedSize = getRemoteFileSize(driveRemoteTarget);
+    if (verifiedSize < Math.floor(optStats.size * 0.95) || verifiedSize <= 102400) {
+      throw new Error(`Verificación de integridad falló en Drive (${verifiedSize} / ${optStats.size} bytes)`);
+    }
+    console.log(`[DriveIngest] ✓ Subido y verificado en Drive (${verifiedSize} bytes): ${driveRemoteTarget}`);
 
     // 5. Update Database
-    await updateDatabaseRecord(episodeId, publicStreamUrl, optStats.size);
+    await updateDatabaseRecord(episodeId, publicStreamUrl, verifiedSize);
     return true;
   } catch (err) {
     console.error(`[DriveIngest] Fallo en episodio ${episodeId}:`, err.message);
@@ -287,13 +333,47 @@ async function updateDatabaseRecord(episodeId, streamUrl, fileSize = null) {
   console.log(`[DriveIngest] ✓ Base de datos actualizada para Ep ${episodeId}: Servidor VIP disponible (GDrive).`);
 }
 
+/** Sync pending anime trailers to Google Drive in small batches */
+export async function ingestBatchTrailers(limit = 3) {
+  console.log(`[DriveIngest] Buscando hasta ${limit} trailers pendientes para Drive...`);
+  const { rows } = await pool.query(
+    `
+      SELECT id, title, trailer_id, trailer_site
+      FROM anime_content
+      WHERE is_active = true
+        AND trailer_id IS NOT NULL
+        AND trailer_id != ''
+        AND (trailer_site IS NULL OR LOWER(trailer_site) != 'gdrive')
+      ORDER BY trailer_checked_at ASC NULLS FIRST, id ASC
+      LIMIT $1
+    `,
+    [limit]
+  );
+  console.log(`[DriveIngest] Procesando lote de ${rows.length} trailers...`);
+  let synced = 0;
+  for (const row of rows) {
+    if (await syncAnimeImages(row.id)) synced++;
+  }
+  console.log(`[DriveIngest] ✓ Lote de trailers terminado: ${synced}/${rows.length} en Drive.`);
+  return { total: rows.length, synced };
+}
+
 /** CLI entrypoint */
 async function main() {
   const args = process.argv.slice(2);
   const limitIdx = args.indexOf('--limit');
   const parsedLimit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : NaN;
 
-  if (args.includes('--episode-id')) {
+  if (args.includes('--trailers')) {
+    if (args.includes('--anime-id')) {
+      const animeId = Number(args[args.indexOf('--anime-id') + 1]);
+      if (!animeId) throw new Error('ID de anime inválido');
+      await syncAnimeImages(animeId);
+    } else {
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 3;
+      await ingestBatchTrailers(limit);
+    }
+  } else if (args.includes('--episode-id')) {
     const epId = Number(args[args.indexOf('--episode-id') + 1]);
     if (!epId) throw new Error('ID de episodio inválido');
     await ingestEpisode(epId);
@@ -338,9 +418,10 @@ async function main() {
   } else {
     console.log(`
 Uso de pixel-drive-ingest:
-  node tools/pixel-drive-ingest.mjs --episode-id <ID>   Descarga y sube un episodio específico
-  node tools/pixel-drive-ingest.mjs --anime-id <ID>     Descarga y sube todos los episodios de un anime
-  node tools/pixel-drive-ingest.mjs --batch --limit 5   Descarga los siguientes N episodios pendientes
+  node tools/pixel-drive-ingest.mjs --episode-id <ID>      Descarga y sube un episodio específico
+  node tools/pixel-drive-ingest.mjs --anime-id <ID>        Descarga y sube episodios pendientes de un anime
+  node tools/pixel-drive-ingest.mjs --batch --limit 2      Descarga los siguientes N episodios pendientes
+  node tools/pixel-drive-ingest.mjs --trailers --limit 2   Descarga y verifica trailers de anime en Drive
     `);
   }
 }

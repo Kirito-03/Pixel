@@ -24,6 +24,38 @@ const INGEST_DIR = join(homedir(), 'server/data/pixel-ingest/manga');
 const RCLONE_REMOTE = 'pixel-drive:PixelNoSekai/Manga';
 const RCLONE_BIN = existsSync('/data/data/com.termux/files/usr/bin/rclone') ? '/data/data/com.termux/files/usr/bin/rclone' : 'rclone';
 const BASE_STREAM_URL = 'https://pixelnosekai.com/api/stream/Manga';
+const RCLONE_THROTTLE = ['--transfers', '2', '--checkers', '2', '--bwlimit', '8M'];
+
+function getRemoteFileSize(remoteOrStreamUrl) {
+  try {
+    let rel = String(remoteOrStreamUrl || '');
+    if (rel.includes('/api/stream/')) {
+      rel = rel.split('/api/stream/')[1] || '';
+    } else {
+      rel = rel.replace(/^pixel-drive:PixelNoSekai\/?/, '');
+    }
+    const encodedRel = rel.split('/').map((seg) => encodeURIComponent(seg)).join('/');
+    const httpCheck = spawnSync('curl', ['-sI', '-f', '--max-time', '4', `http://127.0.0.1:8086/${encodedRel}`], { encoding: 'utf8' });
+    if (httpCheck.status === 0) {
+      const lenMatch = (httpCheck.stdout || '').match(/Content-Length:\s*(\d+)/i);
+      const bytes = lenMatch ? Number(lenMatch[1]) : 0;
+      if (bytes > 0) return bytes;
+    }
+  } catch {}
+  try {
+    let rcloneTarget = String(remoteOrStreamUrl || '');
+    if (rcloneTarget.includes('/api/stream/')) {
+      const rel = rcloneTarget.split('/api/stream/')[1] || '';
+      rcloneTarget = `pixel-drive:PixelNoSekai/${decodeURIComponent(rel)}`;
+    }
+    const out = runCapture(RCLONE_BIN, ['ls', rcloneTarget]);
+    if (!out) return 0;
+    const match = out.match(/^\s*(\d+)\s+/);
+    return match ? Number(match[1]) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 if (!existsSync(INGEST_DIR)) {
   mkdirSync(INGEST_DIR, { recursive: true, mode: 0o700 });
@@ -105,11 +137,24 @@ export async function ingestChapter(chapterUrl) {
     return false;
   }
 
-  // Comprobar si ya están en Drive
+  // Comprobar si ya están en Drive y verificar existencia real vía HTTP local
   const isAlreadyDrive = rawPages.every((p) => typeof p === 'string' && p.includes('/api/stream/Manga/'));
   if (isAlreadyDrive) {
-    console.log(`[MangaIngest] ✓ El capítulo ya está alojado en Google Drive.`);
-    return true;
+    const firstOk = getRemoteFileSize(rawPages[0]) > 500;
+    const lastOk = getRemoteFileSize(rawPages[rawPages.length - 1]) > 500;
+    if (firstOk && lastOk) {
+      console.log(`[MangaIngest] ✓ El capítulo ya está alojado y verificado en Google Drive.`);
+      return true;
+    }
+    console.warn(`[MangaIngest] ⚠ Cache Drive incompleto o inaccesible; re-obteniendo desde origen...`);
+    await pool.query('DELETE FROM manga_page_cache WHERE chapter_url = $1', [cleanUrl]);
+    const { getChapterPages } = await import('../server/services/mangaService.js');
+    const refreshed = await getChapterPages(pool, cleanUrl);
+    rawPages = refreshed?.pages || [];
+    if (!rawPages.length || rawPages.some((p) => typeof p === 'string' && p.includes('/api/stream/Manga/'))) {
+      console.error(`[MangaIngest] ✖ No se pudo recuperar páginas válidas de origen para ${cleanUrl}`);
+      return false;
+    }
   }
 
   // 2. Extraer URLs absolutas de origen
@@ -142,9 +187,19 @@ export async function ingestChapter(chapterUrl) {
     }
     console.log(`\n[MangaIngest] Subiendo lote de imágenes a Google Drive (${driveTargetDir})...`);
 
-    // 3. Subir carpeta completa con rclone copy
-    await runCommand(RCLONE_BIN, ['copy', tmpChapterDir, driveTargetDir]);
-    console.log(`[MangaIngest] ✓ Imágenes subidas exitosamente a Google Drive.`);
+    // 3. Subir carpeta completa con rclone copy (limitado)
+    await runCommand(RCLONE_BIN, ['copy', ...RCLONE_THROTTLE, tmpChapterDir, driveTargetDir]);
+
+    // Verificar primera y última página en Drive antes de actualizar BD
+    const firstPageRemote = `${driveTargetDir}/001.jpg`;
+    const lastPageFilename = `${String(originalUrls.length).padStart(3, '0')}.jpg`;
+    const lastPageRemote = `${driveTargetDir}/${lastPageFilename}`;
+    const firstSize = getRemoteFileSize(firstPageRemote);
+    const lastSize = getRemoteFileSize(lastPageRemote);
+    if (firstSize <= 500 || lastSize <= 500) {
+      throw new Error(`Verificación en Drive falló (primera: ${firstSize} B, última: ${lastSize} B)`);
+    }
+    console.log(`[MangaIngest] ✓ Imágenes verificadas en Google Drive (${originalUrls.length} págs, p1=${firstSize} B).`);
 
     // 4. Actualizar manga_page_cache con las URLs de Drive
     await pool.query(

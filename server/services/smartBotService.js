@@ -791,23 +791,34 @@ async function runScrapeJob(job, animeId, options) {
     job.progress.message = `Insertando ${episodes.length} episodios a la BD (modo scraping)...`;
 
     for (const ep of episodes) {
-      const externalServersJson = JSON.stringify(ep.all_servers || []);
-
       const existing = await pool.query(
-        'SELECT id FROM anime_episodes WHERE anime_id = $1 AND episode_number = $2 AND season = $3',
+        'SELECT id, stream_url, storage_type FROM anime_episodes WHERE anime_id = $1 AND episode_number = $2 AND season = $3',
         [animeId, ep.episode_number, season]
       );
 
       if (existing.rows.length > 0) {
         const row = existing.rows[0];
+        const hasDriveStream = row.storage_type === 'gdrive' || String(row.stream_url || '').includes('/api/stream/');
+        const mergedServers = hasDriveStream && row.stream_url
+          ? [
+              { server: 'Pixel VIP (Drive)', url: row.stream_url },
+              ...(Array.isArray(ep.all_servers) ? ep.all_servers.filter((s) => s?.server !== 'Pixel VIP (Drive)') : []),
+            ]
+          : (ep.all_servers || []);
         await pool.query(
           `UPDATE anime_episodes
-           SET video_url = $1, stream_url = $1, external_servers = $2, status = 'ready', storage_type = 'external', updated_at = NOW()
+           SET video_url = $1,
+               stream_url = CASE WHEN $4 THEN $5 ELSE $1 END,
+               external_servers = $2,
+               status = 'ready',
+               storage_type = CASE WHEN $4 THEN 'gdrive' ELSE 'external' END,
+               updated_at = NOW()
            WHERE id = $3`,
-          [ep.video_url, externalServersJson, row.id]
+          [ep.video_url, JSON.stringify(mergedServers), row.id, hasDriveStream, row.stream_url]
         );
         updated++;
       } else {
+        const externalServersJson = JSON.stringify(ep.all_servers || []);
         await pool.query(
           `INSERT INTO anime_episodes (anime_id, season, episode_number, title, video_url, stream_url, external_servers, status, is_active, storage_type)
            VALUES ($1, $2, $3, $4, $5, $5, $6, 'ready', true, 'external')`,

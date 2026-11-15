@@ -79,7 +79,7 @@ export const catalogService = {
   },
 
   async getHomeSections() {
-    const limit = 24;
+    const limit = 48;
     // Lista de géneros con catálogo abundante para rotar en cada recarga
     const rotatingGenres = ['Action', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Adventure', 'Sci-Fi', 'Slice of Life', 'Supernatural'];
     const randomGenre = rotatingGenres[Math.floor(Math.random() * rotatingGenres.length)];

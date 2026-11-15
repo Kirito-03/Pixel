@@ -68,23 +68,31 @@ function runCapture(bin, args) {
   return res.stdout.trim();
 }
 
-function remoteFileExists(remotePath) {
+const RCLONE_THROTTLE = ['--transfers', '1', '--checkers', '2', '--bwlimit', '8M'];
+
+function getRemoteFileSize(remotePath) {
   try {
     const rel = String(remotePath).replace(/^pixel-drive:PixelNoSekai\/?/, '');
     const encodedRel = rel.split('/').map((seg) => encodeURIComponent(seg)).join('/');
     const httpCheck = spawnSync('curl', ['-sI', '-f', '--max-time', '4', `http://127.0.0.1:8086/${encodedRel}`], { encoding: 'utf8' });
     if (httpCheck.status === 0) {
       const lenMatch = (httpCheck.stdout || '').match(/Content-Length:\s*(\d+)/i);
-      const bytes = lenMatch ? Number(lenMatch[1]) : 1;
-      if (bytes > 0) return true;
+      const bytes = lenMatch ? Number(lenMatch[1]) : 0;
+      if (bytes > 0) return bytes;
     }
   } catch {}
   try {
-    const res = spawnSync(RCLONE_BIN, ['lsf', remotePath]);
-    return res.status === 0 && res.stdout.trim().length > 0;
+    const out = runCapture(RCLONE_BIN, ['ls', remotePath]);
+    if (!out) return 0;
+    const match = out.match(/^\s*(\d+)\s+/);
+    return match ? Number(match[1]) : 0;
   } catch {
-    return false;
+    return 0;
   }
+}
+
+function remoteFileExists(remotePath) {
+  return getRemoteFileSize(remotePath) > 102400;
 }
 
 /** Resolve direct video URL from video_servers */
@@ -173,9 +181,10 @@ export async function ingestHentaiEpisode(episodeId) {
         tmpProcessed,
       ]);
     } else {
-      console.log(`[HentaiIngest] Comprimiendo a 720p Ultra-Liviano (CRF 26 + faststart)...`);
+      console.log(`[HentaiIngest] Comprimiendo a 720p Ultra-Liviano (CRF 26 + faststart, 2 hilos)...`);
       await runCommand(FFMPEG_BIN, [
         '-y', '-i', tmpDownload,
+        '-threads', '2',
         '-vf', 'scale=1280:-2',
         '-c:v', 'libx264',
         '-crf', '26',
@@ -192,9 +201,13 @@ export async function ingestHentaiEpisode(episodeId) {
     const optSizeMb = optStats.size / (1024 * 1024);
     console.log(`[HentaiIngest] Archivo optimizado: ${optSizeMb.toFixed(1)} MB. Subiendo a Google Drive...`);
 
-    // 4. Subir a Google Drive
-    await runCommand(RCLONE_BIN, ['copyto', tmpProcessed, driveRemoteTarget]);
-    console.log(`[HentaiIngest] ✓ Subido a Drive: ${driveRemoteTarget}`);
+    // 4. Subir a Google Drive (limitado) y verificar integridad
+    await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpProcessed, driveRemoteTarget]);
+    const verifiedSize = getRemoteFileSize(driveRemoteTarget);
+    if (verifiedSize < Math.floor(optStats.size * 0.95) || verifiedSize <= 102400) {
+      throw new Error(`Verificación de integridad falló en Drive (${verifiedSize} / ${optStats.size} bytes)`);
+    }
+    console.log(`[HentaiIngest] ✓ Subido y verificado en Drive (${verifiedSize} bytes): ${driveRemoteTarget}`);
 
     // 5. Actualizar Base de Datos
     await updateHentaiDatabase(episodeId, publicStreamUrl);

@@ -305,12 +305,21 @@ router.get('/drive/inventory', async (req, res) => {
             ORDER BY h.synced_episodes DESC, h.created_at DESC
         `);
 
+        const trailerCountRes = await pool.query(`
+            SELECT COUNT(*)::int AS count
+            FROM anime_content
+            WHERE is_active = true
+              AND LOWER(COALESCE(trailer_site, '')) = 'gdrive'
+        `);
+        const totalAnimeTrailers = trailerCountRes.rows[0]?.count || 0;
+
         res.json({
             summary: {
                 totalAnimeEpisodes: animeRes.rows.length,
+                totalAnimeTrailers,
                 totalMangaChapters: mangaRes.rows.length,
                 totalHentaiEpisodes: hentaiRes.rows.length,
-                totalDriveItems: animeRes.rows.length + mangaRes.rows.length + hentaiRes.rows.length,
+                totalDriveItems: animeRes.rows.length + totalAnimeTrailers + mangaRes.rows.length + hentaiRes.rows.length,
             },
             anime: animeRes.rows,
             manga: mangaRes.rows,
@@ -388,11 +397,13 @@ router.post('/drive/sync', async (req, res) => {
             label = `Hentai Ep #${epId}`;
             commands = [{ script: 'tools/pixel-drive-hentai.mjs', args: ['--episode-id', String(epId)] }];
         } else if (type === 'batch') {
-            label = 'Lote Mixto (Anime + Hentai + Manga)';
+            label = 'Lote Mixto (Verificar + Anime + Trailers + Hentai + Manga)';
             commands = [
-                { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '2'] },
+                { script: 'tools/pixel-drive-verify.mjs', args: ['--repair'] },
+                { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '1'] },
+                { script: 'tools/pixel-drive-ingest.mjs', args: ['--trailers', '--limit', '2'] },
                 { script: 'tools/pixel-drive-hentai.mjs', args: ['--batch', '--limit', '1'] },
-                { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '2'] },
+                { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '1'] },
             ];
         } else {
             return res.status(400).json({ message: 'Tipo de sincronización inválido' });

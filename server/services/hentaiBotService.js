@@ -45,7 +45,15 @@ async function upsertEpisodesForHentai(pool, hentaiId, slug, episodesList) {
                     VALUES ($1, $2, $3, true)
                     ON CONFLICT (hentai_id, episode_number)
                     DO UPDATE SET
-                        video_servers = EXCLUDED.video_servers,
+                        video_servers = CASE
+                            WHEN COALESCE(hentai_episodes.video_servers::text, '[]') LIKE '%Pixel VIP (Drive)%' THEN
+                                (
+                                    SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                                    FROM jsonb_array_elements(hentai_episodes.video_servers::jsonb) elem
+                                    WHERE elem->>'server' = 'Pixel VIP (Drive)'
+                                ) || EXCLUDED.video_servers::jsonb
+                            ELSE EXCLUDED.video_servers
+                        END,
                         updated_at = CURRENT_TIMESTAMP;
                 `, [hentaiId, epNum, JSON.stringify(servers)]);
                 scrapedCount++;

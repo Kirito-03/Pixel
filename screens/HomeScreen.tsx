@@ -122,7 +122,7 @@ export default function HomeScreen({ navigation }: Props) {
         // Barajar aleatoriamente para que "Destacados" no sea idéntico a ninguna otra fila
         const shuffled = unique.sort(() => 0.5 - Math.random());
 
-        return shuffled.slice(0, 12);
+        return shuffled.slice(0, 28);
     };
 
     useEffect(() => {
@@ -167,7 +167,9 @@ export default function HomeScreen({ navigation }: Props) {
             setFeaturedItems(featured);
             const featuredIds = new Set(featured.map(item => item.id));
             for (const key of Object.keys(newContentSections)) {
-                newContentSections[key] = newContentSections[key].filter((item, index, all) => !featuredIds.has(item.id) && all.findIndex(other => other.id === item.id) === index);
+                const uniqueSection = newContentSections[key].filter((item, index, all) => all.findIndex(other => other.id === item.id) === index);
+                const withoutFeatured = uniqueSection.filter(item => !featuredIds.has(item.id));
+                newContentSections[key] = withoutFeatured.length >= 28 ? withoutFeatured : uniqueSection;
             }
             setContentSections(newContentSections);
         } catch (error) {
