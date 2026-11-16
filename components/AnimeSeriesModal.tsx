@@ -1019,20 +1019,14 @@ export default function AnimeSeriesModal({
                     </View>
                   )}
 
-                  {/* Descripción única en el hero (con scroll interno si es larga, sin agrandar la altura) */}
+                  {/* Sinopsis breve sin scroll interno; texto completo disponible debajo */}
                   <Animated.View style={{ transform: [{ translateY: descSlideAnim }] }}>
                     {currentContent?.type === 'anime' && (loading || !detailData) ? (
                       <Loader />
                     ) : (
-                      <ScrollView
-                        style={{ maxHeight: isSmallScreen ? 68 : 78 }}
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={true}
-                      >
-                        <Text style={[heroStyles.overview, lightPortrait && { color: colors.textSecondary }]}>
-                          {cleanDescription(fullSynopsis) || 'Sin descripción disponible.'}
-                        </Text>
-                      </ScrollView>
+                      <Text style={[heroStyles.overview, lightPortrait && { color: colors.textSecondary }]} numberOfLines={3}>
+                        {briefSynopsis(fullSynopsis, 240) || 'Sin descripción disponible.'}
+                      </Text>
                     )}
                   </Animated.View>
 
@@ -1179,6 +1173,13 @@ export default function AnimeSeriesModal({
               )}
             </View>
 
+              {!!fullSynopsis && <View style={{ paddingHorizontal: 24, paddingBottom: 20, gap: 10 }}>
+                <Pressable accessibilityRole="button" accessibilityLabel={expandedSynopsis ? 'Contraer sinopsis' : 'Leer sinopsis completa'} accessibilityState={{ expanded: expandedSynopsis }} onPress={() => setExpandedSynopsis(value => !value)} style={{ alignSelf: 'flex-start', paddingVertical: 10 }}>
+                  <Text style={{ color: colors.textSecondary }}>{expandedSynopsis ? 'Contraer sinopsis' : 'Leer sinopsis completa'}</Text>
+                </Pressable>
+                {expandedSynopsis && <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 23 }}>{cleanDescription(fullSynopsis)}</Text>}
+              </View>}
+
               {/* Streaming Episodes for Anime - mostrar si hay datos del M3U */}
               {currentContent?.type === 'anime' && (loadingStreaming || (streamingInfo && Array.isArray(streamingInfo.seasons) && streamingInfo.seasons.length > 0)) && (
                 <View style={styles.streamingSection}>
@@ -1245,16 +1246,12 @@ export default function AnimeSeriesModal({
                                 }
                               }
                               return episodesToShow.map((episode) => (
-                                <TouchableOpacity
+                                <Pressable
                                   key={episode.id}
                                   accessibilityRole="button" accessibilityLabel={`Ver episodio ${episode.number}`}
-                                  style={[epStyles.card, { width: isSmallScreen ? '100%' : '48.5%' }]}
+                                  style={({ hovered, pressed }: any) => [epStyles.card, { width: isSmallScreen ? '100%' : '48.5%', backgroundColor: hovered || pressed ? colors.surfaceElevated : colors.card }]}
                                   onPress={() => handlePlayEpisode(episode, selectedSeason)}
-                                  {...(Platform.OS === 'web' ? {
-                                    // @ts-ignore
-                                    onMouseEnter: (e: any) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; },
-                                    onMouseLeave: (e: any) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; },
-                                  } : {})}
+
                                 >
                                   {/* Miniatura horizontal real o alternativa neutra con etiqueta pequeña */}
                                   <View style={[epStyles.thumbWrap, { backgroundColor: colors.surfaceElevated }]}>
@@ -1289,7 +1286,7 @@ export default function AnimeSeriesModal({
                                   <View style={epStyles.playWrap}>
                                     <Ionicons name="play" size={14} color="#fff" />
                                   </View>
-                                </TouchableOpacity>
+                                </Pressable>
                               ));
                             })()}
                           </View>

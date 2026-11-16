@@ -1,5 +1,5 @@
 import { useAdminLayout } from '../../hooks/useAdminLayout';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -37,6 +37,16 @@ interface DashboardStats {
 
 type NavigationProp = NativeStackNavigationProp<AdminStackParamList>;
 
+function DriveSeriesProgress({ done, total }: { done: number; total: number }) {
+    const percent = total > 0 ? Math.max(0, Math.min(100, Math.round(Number(done || 0) / total * 100))) : 0;
+    return <View style={{ marginTop: 8, gap: 4 }}>
+        <View accessibilityRole="progressbar" accessibilityLabel="Capítulos terminados y guardados de esta serie" accessibilityValue={{ min: 0, max: Number(total || 0), now: Number(done || 0) }} style={{ height: 4, backgroundColor: adminColors.border, borderRadius: 2, overflow: 'hidden' }}>
+            <View style={{ height: 4, width: `${percent}%`, backgroundColor: '#64748b' }} />
+        </View>
+        <Text style={{ fontSize: 10, color: adminColors.textSecondary }}>{percent}% de capítulos guardados · no es el porcentaje del archivo en curso</Text>
+    </View>;
+}
+
 export default function AdminDashboardScreen() {
     const { adminUser } = useAdmin();
     const navigation = useNavigation<NavigationProp>();
@@ -51,18 +61,37 @@ export default function AdminDashboardScreen() {
     const [loadingDrive, setLoadingDrive] = useState(false);
     const [syncingDriveKey, setSyncingDriveKey] = useState<string | null>(null);
     const [driveNotice, setDriveNotice] = useState('');
+    const [driveUpdatedAt, setDriveUpdatedAt] = useState<string | null>(null);
+    const [driveError, setDriveError] = useState('');
+    const driveFetching = useRef(false);
+    const driveRequest = useRef(0);
 
     const refreshDriveInventory = async (showSpinner = true) => {
+        if (driveFetching.current) return;
+        driveFetching.current = true;
+        const request = ++driveRequest.current;
         try {
             if (showSpinner) setLoadingDrive(true);
             const data = await adminApiService.getDriveInventory();
+            if (request !== driveRequest.current) return;
             setDriveInventory(data);
+            setDriveUpdatedAt(new Date().toLocaleTimeString());
+            setDriveError('');
         } catch (err) {
-            console.error('Error fetching drive inventory:', err);
+            if (request === driveRequest.current) setDriveError('No pudimos actualizar el estado. Los datos mostrados pueden estar desactualizados.');
         } finally {
-            if (showSpinner) setLoadingDrive(false);
+            if (request === driveRequest.current) {
+                driveFetching.current = false;
+                if (showSpinner) setLoadingDrive(false);
+            }
         }
     };
+
+    useEffect(() => {
+        if (!driveModalVisible) return;
+        const timer = setInterval(() => { void refreshDriveInventory(false); }, 10000);
+        return () => { clearInterval(timer); driveRequest.current++; driveFetching.current = false; };
+    }, [driveModalVisible]);
 
     const openDriveInventory = async () => {
         setDriveModalVisible(true);
@@ -329,7 +358,7 @@ export default function AdminDashboardScreen() {
                         <View style={styles.modalHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                                 <Ionicons name="cloud-done" size={22} color="#2e7d32" />
-                                <Text style={styles.modalTitle} numberOfLines={1}>Google Drive (5TB) - Inventario</Text>
+                                <Text style={styles.modalTitle} numberOfLines={1}>Google Drive · Archivos y tareas</Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                 <TouchableOpacity
@@ -339,7 +368,7 @@ export default function AdminDashboardScreen() {
                                 >
                                     <Ionicons name="flash" size={14} color="#FFFFFF" />
                                     <Text style={styles.invStreamBtnText}>
-                                        {syncingDriveKey === 'batch' ? 'Iniciando...' : 'Subir Lote'}
+                                        {syncingDriveKey === 'batch' ? 'Iniciando...' : 'Iniciar lote mixto'}
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
@@ -362,6 +391,19 @@ export default function AdminDashboardScreen() {
                             </View>
                         ) : (
                             <ScrollView style={{ maxHeight: 520, paddingHorizontal: 16 }}>
+                                <View style={styles.invNoticeBox}>
+                                    <Text style={[styles.invNoticeText, { fontWeight: '700' }]}>Qué está guardado y qué falta</Text>
+                                    <Text style={styles.invNoticeText}>Los contadores aumentan cuando termina la subida y su verificación. Se actualizan cada 10 segundos.</Text>
+                                    <Text style={styles.invNoticeText}>Última consulta: {driveUpdatedAt || 'pendiente'}. {driveError}</Text>
+                                    <Text style={styles.invNoticeText}>Las tareas de abajo corresponden a solicitudes de este panel. El ciclo automático también puede estar trabajando aunque esta lista esté vacía.</Text>
+                                    <Text style={styles.invNoticeText}>Velocidad, porcentaje del archivo y tiempo restante: todavía no disponibles. El progreso de la serie cuenta capítulos terminados, no bytes transferidos.</Text>
+                                </View>
+                                <View style={styles.invNoticeBox}>
+                                    <Text style={[styles.invNoticeText, { fontWeight: '700' }]}>Cómo usar los controles</Text>
+                                    <Text style={styles.invNoticeText}>Abrir archivo: reproduce lo que ya está en Drive. Subir episodio: solicita solo ese capítulo. Subir próximos: procesa los pendientes de esa serie.</Text>
+                                    <Text style={styles.invNoticeText}>Iniciar lote mixto: verifica archivos, revisa hasta 5 tráileres y procesa hasta 2 capítulos de anime, 3 de manga y 2 de H. No sube todo el catálogo de una vez.</Text>
+                                </View>
+
                                 {/* Avisos / Tareas activas */}
                                 {!!driveNotice && (
                                     <View style={styles.invNoticeBox}>
@@ -369,10 +411,10 @@ export default function AdminDashboardScreen() {
                                     </View>
                                 )}
 
-                                {(driveInventory?.activeJobs || []).filter((j: any) => j.status === 'running').map((job: any) => (
+                                {(driveInventory?.activeJobs || []).map((job: any) => (
                                     <View key={job.id} style={[styles.invNoticeBox, { borderColor: '#1976d2', backgroundColor: 'rgba(25, 118, 210, 0.12)' }]}>
-                                        <Text style={[styles.invNoticeText, { color: '#90caf9' }]}>
-                                            Subiendo en segundo plano: {job.label}
+                                        <Text style={[styles.invNoticeText, { color: '#1d4ed8' }]}>
+                                            {job.status === 'running' ? 'En proceso' : job.status === 'done' ? 'Tarea finalizada (revisa los contadores)' : 'La tarea falló'}: {job.label}{'\n'}Inicio: {new Date(job.startedAt).toLocaleTimeString()} · {job.finishedAt ? `Fin: ${new Date(job.finishedAt).toLocaleTimeString()}` : 'Sin tiempo restante medido'}
                                         </Text>
                                     </View>
                                 ))}
@@ -406,7 +448,7 @@ export default function AdminDashboardScreen() {
                                                 style={styles.invStreamBtn}
                                                 onPress={() => a.stream_url && Linking.openURL(a.stream_url)}
                                             >
-                                                <Text style={styles.invStreamBtnText}>Ver Stream</Text>
+                                                <Text style={styles.invStreamBtnText}>Abrir archivo</Text>
                                             </TouchableOpacity>
                                         </View>
                                     ))
@@ -453,7 +495,7 @@ export default function AdminDashboardScreen() {
                                                 style={styles.invStreamBtn}
                                                 onPress={() => h.stream_url && Linking.openURL(h.stream_url)}
                                             >
-                                                <Text style={styles.invStreamBtnText}>Ver Stream</Text>
+                                                <Text style={styles.invStreamBtnText}>Abrir archivo</Text>
                                             </TouchableOpacity>
                                         </View>
                                     ))
@@ -463,7 +505,7 @@ export default function AdminDashboardScreen() {
 
                                 {/* Pendientes / Incompletos */}
                                 <Text style={[styles.invSectionTitle, { color: '#f59e0b', marginTop: 20 }]}>
-                                    Pendientes / Incompletos (Subir con 1 clic)
+                                    Pendientes por serie · progreso de capítulos terminados
                                 </Text>
 
                                 {(driveInventory?.pending?.anime || []).map((a: any) => (
@@ -473,6 +515,7 @@ export default function AdminDashboardScreen() {
                                             <Text style={styles.invRowSub}>
                                                 {a.synced_episodes}/{a.total_episodes} en Drive • Faltan {a.missing_episodes}
                                             </Text>
+                                            <DriveSeriesProgress done={a.synced_episodes} total={a.total_episodes} />
                                         </View>
                                         <View style={{ flexDirection: 'row', gap: 6 }}>
                                             {!!a.next_episode_id && (
@@ -481,7 +524,7 @@ export default function AdminDashboardScreen() {
                                                     disabled={!!syncingDriveKey}
                                                     onPress={() => handleSyncDrive({ type: 'episode', id: a.next_episode_id }, `pa-ep-${a.next_episode_id}`)}
                                                 >
-                                                    <Text style={styles.invStreamBtnText}>+ Ep {a.next_episode_number}</Text>
+                                                    <Text style={styles.invStreamBtnText}>Subir episodio {a.next_episode_number}</Text>
                                                 </TouchableOpacity>
                                             )}
                                             <TouchableOpacity
@@ -489,7 +532,7 @@ export default function AdminDashboardScreen() {
                                                 disabled={!!syncingDriveKey}
                                                 onPress={() => handleSyncDrive({ type: 'anime', id: a.anime_id, limit: 5 }, `pa-${a.anime_id}`)}
                                             >
-                                                <Text style={styles.invStreamBtnText}>Subir 5</Text>
+                                                <Text style={styles.invStreamBtnText}>Subir próximos {Math.min(5, Number(a.missing_episodes || 0))}</Text>
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -502,13 +545,14 @@ export default function AdminDashboardScreen() {
                                             <Text style={styles.invRowSub}>
                                                 {m.synced_chapters}/{m.total_chapters} caps en Drive
                                             </Text>
+                                            <DriveSeriesProgress done={m.synced_chapters} total={m.total_chapters} />
                                         </View>
                                         <TouchableOpacity
                                             style={[styles.invSyncBtn, { backgroundColor: '#7b1fa2' }, syncingDriveKey === `pm-${m.manga_id}` && { opacity: 0.6 }]}
                                             disabled={!!syncingDriveKey}
                                             onPress={() => handleSyncDrive({ type: 'manga', id: m.manga_id, limit: 5 }, `pm-${m.manga_id}`)}
                                         >
-                                            <Text style={styles.invStreamBtnText}>Subir 5 caps</Text>
+                                            <Text style={styles.invStreamBtnText}>Subir próximos {Math.min(5, Math.max(0, Number(m.total_chapters) - Number(m.synced_chapters)))} caps</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ))}
@@ -936,13 +980,14 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#2e7d32',
-        backgroundColor: 'rgba(46, 125, 50, 0.12)',
+        borderColor: adminColors.border,
+        backgroundColor: adminColors.background,
     },
     invNoticeText: {
         fontSize: 12,
-        color: '#a5d6a7',
-        fontWeight: '600',
+        color: adminColors.textSecondary,
+        lineHeight: 18,
+        fontWeight: '400',
     },
     invEmpty: {
         fontSize: 12,

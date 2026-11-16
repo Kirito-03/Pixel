@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { finalizeWebExport } from './finalize-web-export.mjs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
@@ -67,6 +68,16 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
 });
 child.on('error', error => { console.error(error.message); process.exitCode = 1; });
 child.on('exit', (code, signal) => {
+  if (code === 0 && target === 'web') {
+    try {
+      const argument = process.argv.indexOf('--output-dir');
+      finalizeWebExport(path.resolve(root, argument >= 0 ? process.argv[argument + 1] : 'dist'));
+    } catch (error) {
+      console.error('No se pudo verificar la identidad del bundle web:', error.message);
+      process.exitCode = 1;
+      return;
+    }
+  }
   if (code === 75) console.error('Ya hay otra compilación de Pixel activa. Espera a que termine.');
   if (code && code !== 75) console.error('La compilación terminó con error. Se mantienen los límites; revisa el registro.');
   process.exitCode = code ?? (signal ? 1 : 0);
