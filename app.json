@@ -3,7 +3,7 @@
     "scheme": "pixelnosekai",
     "name": "Pixel No Sekai",
     "slug": "pixel-no-sekai",
-    "version": "1.0.17",
+    "version": "1.0.18",
     "orientation": "default",
     "icon": "./assets/icon-arle.png",
     "userInterfaceStyle": "automatic",
@@ -18,7 +18,7 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.dragonflux.pixelnosekai",
       "googleServicesFile": "./config/google-services.json",
-      "versionCode": 18
+      "versionCode": 19
     },
     "web": {
       "favicon": "./assets/icon-arle.png",

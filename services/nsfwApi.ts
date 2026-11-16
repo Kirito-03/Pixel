@@ -17,6 +17,10 @@ export interface NSFWAnime {
 }
 
 export const nsfwApi = {
+    getPage: async (params: {page:number;search?:string;status?:string;category?:string}) => {
+      const {data}=await backendClient.get('/api/nsfw/latest', {params:{...params,limit:50},cache:false});
+      return data as {items:NSFWAnime[];pagination:{page:number;limit:number;total:number;totalPages:number};categories:string[]};
+    },
     getLatest: async (search?: string, status?: string): Promise<NSFWAnime[]> => {
         try {
             const params = new URLSearchParams();

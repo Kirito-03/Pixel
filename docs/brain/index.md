@@ -56,3 +56,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-16-detalle-contraste-y-lista]]: contraste, primer/último episodio, respuestas tardías, perfil en fila y formatos de Mi Lista; APK1.0.17/código18.
 
 - [[2026-11-16-hero-sin-saltos]]: altura estable de Inicio, sin saltos de En emisión durante cambios del carrusel.
+
+- [[2026-11-16-filtros-paginacion-bloqueo]]: categorías desplazables, estados equivalentes, páginas reales, miniaturas con caché y candado Android; APK1.0.18/código19.

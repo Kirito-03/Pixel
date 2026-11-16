@@ -1,3 +1,4 @@
+import {playbackLockModule} from './helpers/playbackLock.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -27,7 +28,7 @@ function runtime(file, mocks = {}) {
     exports, console, Promise, AbortController, requestAnimationFrame: fn => fn(),
     setTimeout: fn => { timeouts.set(++clock, fn); return clock; }, clearTimeout: id => timeouts.delete(id),
     setInterval: fn => { intervals.set(++clock, fn); return clock; }, clearInterval: id => intervals.delete(id),
-    require(name) { if (name === 'react') return react; if (name === 'react-native') return native; if (name.endsWith('/ThemeContext')) return { useTheme: () => ({ theme: 'dark', colors: { text: '#fff', textSecondary: '#aaa', textMuted: '#999', background: '#000', card: '#141414', primary: '#e50914' } }) };  return mocks[name] || {}; },
+    require(name) { if (name === '../hooks/usePlaybackLock') return playbackLockModule(react); if (name === './PlaybackLock') return { default:'PlaybackLock',__esModule:true }; if (name === 'react') return react; if (name === 'react-native') return native; if (name.endsWith('/ThemeContext')) return { useTheme: () => ({ theme: 'dark', colors: { text: '#fff', textSecondary: '#aaa', textMuted: '#999', background: '#000', card: '#141414', primary: '#e50914' } }) };  return mocks[name] || {}; },
   });
   return { exports, intervals, timeouts,
     render(props) { cursor = 0; const tree = exports.default(props); for (const { i, fn } of pending.splice(0)) { cleanups.get(i)?.(); cleanups.set(i, fn()); } return tree; },
@@ -114,4 +115,12 @@ test('closing a player during an in-flight landscape request still restores port
   f.exports.default = f.exports.useImmersivePlayer;
   f.render(); await tick(); f.unmount(); assert.deepEqual(calls, [1]);
   finish(); await tick(); assert.deepEqual(calls, [1, 2]);
+});
+test('embedded playback stays locked through provider interaction and pause messages',()=>{
+ const f=runtime('components/HentaiVideoPlayer.tsx',{'../hooks/useImmersivePlayer':{useImmersivePlayer(){}},'react-native-webview':{WebView:'WebView'}});
+ const props={animeTitle:'Fixture',episodeNumber:1,servers:[{server:'Fixture',url:'https://example.test/embed'}],onClose(){}};
+ let tree=f.render(props);tree=f.render(props);type(tree,'PlaybackLock').props.onLock();tree=f.render(props);
+ type(tree,'WebView').props.onMessage({nativeEvent:{data:'user_interaction'}});tree=f.render(props);
+ assert.equal(type(tree,'PlaybackLock').props.locked,true);assert.equal(type(tree,'Animated.View').props.pointerEvents,'none');
+ type(tree,'PlaybackLock').props.onUnlock();tree=f.render(props);assert.equal(type(tree,'Animated.View').props.pointerEvents,'box-none');
 });

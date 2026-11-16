@@ -1,3 +1,6 @@
+import CatalogFilterDialog from '../components/CatalogFilterDialog';
+import CatalogPagination from '../components/CatalogPagination';
+import { HentaiCard } from '../components/HentaiComponents';
 import Loader from '../components/Loader';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
@@ -57,6 +60,13 @@ export default function NSFWScreen() {
   const [searchRevision, setSearchRevision] = useState(0);
   const [category, setCategory] = useState<string | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [draftCategory,setDraftCategory]=useState<string|null>(null);
+  const [showAllResults,setShowAllResults]=useState(false);
+  const [resultPage,setResultPage]=useState(1);
+  const [resultTotal,setResultTotal]=useState(0);
+  const [resultPages,setResultPages]=useState(1);
+  const [allCategories,setAllCategories]=useState<string[]>([]);
+  const catalogScroll=useRef<ScrollView>(null);
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<string>('Todos');
@@ -87,16 +97,18 @@ export default function NSFWScreen() {
         return;
       }
 
-      const filter = overrides?.filter !== undefined ? overrides.filter : activeFilter;
+      const filter = overrides?.filter !== undefined ? overrides.filter : 'Todos';
       const reqId = ++catalogRequestIdRef.current;
 
       setLoading(true);
       setError(null);
 
       try {
-        const data = await nsfwApi.getLatest(undefined, filter);
+        const result = await nsfwApi.getPage({page:1,status:filter});
+        const data=result.items;
         if (reqId !== catalogRequestIdRef.current) return;
         setItems(Array.isArray(data) ? data : []);
+        setAllCategories(result.categories);
       } catch {
         if (reqId !== catalogRequestIdRef.current) return;
         setError('No se pudo cargar el catálogo. Intenta nuevamente.');
@@ -107,7 +119,7 @@ export default function NSFWScreen() {
         }
       }
     },
-    [adultContentEnabled, activeFilter]
+    [adultContentEnabled]
   );
 
   // Reset modals/player and discard in-flight requests on profile change or when +18 is disabled
@@ -134,28 +146,28 @@ export default function NSFWScreen() {
     loadContent();
     // Intentionally keyed on adultContentEnabled, profileId, and activeFilter
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adultContentEnabled, profileId, activeFilter]);
+  }, [adultContentEnabled, profileId]);
 
+  useEffect(()=>{setResultPage(1);},[query,category,activeFilter,profileId,showAllResults]);
   useEffect(() => {
-    let active = true;
-    setSearchItems([]);
-    setSearchError(null);
-    if (!adultContentEnabled || !query.trim()) { setSearchLoading(false); return; }
+    let active=true;
+    setSearchItems([]);setSearchError(null);
+    if(!adultContentEnabled || (!query.trim() && !category && activeFilter==='Todos' && !showAllResults)) {setSearchLoading(false);return;}
     setSearchLoading(true);
-    const timer = setTimeout(async () => {
+    const timer=setTimeout(async()=>{
       try {
-        // Query the saved database too, so older titles outside the browse rows remain findable.
-        const found = await nsfwApi.getLatest(query.trim(), activeFilter);
-        if (active) setSearchItems(Array.isArray(found) ? found : []);
-      } catch { if (active) setSearchError('No se pudo completar la búsqueda. Intenta nuevamente.'); }
-      finally { if (active) setSearchLoading(false); }
-    }, 350);
-    return () => { active = false; clearTimeout(timer); };
-  }, [query, activeFilter, adultContentEnabled, profileId, searchRevision]);
+        const result=await nsfwApi.getPage({page:resultPage,search:query.trim(),status:activeFilter,category:category||undefined});
+        if(active){setSearchItems(result.items);setResultTotal(result.pagination.total);setResultPages(result.pagination.totalPages);setAllCategories(result.categories);}
+      }catch{if(active)setSearchError('No se pudo completar la búsqueda. Intenta nuevamente.');}
+      finally{if(active)setSearchLoading(false);}
+    },250);
+    return ()=>{active=false;clearTimeout(timer);};
+  },[query,category,activeFilter,adultContentEnabled,profileId,searchRevision,resultPage,showAllResults]);
 
-  const retryContent = () => query.trim() ? setSearchRevision(value => value + 1) : loadContent();
+  const retryContent = () => (query.trim() || category || activeFilter !== 'Todos' || showAllResults) ? setSearchRevision(value => value + 1) : loadContent();
 
   const handleResetFilters = () => {
+    setShowAllResults(false);
     setQuery('');
     setCategory(null);
     setCategoriesOpen(false);
@@ -166,6 +178,7 @@ export default function NSFWScreen() {
     setQuery('');
     setCategory(null);
     setCategoriesOpen(false);
+    setShowAllResults(false);setDraftCategory(null);
   }, [profileId, adultContentEnabled]);
 
   const handleCardPress = (item: NSFWAnime) => {
@@ -293,11 +306,9 @@ export default function NSFWScreen() {
     return () => { active = false; };
   }, [route.params?.slug, uniqueItems, adultContentEnabled, loading, profileId, navigation]);
 
-  const categories = useMemo(() => catalogCategories(uniqueItems), [uniqueItems]);
-  const filteredItems = useMemo(() => {
-    const pool = query.trim() ? [...new Map([...searchItems, ...uniqueItems].map(item => [item.slug || String(item.id), item])).values()] : uniqueItems;
-    return filterCatalog(pool, query, category);
-  }, [uniqueItems, searchItems, query, category]);
+  const categories = useMemo(() => [...new Set([...allCategories,...catalogCategories(uniqueItems)])].sort(),[allCategories,uniqueItems]);
+  const hasActiveFilters = activeFilter !== 'Todos' || !!query.trim() || category !== null || showAllResults;
+  const filteredItems = hasActiveFilters ? searchItems : uniqueItems;
   const heroItems = useMemo(() => dailySelection(uniqueItems, day, 5).map(item => ({
     key: item.slug || String(item.id), title: item.title, poster: item.poster_path,
     banner: item.banner_path || item.banner_url || item.backdrop_path,
@@ -305,7 +316,6 @@ export default function NSFWScreen() {
   })), [uniqueItems, day]);
   const hasHero = adultContentEnabled && !loading && !error && heroItems.length > 0;
   const horizontalPadding = isSmallScreen ? 16 : 24;
-  const hasActiveFilters = activeFilter !== 'Todos' || !!query.trim() || category !== null;
   const shelves = useMemo(() => {
     // Browse has four curated rows. Filtering/searching exposes every matching loaded title.
     const groups = hasActiveFilters
@@ -325,6 +335,7 @@ export default function NSFWScreen() {
       />
 
       <ScrollView
+        ref={catalogScroll}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={retryContent} />}
         style={styles.scrollView}
         contentContainerStyle={{
@@ -377,21 +388,20 @@ export default function NSFWScreen() {
                     <TextInput accessibilityLabel="Buscar en esta sección" placeholder="Buscar en esta sección…" placeholderTextColor={colors.textMuted} value={query} onChangeText={setQuery} style={[styles.searchInput, { color: colors.text }, isWeb && ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any)]} returnKeyType="search" />
                     {query ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar búsqueda de esta sección" onPress={() => setQuery('')} style={styles.clearSearch}><Ionicons name="close" size={20} color={colors.text} /></TouchableOpacity> : null}
                   </View>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Filtrar por categoría" accessibilityState={{ expanded: categoriesOpen }} onPress={() => setCategoriesOpen(open => !open)} style={[styles.categoryToggle, { backgroundColor: category ? colors.primary : colors.card }]}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Filtrar por categoría" accessibilityState={{ expanded: categoriesOpen }} onPress={() => {setDraftCategory(category);setCategoriesOpen(true);}} style={[styles.categoryToggle, { backgroundColor: category ? colors.primary : colors.card }]}>
                     <Text style={{ color: category ? '#fff' : colors.text, fontSize: 13, flexShrink: 1 }} numberOfLines={1}>{category || 'Categorías'}</Text><Ionicons name={categoriesOpen ? 'chevron-up' : 'chevron-down'} size={16} color={category ? '#fff' : colors.text} />
                   </TouchableOpacity>
                 </View>
               </View>
-              {categoriesOpen ? <ScrollView style={{ maxHeight: 220, marginBottom: 20 }} keyboardShouldPersistTaps="handled">
+              <CatalogFilterDialog visible={categoriesOpen} title="Categorías" onClose={()=>setCategoriesOpen(false)} onApply={()=>{setCategory(draftCategory);setShowAllResults(true);setCategoriesOpen(false);}} onClear={()=>setDraftCategory(null)}>
                 <View style={styles.categoryPanel}>
-                  {[null, ...categories].map(label => <TouchableOpacity key={label ? `category:${label}` : '__all'} accessibilityRole="button" accessibilityLabel={label ? `Categoría ${label}` : 'Todas las categorías'} accessibilityState={{ selected: category === label }} onPress={() => { setCategory(label); setCategoriesOpen(false); }} style={[styles.filterChip, { backgroundColor: category === label ? colors.primary : colors.card }]}>
-                    <Text style={{ color: category === label ? '#fff' : colors.text, fontSize: 13 }}>{label || 'Todas las categorías'}</Text>
+                  {[null, ...categories].map(label => <TouchableOpacity key={label ? `category:${label}` : '__all'} accessibilityRole="button" accessibilityLabel={label ? `Categoría ${label}` : 'Todas las categorías'} accessibilityState={{ selected: draftCategory === label }} onPress={() => { setDraftCategory(label); }} style={[styles.filterChip, { backgroundColor: draftCategory === label ? colors.primary : colors.card }]}>
+                    <Text style={{ color: draftCategory === label ? '#fff' : colors.text, fontSize: 13 }}>{label || 'Todas las categorías'}</Text>
                   </TouchableOpacity>)}
                 </View>
-                {!categories.length ? <Text style={{ color: colors.textMuted, marginTop: 12 }}>Este catálogo todavía no tiene categorías registradas.</Text> : null}
-              </ScrollView> : null}
+              </CatalogFilterDialog>
               {hasActiveFilters && !loading && !searchLoading && !searchError ? <View style={styles.resultSummary}>
-                <Text style={{ color: colors.textMuted }}>{filteredItems.length} {filteredItems.length === 1 ? 'título' : 'títulos'}{category ? ` · ${category}` : ''}</Text>
+                <Text style={{ color: colors.textMuted }}>{resultTotal} {resultTotal === 1 ? 'título' : 'títulos'}{category ? ` · ${category}` : ''}</Text>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Restablecer búsqueda y filtros" onPress={handleResetFilters}><Text style={{ color: colors.primary }}>Restablecer</Text></TouchableOpacity>
               </View> : null}
 
@@ -523,6 +533,12 @@ export default function NSFWScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+              ) : hasActiveFilters ? (
+                <View>
+                 <Text style={{color:colors.text,fontSize:20,fontWeight:'700',marginBottom:16}}>Resultados</Text>
+                 <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{filteredItems.map(item=><HentaiCard key={item.id} item={item} onPress={()=>handleCardPress(item)} cardWidth={Math.floor((width-horizontalPadding*2-12*(Math.max(2,Math.floor((width-horizontalPadding*2)/172))-1))/Math.max(2,Math.floor((width-horizontalPadding*2)/172)))}/>)}</View>
+                 <CatalogPagination page={resultPage} totalPages={resultPages} onChange={page=>{setSearchLoading(true);setResultPage(page);catalogScroll.current?.scrollTo({y:0,animated:true});}} disabled={searchLoading}/>
+                </View>
               ) : (
                 <>
                   {/* Filas horizontales troceadas por 12 */}
@@ -536,6 +552,7 @@ export default function NSFWScreen() {
                         onItemPress={handleCardPress}
                       />
                     ))}
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver catálogo completo" onPress={()=>setShowAllResults(true)} style={{padding:16,alignSelf:'center',backgroundColor:colors.card}}><Text style={{color:colors.text}}>Ver catálogo completo</Text></TouchableOpacity>
                   </View>
                 </>
               )}

@@ -1,3 +1,5 @@
+import PlaybackLock from './PlaybackLock';
+import {usePlaybackLock} from '../hooks/usePlaybackLock';
 import Loader from './Loader';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
@@ -66,6 +68,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   onPreviousEpisode,
   onProgress,
 }) => {
+  const {locked,lockedRef,setLocked}=usePlaybackLock(videoUrl);
   const [showControls, setShowControls] = useState(true);
   const [timeline, setTimeline] = useState({ current_time: 0, duration: 0 });
   const scrubbing = useRef(false);
@@ -113,7 +116,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
   flushProgressRef.current = flushProgress;
 
   const resetControlsTimer = useCallback(() => {
-    if (!mounted.current) return;
+    if (!mounted.current || lockedRef.current) return;
     setShowControls(true);
     if (controlsTimer.current) clearTimeout(controlsTimer.current);
     if (player.playing && !scrubbing.current) controlsTimer.current = setTimeout(() => setShowControls(false), 4000);
@@ -234,7 +237,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
       />
 
       {playbackError ? <Text accessibilityRole="alert" style={{ color: '#fff', position: 'absolute', top: '40%', left: 24, right: 24, textAlign: 'center' }}>{playbackError}</Text> : null}
-      {showControls && (
+      {showControls && !locked && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <PlaybackChrome title={animeTitle} subtitle={`Episodio ${episode.number} · ${episode.title}`}
             onClose={handleClose} onPrevious={hasPreviousEpisode ? handlePreviousEpisode : undefined}
@@ -271,6 +274,7 @@ export const NativeVideoPlayer: React.FC<NativePlayerProps> = ({
           </View>
         </View>
       )}
+      <PlaybackLock locked={locked} visible={showControls} onLock={()=>{setLocked(true);setShowControls(false);}} onUnlock={()=>{setLocked(false);resetControlsTimer();}}/>
     </View>
   );
 };
@@ -297,6 +301,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   const [loading, setLoading] = useState(true);
   const [webViewLoading, setWebViewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const {locked,lockedRef,setLocked}=usePlaybackLock(episode.id);
   const [showUI, setShowUI] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [canControlEmbed, setCanControlEmbed] = useState(false);
@@ -501,6 +506,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
 
   // ── Auto-hide UI ────────────────────────────────────────────
   const showUITemporarily = useCallback(() => {
+    if(lockedRef.current)return;
     setShowUI(true);
     Animated.timing(uiOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -721,7 +727,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
             </View>
           )}
           {/* Interfaz Animada */}
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: uiOpacity }]} pointerEvents={showUI ? 'box-none' : 'none'}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: locked ? 0 : uiOpacity }]} pointerEvents={showUI && !locked ? 'box-none' : 'none'}>
             <PlaybackChrome title={animeTitle} subtitle={`Temporada ${seasonNumber || 1} · Episodio ${episode.number}`}
               onClose={handleClose} servers={sources} selectedIndex={Math.max(0, sources.indexOf(selectedSource!))}
               menuOpen={serverMenuOpen} onMenuChange={open => { setServerMenuOpen(open); serverMenuOpenRef.current = open; showUITemporarily(); }}
@@ -734,6 +740,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
               <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color="#fff" />
             </TouchableOpacity>}
           </Animated.View>
+          <PlaybackLock locked={locked} visible={showUI} onLock={()=>{setLocked(true);setShowUI(false);setServerMenuOpen(false);serverMenuOpenRef.current=false;}} onUnlock={()=>{setLocked(false);showUITemporarily();}}/>
         </View>
       );
     }
@@ -753,7 +760,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
         onProgress={sendProgress}
       />
     );
-  }, [selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds, serverMenuOpen, sources, seasonNumber]);
+  }, [locked, selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds, serverMenuOpen, sources, seasonNumber]);
 
   // ── Loading / Error screens ──────────────────────────────────
   if (loading || loadedEpisode.current !== String(episode.id)) {
@@ -798,7 +805,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
         <View style={styles.videoFullscreen}>
           {renderVideoPlayer}
         </View>
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: uiOpacity }]} pointerEvents={showUI ? 'box-none' : 'none'}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: locked ? 0 : uiOpacity }]} pointerEvents={showUI && !locked ? 'box-none' : 'none'}>
           <LinearGradient
             colors={['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.4)', 'transparent']}
             style={styles.gradTop}

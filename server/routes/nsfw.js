@@ -1,3 +1,4 @@
+import { getNSFWCatalog } from '../services/nsfwCatalog.js';
 import express from 'express';
 import hentailaScraper from '../services/hentailaScraper.js';
 import { syncHentaiSingle } from '../services/hentaiBotService.js';
@@ -9,45 +10,8 @@ const inFlightHentaiSyncs = new Map();
 // GET /api/nsfw/latest
 router.get('/latest', async (req, res) => {
     try {
-        const { search, status } = req.query;
-        let query = `
-            SELECT id::TEXT, slug, title, poster_url as poster_path, status, synopsis, genres, is_active
-            FROM hentai_content
-            WHERE is_active = true
-        `;
-        const queryParams = [];
-        let paramCount = 1;
-
-        if (status && status !== 'Todos') {
-            // Asumiremos que 'Nuevos caps' en la UI buscará los actualizados recientemente o estado 'En emisión'
-            // Dado que hentaila marca casi todo Finalizado, por ahora filtramos exacto por el estado.
-            if (status === 'Nuevos caps') {
-                // Ordenaremos por updated_at pero no filtramos por estado exacto si todos son Finalizado
-            } else {
-                query += ` AND status ILIKE $${paramCount}`;
-                queryParams.push(`%${status}%`);
-                paramCount++;
-            }
-        }
-
-        if (search) {
-            query += ` AND title ILIKE $${paramCount}`;
-            queryParams.push(`%${search}%`);
-            paramCount++;
-        }
-
-        query += ` ORDER BY updated_at DESC LIMIT 50`;
-
-        const result = await pool.query(query, queryParams);
-        
-        // Mapear al formato que espera el frontend (NSFWAnime)
-        const latest = result.rows.map(r => ({
-            ...r,
-            type: 'hentai',
-            is_nsfw: true
-        }));
-
-        res.json(latest);
+        const result = await getNSFWCatalog(pool, req.query);
+        res.json(req.query.page !== undefined ? result : result.items);
     } catch (error) {
         console.error('Error in /nsfw/latest:', error);
         res.status(500).json({ error: 'Failed to fetch latest NSFW content from DB' });

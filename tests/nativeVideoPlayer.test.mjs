@@ -1,3 +1,4 @@
+import {playbackLockModule} from './helpers/playbackLock.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ test('Android pause reflects player events, stays visible while paused and advan
   const exports={};
   const source=ts.transpileModule(fs.readFileSync(new URL('../components/EpisodePlayer.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText;
   vm.runInNewContext(source,{exports,setTimeout:fn=>{timers.set(++clock,fn);return clock;},clearTimeout:id=>timers.delete(id),setInterval:()=>1,clearInterval(){},require(name){
-    if(name==='react')return react;if(name==='react-native')return native;
+    if(name==='../hooks/usePlaybackLock')return playbackLockModule(react);if(name==='./PlaybackLock')return{default:'PlaybackLock',__esModule:true};if(name==='react')return react;if(name==='react-native')return native;
     if(name==='../hooks/useImmersivePlayer')return{useImmersivePlayer(){}};if(name==='expo-video')return{useVideoPlayer:()=>player,VideoView:'VideoView'};
     if(name==='expo-status-bar')return{StatusBar:'StatusBar'};
     if(name==='expo-linear-gradient')return{LinearGradient:'LinearGradient'};
@@ -151,7 +152,7 @@ function createPlayerHarness(overrides = {}) {
     setInterval: fn => { intervals.set(++clock, fn); return clock; },
     clearInterval: id => intervals.delete(id),
     require(name) {
-      if (name === 'react') return react;
+      if (name === '../hooks/usePlaybackLock') return playbackLockModule(react); if (name === './PlaybackLock') return { default:'PlaybackLock',__esModule:true }; if (name === 'react') return react;
       if (name === 'react-native') return native;
       if (name === '../hooks/useImmersivePlayer') return { useImmersivePlayer() {} };
       if (name === 'expo-video') return { useVideoPlayer: () => player, VideoView: 'VideoView' };
@@ -515,4 +516,15 @@ test('timeline seeks to an arbitrary minute while preserving pause and saving th
   h.findByType(tree, 'PlaybackTimeline').props.onSeek(600);
   assert.equal(h.player.currentTime, 600); assert.equal(h.player.playing, false);
   assert.equal(saved.at(-1).current_time, 600); h.unmount();
+});
+test('locking native playback hides chrome through accidental touches and playback events until explicit unlock',()=>{
+ const h=createPlayerHarness();
+ const props={videoUrl:'https://example.test/video.mp4',episode:{id:'5',number:5,title:'Fixture'},animeTitle:'Fixture',onClose(){},onProgress(){}};
+ let tree=h.renderNative(props);
+ h.findByType(tree,'PlaybackLock').props.onLock();tree=h.renderNative(props);
+ assert.equal(h.findByType(tree,'PlaybackLock').props.locked,true);
+ tree.props.onTouchStart();h.events.playingChange?.({isPlaying:true});tree=h.renderNative(props);
+ assert.equal(h.findByType(tree,'PlaybackChrome'),null);
+ h.findByType(tree,'PlaybackLock').props.onUnlock();tree=h.renderNative(props);
+ assert.ok(h.findByType(tree,'PlaybackChrome'));
 });

@@ -1,3 +1,4 @@
+import CatalogPagination from '../components/CatalogPagination';
 import { dailySelection, localDayKey } from '../utils/catalogSections';
 import Loader from '../components/Loader';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -67,9 +68,9 @@ export default function MangaScreen() {
   const [heroDay, setHeroDay] = useState(localDayKey);
   useEffect(() => { const timer = setInterval(() => setHeroDay(localDayKey()), 60000); return () => clearInterval(timer); }, []);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const [totalPages,setTotalPages]=useState(1);
+  const catalogScroll=useRef<ScrollView>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [items, setItems] = useState<Manga[]>([]);
   const [popular, setPopular] = useState<Array<Manga & { rank: number }>>([]);
 
@@ -94,20 +95,19 @@ export default function MangaScreen() {
     };
   };
 
+  useEffect(()=>{setPage(1);},[activeFilter,publicationType,selectedGenre,search,refreshVersion]);
   useEffect(() => {
     let cancelled = false;
     const generation = ++listGeneration.current;
-    setLoadingMore(false);
     const run = async () => {
       if (!refreshingSection) setLoading(true);
-      setPage(1);
       try {
         const status = activeFilter === 'Todos' ? undefined : activeFilter;
         const q = search.trim();
-        const limit = 36;
+        const limit = 50;
         const [list, pop] = await Promise.all([
           mangaApi.list({
-            page: 1,
+            page,
             limit,
             status,
             search: q || undefined,
@@ -120,12 +120,11 @@ export default function MangaScreen() {
         if (cancelled) return;
         const rows = (list.items || list.data || []) as Manga[];
         setItems(rows);
-        setHasMore(rows.length >= limit);
+        setTotalPages(Math.max(1,Math.ceil(Number(list.pagination?.total || rows.length)/limit)));
         setPopular((pop.items || []) as Array<Manga & { rank: number }>);
       } catch {
         if (cancelled) return;
         setItems([]);
-        setHasMore(false);
       } finally {
         if (!cancelled) { setLoading(false); setRefreshingSection(false); }
       }
@@ -136,40 +135,7 @@ export default function MangaScreen() {
       if (listGeneration.current === generation) listGeneration.current++;
       clearTimeout(t);
     };
-  }, [activeFilter, publicationType, selectedGenre, search, refreshVersion]);
-
-  const loadMore = async () => {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    const generation = listGeneration.current;
-    try {
-      const nextPage = page + 1;
-      const status = activeFilter === 'Todos' ? undefined : activeFilter;
-      const q = search.trim();
-      const limit = 36;
-      const list = await mangaApi.list({
-        page: nextPage,
-        limit,
-        status,
-        search: q || undefined,
-        order: 'updated',
-        publicationType: publicationType || undefined,
-        genre: selectedGenre || undefined,
-      });
-      if (generation !== listGeneration.current) return;
-      const rows = (list.items || list.data || []) as Manga[];
-      setItems((prev) => {
-        const seen = new Set(prev.map((x) => x.id));
-        return [...prev, ...rows.filter((x) => !seen.has(x.id))];
-      });
-      setPage(nextPage);
-      setHasMore(rows.length >= limit);
-    } catch {
-      if (generation === listGeneration.current) setHasMore(false);
-    } finally {
-      if (generation === listGeneration.current) setLoadingMore(false);
-    }
-  };
+  }, [activeFilter, publicationType, selectedGenre, search, refreshVersion, page]);
 
   const mapped = useMemo(() => items.map(toUI), [items]);
   const heroItems: CatalogHeroItem[] = useMemo(
@@ -199,6 +165,7 @@ export default function MangaScreen() {
       />
 
       <ScrollView
+        ref={catalogScroll}
         refreshControl={<RefreshControl refreshing={refreshingSection} onRefresh={() => { setRefreshingSection(true); setRefreshVersion(value => value + 1); }} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -367,22 +334,8 @@ export default function MangaScreen() {
                   ))}
                 </View>
 
-                {hasMore ? (
-                  <TouchableOpacity
-                    style={[styles.loadMoreBtn, { backgroundColor: colors.card }]}
-                    onPress={loadMore}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <>
-                        <Text style={[styles.loadMoreText, { color: colors.text }]}>Cargar más</Text>
-                        <Ionicons name="chevron-down" size={16} color={colors.text} />
-                      </>
-                    )}
-                  </TouchableOpacity>
-                ) : null}
+                <CatalogPagination page={page} totalPages={totalPages} onChange={p=>{setLoading(true);setPage(p);catalogScroll.current?.scrollTo({y:0,animated:false});}} disabled={loading}/>
+
               </>
             )}
           </View>

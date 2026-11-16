@@ -1,3 +1,5 @@
+import PlaybackLock from './PlaybackLock';
+import {usePlaybackLock} from '../hooks/usePlaybackLock';
 import Loader from './Loader';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -54,6 +56,7 @@ export default function HentaiVideoPlayer({
   error = null,
   onRetry,
 }: HentaiVideoPlayerProps) {
+  const {locked,lockedRef,setLocked}=usePlaybackLock(episodeNumber);
   const isWeb = Platform.OS === 'web';
   useImmersivePlayer();
   const [activeServer, setActiveServer] = useState<VideoServer | null>(
@@ -95,6 +98,7 @@ export default function HentaiVideoPlayer({
 
   const showControls = useCallback(
     (autoHide = true) => {
+      if(lockedRef.current)return;
       clearHideTimer();
       setControlsVisible(true);
       Animated.timing(controlsOpacity, {
@@ -252,7 +256,7 @@ export default function HentaiVideoPlayer({
       </View>
 
       {/* Subtle corner/top trigger when controls are faded out */}
-      {!controlsVisible && (
+      {!controlsVisible && !locked && (
         <View style={styles.hiddenTriggersRow} pointerEvents="box-none">
           <TouchableOpacity
             accessibilityRole="button"
@@ -268,8 +272,8 @@ export default function HentaiVideoPlayer({
 
       {/* Auto-hiding Floating Overlay (Header + Corner Server Picker) */}
       <Animated.View
-        style={[styles.overlayWrap, { opacity: controlsOpacity }]}
-        pointerEvents={controlsVisible ? 'box-none' : 'none'}
+        style={[styles.overlayWrap, { opacity: locked ? 0 : controlsOpacity }]}
+        pointerEvents={controlsVisible && !locked ? 'box-none' : 'none'}
       >
         <PlaybackChrome title={animeTitle} subtitle={`Episodio ${episodeNumber}`} onClose={handleClose}
           servers={!loadingServers && !error ? servers : []} selectedIndex={Math.max(0, servers.indexOf(activeServer!))}
@@ -279,6 +283,7 @@ export default function HentaiVideoPlayer({
           onPrevious={hasPreviousEpisode && onPreviousEpisode ? () => { showControls(true); onPreviousEpisode(); } : undefined}
           onNext={hasNextEpisode && onNextEpisode ? () => { showControls(true); onNextEpisode(); } : undefined} />
       </Animated.View>
+      <PlaybackLock locked={locked} visible={controlsVisible} onLock={()=>{clearHideTimer();setLocked(true);setControlsVisible(false);setServerMenuOpen(false);serverMenuOpenRef.current=false;}} onUnlock={()=>{setLocked(false);showControls(true);}}/>
     </View>
   );
 }

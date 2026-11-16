@@ -1,3 +1,4 @@
+import { statusAliases } from './catalogStatus.js';
 import { extractPublicationType } from './mangaFormat.js';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
@@ -266,8 +267,8 @@ export async function queryMangaCache(pool, { page, limit, status, search, order
 
   const st = String(status || '').trim();
   if (st) {
-    where.push(`status = $${i++}`);
-    params.push(st);
+    where.push(`lower(trim(status)) = ANY($${i++}::text[])`);
+    params.push(statusAliases(st));
   }
 
   const q = String(search || '').trim();
@@ -303,8 +304,8 @@ export async function queryMangaCache(pool, { page, limit, status, search, order
   const ord = String(order || '').trim().toLowerCase();
   const orderSql =
     ord === 'popular'
-      ? `ORDER BY popularity_score DESC, md_updated_at DESC NULLS LAST, cached_at DESC`
-      : `ORDER BY md_updated_at DESC NULLS LAST, cached_at DESC`;
+      ? `ORDER BY popularity_score DESC, md_updated_at DESC NULLS LAST, cached_at DESC, manga_id ASC`
+      : `ORDER BY md_updated_at DESC NULLS LAST, cached_at DESC, manga_id ASC`;
 
   const rows = await pool.query(
     `
@@ -589,7 +590,7 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
       chapter_count, latest_chapter, author, artist, md_updated_at
     FROM manga_cache
     WHERE is_active = true
-    ORDER BY popularity_score DESC, md_updated_at DESC NULLS LAST, cached_at DESC
+    ORDER BY popularity_score DESC, md_updated_at DESC NULLS LAST, cached_at DESC, manga_id ASC
     LIMIT $1
     `,
     [l]
@@ -637,7 +638,7 @@ export async function getPopularManga(pool, { limit = 12 } = {}) {
       chapter_count, latest_chapter, author, artist, md_updated_at
     FROM manga_cache
     WHERE is_active = true
-    ORDER BY popularity_score DESC, md_updated_at DESC NULLS LAST, cached_at DESC
+    ORDER BY popularity_score DESC, md_updated_at DESC NULLS LAST, cached_at DESC, manga_id ASC
     LIMIT $1
     `,
     [l]

@@ -192,6 +192,7 @@ app.use('/auth', authLimiter, authRoutes);
 app.use('/api/app-release', appReleaseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/bot', botRoutes);
+app.use('/api/episode-thumbnails', (await import('./routes/episodeThumbnails.js')).default);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/news', newsRoutes);

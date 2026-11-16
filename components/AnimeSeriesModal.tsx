@@ -1,3 +1,4 @@
+import {episodeThumbnailURL} from '../utils/episodeThumbnail';
 import { resolveAnimeTrailer, relatedAnime, seriesSearchTerm } from '../services/animePresentation';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { briefSynopsis, cleanSynopsisText } from '../utils/briefSynopsis';
@@ -99,6 +100,13 @@ export default function AnimeSeriesModal({
   const [loadingStreaming, setLoadingStreaming] = useState(true);
   const detailData = loadedDetailData && String(loadedDetailData.id) === String(currentContent?.id) ? loadedDetailData : null;
   const streamingInfo = loadedStreamingInfo && loadedStreamingInfo.animeId === String(currentContent?.id) ? loadedStreamingInfo : null;
+  useEffect(()=>{
+    let active=true;
+    const urls=loadedStreamingInfo?.animeId===String(content?.id)?loadedStreamingInfo.seasons.flatMap(season=>season.episodes).map(ep=>ep.image).filter((url):url is string=>!!url).slice(0,8):[];
+    let index=0;
+    const worker=async()=>{while(active&&index<urls.length){const url=urls[index++];try{await Image.prefetch(url);}catch{}}};
+    void worker();void worker();return()=>{active=false;};
+  },[loadedStreamingInfo,content?.id]);
   const [showEpisodePlayer, setShowEpisodePlayer] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<AnimeEpisode | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<AnimeSeason | null>(null);
@@ -347,7 +355,7 @@ export default function AnimeSeriesModal({
           id: String(ep.id),
           number: ep.episode_number,
           title: ep.title || `Episodio ${ep.episode_number}`,
-          image: ep.thumbnail_url || undefined,
+          image: episodeThumbnailURL(ep.thumbnail_url || undefined),
           url,
           downloadUrl: ep.video_url || undefined,
           external_servers: ep.external_servers || undefined,
