@@ -103,15 +103,15 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   }, [heroArtUri]);
 
   const isLight = theme === 'light';
-  // Keep the image cinematic without dark bottom bands in light mode.
+  // Keep the image vivid in light mode with minimal white veil; only the very bottom joins the page surface.
   const heroTopColors = isLight
-    ? ['rgba(255,255,255,0.52)', 'transparent']
+    ? ['rgba(255,255,255,0.14)', 'transparent']
     : ['rgba(0,0,0,0.42)', 'transparent'];
   const heroBottomColors = isLight
-    ? ['transparent', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.52)', colors.background]
+    ? ['transparent', 'transparent', 'rgba(255,255,255,0.16)', colors.background]
     : ['transparent', 'rgba(0,0,0,0.14)', 'rgba(0,0,0,0.68)', colors.background];
   const heroLeftColors = isLight
-    ? ['rgba(255,255,255,0.84)', 'rgba(255,255,255,0.36)', 'transparent']
+    ? ['rgba(255,255,255,0.42)', 'rgba(255,255,255,0.10)', 'transparent']
     : ['rgba(0,0,0,0.68)', 'rgba(0,0,0,0.22)', 'transparent'];
 
   const headerOffset = isSmallScreen ? 0 : (isWeb ? 72 : 64);
@@ -146,7 +146,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
       {/* Bottom gradient — zona nítida más alta, transición corta al final */}
       <LinearGradient
         colors={heroBottomColors as any}
-        locations={[0, 0.72, 0.91, 1]}
+        locations={isLight ? [0, 0.78, 0.92, 1] : [0, 0.72, 0.91, 1]}
         style={[StyleSheet.absoluteFillObject, { top: 0 }]}
         pointerEvents="none"
       />
@@ -184,7 +184,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           style={[
             isSmallScreen ? styles.titleMobile : styles.title,
             { color: isLight ? colors.text : '#fff' },
-            !isLight && isWeb ? { textShadow: '0px 4px 20px rgba(0,0,0,0.65)' } as any : null,
+            isWeb ? { textShadow: isLight ? '0px 1px 10px rgba(255,255,255,0.9)' : '0px 4px 20px rgba(0,0,0,0.65)' } as any : null,
           ]}
           numberOfLines={2}
         >

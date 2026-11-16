@@ -946,25 +946,25 @@ export default function AnimeSeriesModal({
                       ? ((currentContent as any)?.poster_position || '50% 18%')
                       : (currentContent as any)?.banner_position}
                   />
-                  {/* En modo claro sin degradado negro: transición suave al fondo claro; en modo oscuro conserva sombreado cinematográfico */}
+                  {/* En modo claro sin degradado negro y con velo mínimo; en modo oscuro conserva sombreado cinematográfico */}
                   {isLight && hasLandscapeBanner && (
                     <LinearGradient
-                      colors={['rgba(255,255,255,0.82)', 'rgba(255,255,255,0.38)', 'transparent']}
+                      colors={['rgba(255,255,255,0.38)', 'rgba(255,255,255,0.08)', 'transparent']}
                       start={{ x: 0, y: 0.5 }}
                       end={{ x: 1, y: 0.5 }}
-                      locations={[0, 0.52, 0.85]}
+                      locations={[0, 0.48, 0.82]}
                       style={StyleSheet.absoluteFill}
                     />
                   )}
                   <LinearGradient
-                    colors={isLight ? ['transparent', 'rgba(255,255,255,0.18)', 'rgba(255,255,255,0.58)', colors.background] : [
+                    colors={isLight ? ['transparent', 'transparent', 'rgba(255,255,255,0.14)', colors.background] : [
                       'rgba(0,0,0,0.22)',
                       'rgba(0,0,0,0.12)',
                       'rgba(0,0,0,0.52)',
                       'rgba(0,0,0,0.78)',
                       colors.background,
                     ]}
-                    locations={isLight ? [0, 0.58, 0.86, 1] : [0, 0.45, 0.72, 0.9, 1]}
+                    locations={isLight ? [0, 0.8, 0.92, 1] : [0, 0.45, 0.72, 0.9, 1]}
                     style={StyleSheet.absoluteFill}
                   />
                 </>
@@ -1019,18 +1019,20 @@ export default function AnimeSeriesModal({
                     </View>
                   )}
 
-                  {/* Descripción */}
+                  {/* Descripción única en el hero (con scroll interno si es larga, sin agrandar la altura) */}
                   <Animated.View style={{ transform: [{ translateY: descSlideAnim }] }}>
                     {currentContent?.type === 'anime' && (loading || !detailData) ? (
                       <Loader />
                     ) : (
-                      <Text style={[heroStyles.overview, lightPortrait && { color: colors.textSecondary }]} numberOfLines={2}>
-                        {briefSynopsis(cleanDescription(
-                          currentContent?.type === 'anime' && detailData && 'description' in detailData
-                            ? (detailData as any).description || currentContent?.overview || ''
-                            : currentContent?.overview || ''
-                        ))}
-                      </Text>
+                      <ScrollView
+                        style={{ maxHeight: isSmallScreen ? 68 : 78 }}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={true}
+                      >
+                        <Text style={[heroStyles.overview, lightPortrait && { color: colors.textSecondary }]}>
+                          {cleanDescription(fullSynopsis) || 'Sin descripción disponible.'}
+                        </Text>
+                      </ScrollView>
                     )}
                   </Animated.View>
 
@@ -1176,14 +1178,6 @@ export default function AnimeSeriesModal({
                 </View>
               )}
             </View>
-
-              {fullSynopsis ? <View style={{ paddingHorizontal: 24, paddingBottom: 20, gap: 10 }}>
-                {(detailData as any)?.translation_status === 'pending' ? <Text style={{ color: colors.textMuted, fontSize: 12 }}>Sinopsis original · traducción al español pendiente</Text> : null}
-                <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: expandedSynopsis }} onPress={() => setExpandedSynopsis(value => !value)} style={{ alignSelf: 'flex-start', paddingVertical: 8 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{expandedSynopsis ? 'Ocultar sinopsis' : 'Leer sinopsis completa'}</Text>
-                </TouchableOpacity>
-                {expandedSynopsis ? <Text style={{ color: colors.textSecondary, lineHeight: 23, fontSize: 14 }}>{cleanDescription(fullSynopsis)}</Text> : null}
-              </View> : null}
 
               {/* Streaming Episodes for Anime - mostrar si hay datos del M3U */}
               {currentContent?.type === 'anime' && (loadingStreaming || (streamingInfo && Array.isArray(streamingInfo.seasons) && streamingInfo.seasons.length > 0)) && (
