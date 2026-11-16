@@ -338,7 +338,13 @@ const linking: LinkingOptions<LinkRoutes> = {
       SeleccionPerfil: 'profiles',
       Principal: {
         screens: {
-          Inicio: 'home',
+          Inicio: {
+            path: 'home',
+            screens: {
+              HomeMain: { path: '', alias: ['HomeMain'] },
+              Categoria: 'category',
+            },
+          },
           Buscar: 'search',
           Noticias: {
             path: 'news',
@@ -356,7 +362,7 @@ const linking: LinkingOptions<LinkRoutes> = {
               MangaReader: { path: ':id/:chapterKey', alias: ['read/:id/:chapterId'] }
             }
           },
-          Hentai: { path: 'h-anime', alias: ['Hentai'] },
+          Hentai: { path: 'h-anime', alias: ['Hentai', 'hentai'] },
           MiLista: 'mylist',
           Perfil: 'profile',
         },
@@ -383,12 +389,12 @@ export default function AppNavigator() {
   const { colors, theme } = useTheme();
   const { user, isLoading } = useAuth();
   const { currentProfile, profileLoading } = useProfile();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, isLoading: adminLoading } = useAdmin();
   const activeLinking = React.useMemo(() => {
     const screens = profileNavigationScreens(linking.config!.screens as any, !!user, !!currentProfile, isAdmin);
     return { ...linking, config: { screens } };
   }, [!!user, !!currentProfile, isAdmin]);
-  if (isLoading || profileLoading) return <LoadingScreen />;
+  if (isLoading || profileLoading || (user && currentProfile && adminLoading)) return <LoadingScreen />;
   const initialRoute = !user ? 'Ingreso' : currentProfile ? 'Principal' : 'SeleccionPerfil';
 
   return (

@@ -892,14 +892,23 @@ export default function AnimeSeriesModal({
       navigationBarTranslucent
       onRequestClose={playback ? onClosePlayback : handleClose}
     >
-      {playback ? <View style={{ flex: 1, backgroundColor: '#000' }}>{playback}</View> : <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+      {playback ? <View style={{ flex: 1, backgroundColor: '#000' }}>{playback}</View> : (() => {
+        const hasLandscapeBanner = !isSmallScreen && Boolean(
+          currentContent?.type === 'anime'
+            ? (detailData as any)?.bannerImage || currentContent?.backdrop_path
+            : currentContent?.backdrop_path
+        );
+        const lightPortrait = theme === 'light' && !hasLandscapeBanner;
+        const heroBg = theme === 'light' ? colors.background : '#050505';
+        return (
+      <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
         <StatusBar style={theme === 'light' ? 'dark' : 'light'} translucent />
 
         <Animated.View style={[styles.content, { opacity: contentFadeAnim, maxWidth: undefined, maxHeight: '100%', borderRadius: 0, overflow: 'hidden' }]}>
           {/* Botón cerrar estilo Pixel */}
           <>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar detalles" style={[styles.closeButton, Platform.OS === 'android' && { top: insets.top + 12 }]} onPress={handleClose}>
-              <Ionicons name="close" size={28} color="#FFFFFF" />
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar detalles" style={[styles.closeButton, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.08)' }, Platform.OS === 'android' && { top: insets.top + 12 }]} onPress={handleClose}>
+              <Ionicons name="close" size={28} color={lightPortrait ? colors.text : '#FFFFFF'} />
             </TouchableOpacity>
           </>
 
@@ -936,7 +945,7 @@ export default function AnimeSeriesModal({
               ) : (
                 <>
                   <AnimeArtwork
-                    backgroundColor="#050505"
+                    backgroundColor={heroBg}
                     banner={isSmallScreen ? undefined : (
                       currentContent?.type === 'anime'
                         ? (detailData as any)?.bannerImage || currentContent?.backdrop_path || undefined
@@ -949,16 +958,16 @@ export default function AnimeSeriesModal({
                       ? ((currentContent as any)?.poster_position || '50% 18%')
                       : (currentContent as any)?.banner_position}
                   />
-                  {/* Sombreado oscuro suave detrás del texto incluso en modo claro; transición corta al fondo inferior */}
+                  {/* Sombreado oscuro suave detrás del texto cuando hay banner o modo oscuro; en modo claro con póster mantiene fondo claro */}
                   <LinearGradient
-                    colors={[
+                    colors={lightPortrait ? ['transparent', 'transparent', colors.background] : [
                       'rgba(0,0,0,0.22)',
                       'rgba(0,0,0,0.12)',
                       'rgba(0,0,0,0.52)',
                       'rgba(0,0,0,0.78)',
                       colors.background,
                     ]}
-                    locations={[0, 0.45, 0.72, 0.9, 1]}
+                    locations={lightPortrait ? [0, 0.9, 1] : [0, 0.45, 0.72, 0.9, 1]}
                     style={StyleSheet.absoluteFill}
                   />
                 </>
@@ -976,7 +985,7 @@ export default function AnimeSeriesModal({
                       </View>
                     )}
                     {getReleaseDate() && (
-                      <Text style={heroStyles.metaText}>{new Date(getReleaseDate()).getFullYear()}</Text>
+                      <Text style={[heroStyles.metaText, lightPortrait && { color: colors.textSecondary }]}>{new Date(getReleaseDate()).getFullYear()}</Text>
                     )}
                     {detailData && 'status' in detailData && (
                       <View style={[
@@ -993,12 +1002,12 @@ export default function AnimeSeriesModal({
                       </View>
                     )}
                     {detailData && 'episodes' in detailData && isRealAnime() && (
-                      <Text style={heroStyles.metaText}>{(detailData as any).episodes} ep.</Text>
+                      <Text style={[heroStyles.metaText, lightPortrait && { color: colors.textSecondary }]}>{(detailData as any).episodes} ep.</Text>
                     )}
                   </View>
 
                   {/* Título */}
-                  <Text style={[heroStyles.title, { fontSize: isSmallScreen ? 24 : 34 }]} numberOfLines={2}>
+                  <Text style={[heroStyles.title, { fontSize: isSmallScreen ? 24 : 34 }, lightPortrait && { color: colors.text }]} numberOfLines={2}>
                     {String(getTitle())}
                   </Text>
 
@@ -1006,8 +1015,8 @@ export default function AnimeSeriesModal({
                   {detailData?.genres && detailData.genres.length > 0 && (
                     <View style={heroStyles.genreRow}>
                       {detailData.genres.slice(0, 4).map((g: any, i: number) => (
-                        <View key={i} style={heroStyles.genreChip}>
-                          <Text style={heroStyles.genreChipText}>{typeof g === 'string' ? g : g.name}</Text>
+                        <View key={i} style={[heroStyles.genreChip, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.12)' }]}>
+                          <Text style={[heroStyles.genreChipText, lightPortrait && { color: colors.text }]}>{typeof g === 'string' ? g : g.name}</Text>
                         </View>
                       ))}
                     </View>
@@ -1018,7 +1027,7 @@ export default function AnimeSeriesModal({
                     {currentContent?.type === 'anime' && (loading || !detailData) ? (
                       <Loader />
                     ) : (
-                      <Text style={heroStyles.overview} numberOfLines={2}>
+                      <Text style={[heroStyles.overview, lightPortrait && { color: colors.textSecondary }]} numberOfLines={2}>
                         {briefSynopsis(cleanDescription(
                           currentContent?.type === 'anime' && detailData && 'description' in detailData
                             ? (detailData as any).description || currentContent?.overview || ''
@@ -1031,29 +1040,29 @@ export default function AnimeSeriesModal({
                   {/* Botones de acción */}
                   {currentContent?.type === 'anime' && (isRealAnime() || isAnimeMovie()) && (
                     <View style={[heroStyles.actionRow, androidCompact && { flexWrap: 'nowrap', width: '100%', gap: 8 }]}>
-                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reproducir anime" disabled={loadingStreaming || !streamingInfo?.seasons?.some(s => s.episodes.length > 0)} style={[heroStyles.btnPlay, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, (!streamingInfo?.seasons?.some(s => s.episodes.length > 0)) && { opacity: 0.45 }]} onPress={handleWatchNow}>
-                        <Ionicons name="play" size={18} color={colors.background} />
-                        <Text numberOfLines={1} style={[heroStyles.btnPlayText, androidCompact && { fontSize: 13, flexShrink: 1 }]}>{androidCompact ? 'Ver ahora' : 'Reproducir'}</Text>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reproducir anime" disabled={loadingStreaming || !streamingInfo?.seasons?.some(s => s.episodes.length > 0)} style={[heroStyles.btnPlay, lightPortrait && { backgroundColor: '#111111' }, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, (!streamingInfo?.seasons?.some(s => s.episodes.length > 0)) && { opacity: 0.45 }]} onPress={handleWatchNow}>
+                        <Ionicons name="play" size={18} color={lightPortrait ? '#FFFFFF' : '#111111'} />
+                        <Text numberOfLines={1} style={[heroStyles.btnPlayText, { color: lightPortrait ? '#FFFFFF' : '#111111' }, androidCompact && { fontSize: 13, flexShrink: 1 }]}>{androidCompact ? 'Ver ahora' : 'Reproducir'}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[heroStyles.btnSecondary, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, isTogglingMyList && { opacity: 0.6 }]}
+                        style={[heroStyles.btnSecondary, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.14)' }, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, isTogglingMyList && { opacity: 0.6 }]}
                         accessibilityRole="button" accessibilityLabel={currentInMyList ? "Quitar de Mi Lista" : "Añadir a Mi Lista"}
                         onPress={handleToggleList}
                         accessibilityState={{ busy: isTogglingMyList, disabled: isTogglingMyList }} disabled={isTogglingMyList}
                       >
                         {isTogglingMyList
-                          ? <ActivityIndicator size="small" color={colors.text} />
-                          : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color={colors.text} />}
-                        <Text numberOfLines={1} style={[heroStyles.btnSecondaryText, androidCompact && { flexShrink: 1, fontSize: 13 }]}>
+                          ? <ActivityIndicator size="small" color={lightPortrait ? colors.text : '#FFFFFF'} />
+                          : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color={lightPortrait ? colors.text : '#FFFFFF'} />}
+                        <Text numberOfLines={1} style={[heroStyles.btnSecondaryText, lightPortrait && { color: colors.text }, androidCompact && { flexShrink: 1, fontSize: 13 }]}>
                           {isTogglingMyList ? 'Guardando…' : currentInMyList ? 'En mi lista' : 'Mi lista'}
                         </Text>
                       </TouchableOpacity>
 
                       {trailerKey && (
-                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tráiler" style={[heroStyles.btnIcon, androidCompact && { width: 48, minHeight: 48, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={handlePlayTrailer}>
-                          <Ionicons name="play-circle-outline" size={22} color={colors.text} />
-                          {!androidCompact && <Text style={heroStyles.btnIconText}>Trailer</Text>}
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tráiler" style={[heroStyles.btnIcon, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.14)' }, androidCompact && { width: 48, minHeight: 48, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={handlePlayTrailer}>
+                          <Ionicons name="play-circle-outline" size={22} color={lightPortrait ? colors.text : '#FFFFFF'} />
+                          {!androidCompact && <Text style={[heroStyles.btnIconText, lightPortrait && { color: colors.text }]}>Trailer</Text>}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1399,7 +1408,9 @@ export default function AnimeSeriesModal({
             </View>
           </ScrollView>
         </Animated.View>
-      </Animated.View>}
+      </Animated.View>
+        );
+      })()}
 
     </Modal>
   );
