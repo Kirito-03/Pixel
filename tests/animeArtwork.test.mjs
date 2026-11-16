@@ -28,3 +28,18 @@ test('explicit focal point controls vertical crop; invalid sizes cannot render',
   assert.equal(bottom.top, -300);
   assert.equal(artworkLayout({ width: 0, height: 300 }, { width: 100, height: 100 }), null);
 });
+
+test('a cinematic landscape hero fills its whole frame without distortion or an empty lower band', () => {
+  const r = artworkLayout({ width: 1920, height: 738 }, { width: 1900, height: 400 }, '50% 0%', true);
+  assert.ok(r.width >= 1920 && r.height >= 738);
+  assert.ok(Math.abs(r.width / r.height - 1900 / 400) < 0.001);
+  assert.equal(r.top, 0);
+});
+
+test('very wide banners keep their whole sharp composition over a separate backdrop; ordinary and mobile artwork keep normal fitting', () => {
+ const r = exports.panoramaLayout({ width: 1920, height: 738 }, { width: 1900, height: 400 });
+ assert.equal(r.width, 1920); assert.ok(r.left >= 0 && r.top > 0);
+ assert.ok(r.height < 738 && r.height * 1900 / 400 === r.width);
+ assert.equal(exports.panoramaLayout({ width: 390, height: 620 }, { width: 500, height: 750 }), null);
+ assert.equal(exports.panoramaLayout({ width: 1920, height: 738 }, { width: 1920, height: 1080 }), null);
+});

@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -153,9 +154,9 @@ export default function MangaReaderScreen() {
     {!pages.length ? <ScrollView contentContainerStyle={styles.stateContent}>
       {chapterNavigation('inicio')}
       <View style={styles.status}>
-        {(!paused && active) && <ActivityIndicator size="large" color="#E50914" />}
-        <Text style={styles.statusTitle}>{paused ? 'Carga en pausa' : loading ? 'Preparando tu lectura' : 'Seguimos intentando cargar el capítulo'}</Text>
-        <Text style={styles.statusCopy}>{message || 'Buscando las páginas del capítulo…'}</Text>
+        {(!paused && active) && <Loader onDark />}
+        {(!loading || paused || retryAttempt > 0) && <Text style={styles.statusTitle}>{paused ? 'Carga en pausa' : loading ? 'Preparando tu lectura' : 'Seguimos intentando cargar el capítulo'}</Text>}
+        {(!loading || paused || retryAttempt > 0) && <Text style={styles.statusCopy}>{message || 'El origen todavía no entregó las páginas.'}</Text>}
         {retryAttempt > 0 && <Text style={styles.hint}>Reintento {retryAttempt} · los intervalos aumentan hasta 30 segundos</Text>}
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reintentar capítulo" onPress={reload} style={styles.loadMore}><Text style={styles.buttonText}>Reintentar ahora</Text></TouchableOpacity>
         {!paused && <TouchableOpacity accessibilityRole="button" onPress={() => setPaused(true)} style={styles.pauseButton}><Text style={styles.hint}>Pausar reintentos</Text></TouchableOpacity>}

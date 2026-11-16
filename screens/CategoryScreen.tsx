@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -196,7 +197,7 @@ export default function CategoryScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <Loader />
       </View>
     );
   }

@@ -6,6 +6,7 @@ import { useProfileScreenLogic } from '../hooks/useProfileScreenLogic';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAppUpdate } from '../contexts/AppUpdateContext';
+import LoadingScreen from '../components/LoadingScreen';
 import { auth } from '../services/firebase';
 
 type Section = 'account' | 'preferences' | 'security';
@@ -41,6 +42,7 @@ export default function ProfileScreen() {
   const providerLabel = providers.includes('google.com') ? 'Google' : password ? 'Correo y contraseña' : 'Cuenta vinculada';
   const back = () => p.navigation.canGoBack() ? p.navigation.goBack() : (p.navigation as any).navigate('Inicio');
   const heading = section === 'account' ? 'Tu cuenta' : section === 'preferences' ? 'A tu manera' : 'Acceso y seguridad';
+  if (!p.currentProfile) return <LoadingScreen />;
   return <SafeAreaView edges={['top']} style={[styles.page, { backgroundColor: colors.background }]}>
     <ScrollView contentContainerStyle={styles.scroll}>
       <View style={[styles.bound, { paddingHorizontal: width < 600 ? 20 : 32 }]}>

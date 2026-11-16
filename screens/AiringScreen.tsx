@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, ScrollView, useWindowDimensions, Platform, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,7 +92,7 @@ export default function AiringScreen() {
       renderItem={({ item }: any) => <DiscoveryCard width={itemWidth} title={item.title} poster={tab === 'local' ? item.poster_url : item.images?.jpg?.large_image_url || item.images?.webp?.large_image_url}
         rating={Number(tab === 'local' ? item.rating : item.score) || undefined} caption={tab === 'local' ? (item.total_episodes ? `${item.total_episodes} ${Number(item.total_episodes) === 1 ? 'episodio' : 'episodios'} · En emisión` : 'En emisión') : item.broadcast?.time ? `${item.broadcast.time} · Japón` : 'Horario por confirmar'}
         onPress={() => tab === 'local' ? setSelectedContent(animeSearchResult(item).content) : openCalendar(item)} />}
-      ListEmptyComponent={<View style={s.empty}>{loading ? <ActivityIndicator color={colors.textMuted} /> : <><Ionicons name={error ? 'cloud-offline-outline' : 'calendar-outline'} size={32} color={colors.textMuted} /><Text style={{ color: colors.textMuted, textAlign: 'center', lineHeight: 22 }}>{error || 'No hay títulos para mostrar en esta selección.'}</Text>{!!error && <TouchableOpacity accessibilityRole="button" onPress={() => setRetry(value => value + 1)} style={[s.retry, { backgroundColor: colors.card }]}><Text style={{ color: colors.text }}>Reintentar</Text></TouchableOpacity>}</>}</View>} />
+      ListEmptyComponent={<View style={s.empty}>{loading ? <Loader /> : <><Ionicons name={error ? 'cloud-offline-outline' : 'calendar-outline'} size={32} color={colors.textMuted} /><Text style={{ color: colors.textMuted, textAlign: 'center', lineHeight: 22 }}>{error || 'No hay títulos para mostrar en esta selección.'}</Text>{!!error && <TouchableOpacity accessibilityRole="button" onPress={() => setRetry(value => value + 1)} style={[s.retry, { backgroundColor: colors.card }]}><Text style={{ color: colors.text }}>Reintentar</Text></TouchableOpacity>}</>}</View>} />
     <MovieModal content={selectedContent} visible={!!selectedContent} onClose={() => setSelectedContent(null)} />
     <Modal visible={!!schedule} transparent animationType="fade" onRequestClose={closeCalendar}>
       <View style={s.backdrop}><View style={[s.schedule, { backgroundColor: colors.card, width: Math.min(600, width - 32) }]}>

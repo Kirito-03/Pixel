@@ -1,3 +1,4 @@
+import Loader from './Loader';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { NewsArticle } from '../services/newsApi';
@@ -88,7 +89,7 @@ export default function AndroidNewsFeed({ items, featured, loading, category, ca
         <Text accessible={false} style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
       </Pressable>}
       ListEmptyComponent={<View style={styles.empty}>
-        {loading ? <><ActivityIndicator color={colors.primary} /><Text style={[styles.emptyCopy, { color: colors.textMuted }]}>Cargando noticias…</Text></> : <>
+        {loading ? <Loader /> : <>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No hay noticias disponibles</Text>
           <Text style={[styles.emptyCopy, { color: colors.textMuted }]}>Prueba otra categoría o vuelve más tarde.</Text>
           {category ? <Pressable accessibilityRole="button" onPress={() => onCategoryChange('')} style={[styles.reset, { backgroundColor: colors.card }]}><Text style={{ color: colors.text }}>Ver todas</Text></Pressable> : null}

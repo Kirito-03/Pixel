@@ -1,3 +1,4 @@
+import { withSpanishSynopses } from '../services/spanishSynopsisService.js';
 import express from 'express';
 import pool from '../db.js';
 import { createLegacyAnimeResolver } from '../services/legacyAnimeMetadata.js';
@@ -90,7 +91,7 @@ router.get('/anime', async (req, res) => {
 
     const listResult = await pool.query(listQuery, [...params, safeLimit, offset]);
     res.json({
-      data: listResult.rows,
+      data: await withSpanishSynopses(pool, listResult.rows),
       pagination: {
         page: safePage,
         limit: safeLimit,
@@ -135,11 +136,11 @@ router.get('/anime/:id', async (req, res) => {
 
     if (!result.rows.length) {
       const legacy = await resolveLegacyAnime(id);
-      if (legacy) return res.json(legacy);
+      if (legacy) return res.json((await withSpanishSynopses(pool, [legacy]))[0]);
       return res.status(404).json({ message: 'Anime no encontrado' });
     }
 
-    res.json(result.rows[0]);
+    res.json((await withSpanishSynopses(pool, [result.rows[0]]))[0]);
   } catch (e) {
     res.status(500).json({ message: 'Error obteniendo anime', error: e.message });
   }
@@ -247,7 +248,7 @@ router.get('/search', async (req, res) => {
 
     const listResult = await pool.query(listQuery, [...params, safeLimit, offset]);
     res.json({
-      data: listResult.rows,
+      data: await withSpanishSynopses(pool, listResult.rows),
       pagination: { page: safePage, limit: safeLimit, total, totalPages },
     });
   } catch (e) {

@@ -1,3 +1,6 @@
+import { useTheme } from '../contexts/ThemeContext';
+import { detailPalette } from '../utils/detailPalette';
+import Loader from '../components/Loader';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +19,8 @@ function summarize(title?: string | null, excerpt?: string | null, content?: str
 }
 
 export default function NewsDetailScreen() {
+  const { colors } = useTheme();
+  const styles = detailPalette(baseStyles, colors, { background: ['container'], text: ['sectionTitle', 'backText', 'emptyTitle'], secondary: ['contentText'], surface: ['backBtn'] });
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { navigateByLabel } = useTabNavigation();
@@ -79,7 +84,7 @@ export default function NewsDetailScreen() {
 
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#E50914" />
+            <Loader />
           </View>
         ) : !item ? (
           <View style={styles.empty}>
@@ -154,7 +159,7 @@ export default function NewsDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A0A' },
   scroll: { paddingTop: 80, paddingBottom: 40 },
   topBar: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 },

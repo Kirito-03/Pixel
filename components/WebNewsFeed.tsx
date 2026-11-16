@@ -1,3 +1,4 @@
+import Loader from './Loader';
 import React from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +33,7 @@ export default function WebNewsFeed({ items, featured, loading, loadingMore, err
           <Text style={{ color: c === category ? colors.text : colors.textMuted, fontWeight: c === category ? '700' : '500', fontSize: 14 }}>{c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Todo'}</Text>
         </TouchableOpacity>)}
       </ScrollView>
-      {loading ? <ActivityIndicator style={{ padding: 70 }} color={colors.textMuted} /> : <>
+      {loading ? <View style={{ padding: 50 }}><Loader /></View> : <>
         {hero && <TouchableOpacity accessibilityRole="link" onPress={() => onOpen(hero)} style={[s.hero, small && { flexDirection: 'column' }]}>
           {image(hero, small ? { width: '100%', height: 200 } : { width: '56%', height: 310 })}
           <View style={[s.heroCopy, small ? { padding: 20 } : { padding: 32 }, { backgroundColor: colors.card }]}>

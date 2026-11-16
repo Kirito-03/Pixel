@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { nsfwApi, NSFWAnime } from '../services/nsfwApi';
 import { useProfile } from '../contexts/ProfileContext';
 import MyListButton from './MyListButton';
+import Loader from './Loader';
 import { useTheme } from '../contexts/ThemeContext';
 import { getFirstEpisode, sortEpisodesAscending } from '../utils/episodeNavigation';
 
@@ -33,7 +34,7 @@ export default function HentaiSeriesModal({
   anime,
   onPlayEpisode,
 }: HentaiSeriesModalProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const { adultContentEnabled, currentProfile } = useProfile();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -114,7 +115,7 @@ export default function HentaiSeriesModal({
       onRequestClose={onClose}
     >
       <View style={[styles.fullscreenOverlay, { backgroundColor: colors.background }]}>
-        <StatusBar style="light" translucent />
+        <StatusBar style={theme === 'light' ? 'dark' : 'light'} translucent />
 
         <TouchableOpacity
           accessibilityRole="button"
@@ -136,7 +137,7 @@ export default function HentaiSeriesModal({
         </TouchableOpacity>
 
         <ScrollView
-          style={styles.scrollContent}
+          style={[styles.scrollContent, { backgroundColor: colors.background }]}
           contentContainerStyle={[
             styles.scrollInner,
             {
@@ -209,14 +210,14 @@ export default function HentaiSeriesModal({
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel={`Reproducir episodio ${firstEpisode.number}`}
-                      style={[styles.playHeroBtn, isWeb && ({ cursor: 'pointer' } as any)]}
+                      style={[styles.playHeroBtn, { backgroundColor: colors.text }, isWeb && ({ cursor: 'pointer' } as any)]}
                       activeOpacity={0.85}
                       onPress={() => {
                         onPlayEpisode(displayData.slug, firstEpisode.number, episodes);
                       }}
                     >
-                      <Ionicons name="play" size={18} color="#000" />
-                      <Text style={styles.playHeroBtnText}>
+                      <Ionicons name="play" size={18} color={colors.background} />
+                      <Text style={[styles.playHeroBtnText, { color: colors.background }]}>
                         Reproducir Ep. {firstEpisode.number}
                       </Text>
                     </TouchableOpacity>
@@ -226,12 +227,7 @@ export default function HentaiSeriesModal({
 
                 <Text style={[styles.synopsisHeader, { color: colors.text }]}>Sinopsis</Text>
                 {loading ? (
-                  <View style={styles.inlineLoadingRow}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={[styles.inlineLoadingText, { color: colors.textMuted }]}>
-                      Cargando sinopsis...
-                    </Text>
-                  </View>
+                  <Loader />
                 ) : (
                   <Text style={[styles.synopsis, { color: colors.textSecondary }]}>
                     {displayData.synopsis ? displayData.synopsis : 'No hay sinopsis disponible.'}
@@ -277,12 +273,7 @@ export default function HentaiSeriesModal({
               </View>
 
               {loading ? (
-                <View style={styles.episodesLoading}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={[styles.episodesLoadingText, { color: colors.textMuted }]}>
-                    Cargando episodios...
-                  </Text>
-                </View>
+                <View style={styles.episodesLoading}><Loader /></View>
               ) : episodes.length > 0 ? (
                 episodes.map((ep) => (
                   <TouchableOpacity

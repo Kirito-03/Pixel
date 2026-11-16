@@ -1,3 +1,4 @@
+import { briefSynopsis } from '../utils/briefSynopsis';
 import MovieRow from './MovieRow';
 import TrailerPreview from './TrailerPreview';
   import React, { useState, useEffect, useRef } from 'react';
@@ -39,7 +40,9 @@ import { canReachUrl } from '../services/connectivity';
 import { offlineDownloads } from '../services/offlineDownloads';
 import { getResumeTarget } from '../services/resumeTarget';
 import { seriesPlaybackTarget } from '../services/seriesPlaybackTarget';
-import { styles, heroStyles, continueStyles, infoStyles, epStyles, simStyles } from './AnimeSeriesModalStyles';
+import { animeModalPalette } from './AnimeSeriesModalStyles';
+import { useTheme } from '../contexts/ThemeContext';
+import Loader from './Loader';
 import AnimeArtwork from './AnimeArtwork';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -60,6 +63,8 @@ export default function AnimeSeriesModal({
   playback,
   onClosePlayback,
 }: AnimeSeriesModalProps) {
+  const { colors, theme } = useTheme();
+  const { styles, heroStyles, continueStyles, infoStyles, epStyles, simStyles } = React.useMemo(() => animeModalPalette(colors), [colors]);
   const visible = modalVisible && !playback;
   const [currentContent, setCurrentContent] = useState<ContentItem | null>(null);
   const detailScrollRef = useRef<ScrollView>(null);
@@ -268,6 +273,7 @@ export default function AnimeSeriesModal({
           },
           trailer: anime.trailer_id ? { id: anime.trailer_id, site: anime.trailer_site || 'youtube' } : undefined,
           description: anime.description || '',
+          translation_status: anime.translation_status,
           coverImage: {
             large: anime.poster_url || '',
             medium: anime.poster_url || '',
@@ -838,6 +844,10 @@ export default function AnimeSeriesModal({
   };
 
   // Función para limpiar HTML de las descripciones
+  const [expandedSynopsis, setExpandedSynopsis] = useState(false);
+  useEffect(() => setExpandedSynopsis(false), [currentContent?.id]);
+  const fullSynopsis = String((detailData as any)?.description || currentContent?.overview || '');
+
   const cleanDescription = (description: string): string => {
     if (!description) return '';
 
@@ -881,8 +891,8 @@ export default function AnimeSeriesModal({
       navigationBarTranslucent
       onRequestClose={playback ? onClosePlayback : handleClose}
     >
-      {playback ? <View style={{ flex: 1, backgroundColor: '#000' }}>{playback}</View> : <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center' }]}>
-        <StatusBar style="light" translucent />
+      {playback ? <View style={{ flex: 1, backgroundColor: '#000' }}>{playback}</View> : <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+        <StatusBar style={theme === 'light' ? 'dark' : 'light'} translucent />
 
         <Animated.View style={[styles.content, { opacity: contentFadeAnim, maxWidth: undefined, maxHeight: '100%', borderRadius: 0, overflow: 'hidden' }]}>
           {/* Botón cerrar estilo Pixel */}
@@ -925,6 +935,7 @@ export default function AnimeSeriesModal({
               ) : (
                 <>
                   <AnimeArtwork
+                    backgroundColor={colors.background}
                     banner={currentContent?.type === 'anime'
                       ? (detailData as any)?.bannerImage || currentContent?.backdrop_path || undefined
                       : currentContent?.backdrop_path ? getImageUrl(currentContent.backdrop_path, 'original') : undefined}
@@ -935,7 +946,7 @@ export default function AnimeSeriesModal({
                   />
                   {/* Gradiente multi-stop — más agresivo en la mitad inferior para legibilidad */}
                   <LinearGradient
-                    colors={[
+                    colors={theme === 'light' ? ['rgba(255,255,255,0)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.97)', '#fff', '#fff'] : [
                       'rgba(0,0,0,0.0)',
                       'rgba(0,0,0,0.10)',
                       'rgba(0,0,0,0.32)',
@@ -1001,18 +1012,14 @@ export default function AnimeSeriesModal({
                   {/* Descripción */}
                   <Animated.View style={{ transform: [{ translateY: descSlideAnim }] }}>
                     {currentContent?.type === 'anime' && (loading || !detailData) ? (
-                      <View style={styles.skeletonContainer}>
-                        <View style={styles.skeletonLine} />
-                        <View style={styles.skeletonLine} />
-                        <View style={[styles.skeletonLine, { width: '60%' }]} />
-                      </View>
+                      <Loader />
                     ) : (
-                      <Text style={heroStyles.overview} numberOfLines={3}>
-                        {cleanDescription(
+                      <Text style={heroStyles.overview} numberOfLines={2}>
+                        {briefSynopsis(cleanDescription(
                           currentContent?.type === 'anime' && detailData && 'description' in detailData
                             ? (detailData as any).description || currentContent?.overview || ''
                             : currentContent?.overview || ''
-                        )}
+                        ))}
                       </Text>
                     )}
                   </Animated.View>
@@ -1021,7 +1028,7 @@ export default function AnimeSeriesModal({
                   {currentContent?.type === 'anime' && (isRealAnime() || isAnimeMovie()) && (
                     <View style={[heroStyles.actionRow, androidCompact && { flexWrap: 'nowrap', width: '100%', gap: 8 }]}>
                       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reproducir anime" disabled={loadingStreaming || !streamingInfo?.seasons?.some(s => s.episodes.length > 0)} style={[heroStyles.btnPlay, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, (!streamingInfo?.seasons?.some(s => s.episodes.length > 0)) && { opacity: 0.45 }]} onPress={handleWatchNow}>
-                        <Ionicons name="play" size={18} color="#000" />
+                        <Ionicons name="play" size={18} color={colors.background} />
                         <Text numberOfLines={1} style={[heroStyles.btnPlayText, androidCompact && { fontSize: 13, flexShrink: 1 }]}>{androidCompact ? 'Ver ahora' : 'Reproducir'}</Text>
                       </TouchableOpacity>
 
@@ -1032,8 +1039,8 @@ export default function AnimeSeriesModal({
                         accessibilityState={{ busy: isTogglingMyList, disabled: isTogglingMyList }} disabled={isTogglingMyList}
                       >
                         {isTogglingMyList
-                          ? <ActivityIndicator size="small" color="#fff" />
-                          : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color="#fff" />}
+                          ? <ActivityIndicator size="small" color={colors.text} />
+                          : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color={colors.text} />}
                         <Text numberOfLines={1} style={[heroStyles.btnSecondaryText, androidCompact && { flexShrink: 1, fontSize: 13 }]}>
                           {isTogglingMyList ? 'Guardando…' : currentInMyList ? 'En mi lista' : 'Mi lista'}
                         </Text>
@@ -1041,7 +1048,7 @@ export default function AnimeSeriesModal({
 
                       {trailerKey && (
                         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tráiler" style={[heroStyles.btnIcon, androidCompact && { width: 48, minHeight: 48, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={handlePlayTrailer}>
-                          <Ionicons name="play-circle-outline" size={22} color="#fff" />
+                          <Ionicons name="play-circle-outline" size={22} color={colors.text} />
                           {!androidCompact && <Text style={heroStyles.btnIconText}>Trailer</Text>}
                         </TouchableOpacity>
                       )}
@@ -1160,6 +1167,14 @@ export default function AnimeSeriesModal({
               )}
             </View>
 
+              {fullSynopsis ? <View style={{ paddingHorizontal: 24, paddingBottom: 20, gap: 10 }}>
+                {(detailData as any)?.translation_status === 'pending' ? <Text style={{ color: colors.textMuted, fontSize: 12 }}>Sinopsis original · traducción al español pendiente</Text> : null}
+                <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: expandedSynopsis }} onPress={() => setExpandedSynopsis(value => !value)} style={{ alignSelf: 'flex-start', paddingVertical: 8 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{expandedSynopsis ? 'Ocultar sinopsis' : 'Leer sinopsis completa'}</Text>
+                </TouchableOpacity>
+                {expandedSynopsis ? <Text style={{ color: colors.textSecondary, lineHeight: 23, fontSize: 14 }}>{cleanDescription(fullSynopsis)}</Text> : null}
+              </View> : null}
+
               {/* Streaming Episodes for Anime - mostrar si hay datos del M3U */}
               {currentContent?.type === 'anime' && (loadingStreaming || (streamingInfo && Array.isArray(streamingInfo.seasons) && streamingInfo.seasons.length > 0)) && (
                 <View style={styles.streamingSection}>
@@ -1179,8 +1194,7 @@ export default function AnimeSeriesModal({
 
                   {loadingStreaming ? (
                     <View style={styles.streamingLoading}>
-                      <ActivityIndicator size="small" color="#E50914" />
-                      <Text style={styles.streamingLoadingText}>Cargando episodios...</Text>
+                      <Loader />
                     </View>
                   ) : streamingInfo && streamingInfo.seasons.length > 0 ? (
                     <View style={styles.seasonsContainer}>
@@ -1193,7 +1207,7 @@ export default function AnimeSeriesModal({
                             <Text style={styles.seasonPickerButtonText}>
                               {selectedSeason?.title || streamingInfo.seasons[0].title}
                             </Text>
-                            <Ionicons name={showSeasonPicker ? 'chevron-up' : 'chevron-down'} size={16} color="#FFFFFF" />
+                            <Ionicons name={showSeasonPicker ? 'chevron-up' : 'chevron-down'} size={16} color={colors.text} />
                           </TouchableOpacity>
                           {/* Lista movida a Modal para evitar problemas de transparencia y z-index */}
                         </View>

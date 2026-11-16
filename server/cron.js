@@ -1,3 +1,4 @@
+import { runSpanishSynopsisBatch } from './services/spanishSynopsisService.js';
 import cron from 'node-cron';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -55,6 +56,8 @@ async function runDriveIngestBatch() {
 }
 
 export function startBotSchedulers() {
+  cron.schedule('*/10 * * * *', () => runSpanishSynopsisBatch(pool).catch(error => console.warn('[SynopsisES]', error.message)));
+  setTimeout(() => runSpanishSynopsisBatch(pool).catch(error => console.warn('[SynopsisES]', error.message)), 60000);
   console.log('[Cron] Inicializando tareas automáticas del Bot...');
 
   // Tarea 1: Buscar episodios nuevos de animes existentes en emisión (Cada 4 horas)

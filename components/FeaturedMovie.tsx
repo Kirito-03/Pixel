@@ -1,3 +1,4 @@
+import { briefSynopsis } from '../utils/briefSynopsis';
 import React, { useState } from 'react';
 import { View, Image, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -85,17 +86,10 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     : getImageUrl(movie.poster_path || movie.backdrop_path, 'original');
   const bannerUri = isSmallScreen ? undefined : isAnime ? (movie as AnimeDetail).bannerImage || undefined : getImageUrl(movie.backdrop_path, 'original');
 
-  const heroTopColors = theme === 'dark' 
-    ? ['rgba(0,0,0,0.5)', 'transparent'] 
-    : ['rgba(255,255,255,0.8)', 'transparent'];
-    
-  const heroBottomColors = theme === 'dark'
-    ? ['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.6)', '#000']
-    : ['transparent', 'rgba(255,255,255,0.1)', 'rgba(255,255,255,0.8)', '#FFF'];
-    
-  const heroLeftColors = theme === 'dark'
-    ? ['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.3)', 'transparent']
-    : ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.5)', 'transparent'];
+  // Keep the image cinematic in both themes; only the very bottom joins the page surface.
+  const heroTopColors = ['rgba(0,0,0,0.48)', 'transparent'];
+  const heroBottomColors = ['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.64)', colors.background];
+  const heroLeftColors = ['rgba(0,0,0,0.72)', 'rgba(0,0,0,0.25)', 'transparent'];
 
   const headerOffset = isSmallScreen ? 0 : (isWeb ? 72 : 64);
   const heroHeight = isSmallScreen
@@ -104,7 +98,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
 
   return (
     <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: heroHeight }]}>
-      <AnimeArtwork alignTop banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "50% 0%"} />
+      <AnimeArtwork cover preservePanorama alignTop banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "50% 0%"} />
 
       {/* Top vignette para navbar */}
       <LinearGradient
@@ -116,7 +110,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
       {/* Bottom gradient — cinematográfico */}
       <LinearGradient
         colors={heroBottomColors as any}
-        locations={[0, 0.3, 0.7, 1]}
+        locations={[0, 0.4, 0.94, 1]}
         style={[StyleSheet.absoluteFillObject, { top: 0 }]}
         pointerEvents="none"
       />
@@ -153,8 +147,8 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         <Text
           style={[
             isSmallScreen ? styles.titleMobile : styles.title,
-            { color: colors.text },
-            isWeb ? { textShadow: theme === 'dark' ? '0px 4px 20px rgba(0,0,0,0.8)' : '0px 4px 20px rgba(255,255,255,0.8)' } as any : null,
+            { color: '#fff' },
+            isWeb ? { textShadow: '0px 4px 20px rgba(0,0,0,0.65)' } as any : null,
           ]}
           numberOfLines={2}
         >
@@ -165,14 +159,14 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         <View style={styles.metaRow}>
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={13} color="#E50914" />
-            <Text style={[styles.ratingText, { color: colors.text }]}>{voteAverage}</Text>
+            <Text style={[styles.ratingText, { color: '#fff' }]}>{voteAverage}</Text>
           </View>
-          <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
-          <Text style={[styles.metaText, { color: colors.text }]}>{releaseYear}</Text>
+          <Text style={[styles.metaDot, { color: 'rgba(255,255,255,0.65)' }]}>•</Text>
+          <Text style={[styles.metaText, { color: '#fff' }]}>{releaseYear}</Text>
           {!isAnime && (movie as MovieDetail).runtime && (
             <>
-              <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
-              <Text style={[styles.metaText, { color: colors.text }]}>{(movie as MovieDetail).runtime} min</Text>
+              <Text style={[styles.metaDot, { color: 'rgba(255,255,255,0.65)' }]}>•</Text>
+              <Text style={[styles.metaText, { color: '#fff' }]}>{(movie as MovieDetail).runtime} min</Text>
             </>
           )}
         </View>
@@ -181,16 +175,16 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
         {genres.length > 0 && (
           <View style={styles.genreRow}>
             {genres.slice(0, 4).map((genre, idx) => (
-              <View key={idx} style={[styles.genrePill, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}>
-                <Text style={[styles.genrePillText, { color: colors.text }]}>{genre}</Text>
+              <View key={idx} style={[styles.genrePill, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                <Text style={[styles.genrePillText, { color: '#fff' }]}>{genre}</Text>
               </View>
             ))}
           </View>
         )}
 
         {/* Descripción corta */}
-        <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={3}>
-          {description || 'Sin descripción disponible.'}
+        <Text style={[styles.description, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={2}>
+          {briefSynopsis(description) || 'Sin descripción disponible.'}
         </Text>
 
         {/* Botones */}
@@ -200,7 +194,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
               styles.playButton,
               androidCompact && { flexBasis: 0, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
               !isSmallScreen && { flex: 0, flexBasis: 'auto', flexShrink: 0, paddingHorizontal: 24, minWidth: 170 },
-              { backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000' },
+              { backgroundColor: '#FFFFFF' },
               isWeb && playHover && {
                 backgroundColor: theme === 'dark' ? '#E50914' : '#E50914',
                 transform: [{ scale: 1.04 }],
@@ -213,13 +207,13 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
               onMouseLeave: () => setPlayHover(false),
             } : {})}
           >
-            <Ionicons name="play" size={18} color={isWeb && playHover ? '#fff' : (theme === 'dark' ? '#000' : '#fff')} />
+            <Ionicons name="play" size={18} color={isWeb && playHover ? '#fff' : ('#000')} />
             <Text 
               numberOfLines={1}
               style={[
               styles.playButtonText,
               androidCompact && { flexShrink: 1, fontSize: 12, letterSpacing: 0 },
-              { color: theme === 'dark' ? '#000' : '#fff' },
+              { color: '#000' },
               isWeb && playHover && { color: '#fff' },
             ]}>
               Reproducir
@@ -231,10 +225,10 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
               styles.infoButton,
               androidCompact && { flexBasis: 0, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
               !isSmallScreen && { flex: 0, flexBasis: 'auto', flexShrink: 0, paddingHorizontal: 24, minWidth: 210 },
-              { borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)' },
+              { borderColor: 'rgba(255,255,255,0.7)' },
               isWeb && infoHover && {
                 backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
-                borderColor: theme === 'dark' ? '#fff' : '#000',
+                borderColor: '#fff',
                 transform: [{ scale: 1.04 }],
               } as any,
             ]}
@@ -245,8 +239,8 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
               onMouseLeave: () => setInfoHover(false),
             } : {})}
           >
-            <Ionicons name="information-circle-outline" size={18} color={theme === 'dark' ? '#fff' : '#000'} />
-            <Text numberOfLines={1} style={[styles.infoButtonText, androidCompact && { flexShrink: 1, fontSize: 12, letterSpacing: 0 }, { color: theme === 'dark' ? '#fff' : '#000' }]}>
+            <Ionicons name="information-circle-outline" size={18} color={'#fff'} />
+            <Text numberOfLines={1} style={[styles.infoButtonText, androidCompact && { flexShrink: 1, fontSize: 12, letterSpacing: 0 }, { color: '#fff' }]}>
               {androidCompact ? 'Más info' : 'Más información'}
             </Text>
           </TouchableOpacity>

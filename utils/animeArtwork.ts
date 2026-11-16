@@ -1,4 +1,4 @@
-export function artworkLayout(frame: { width: number; height: number }, image: { width: number; height: number }, position?: string) {
+export function artworkLayout(frame: { width: number; height: number }, image: { width: number; height: number }, position?: string, cover = false) {
   if (frame.width <= 0 || frame.height <= 0 || image.width <= 0 || image.height <= 0) return null;
   const portrait = image.width / image.height < 1.15;
   if (portrait && frame.width >= 768) {
@@ -9,11 +9,19 @@ export function artworkLayout(frame: { width: number; height: number }, image: {
     return { width, height, left: frame.width - width - Math.max(24, (frame.width - 1120) / 2), top: (frame.height - height) / 2 };
   }
   const requestedScale = Math.max(frame.width / image.width, frame.height / image.height);
-  const scale = Math.min(requestedScale, portrait ? 1.5 : 1.35);
+  const scale = cover ? requestedScale : Math.min(requestedScale, portrait ? 1.5 : 1.35);
   const width = image.width * scale;
   const height = image.height * scale;
   const focal = position?.match(/^(\d{1,3})%\s+(\d{1,3})%$/);
   const x = focal ? Math.min(100, Number(focal[1])) / 100 : 0.5;
   const y = focal ? Math.min(100, Number(focal[2])) / 100 : portrait ? 0 : 0.35;
   return { width, height, left: (frame.width - width) * x, top: (frame.height - height) * (height < frame.height ? 0.5 : y) };
+}
+
+// Extremely wide artwork cannot fill a tall hero without losing most characters.
+export function panoramaLayout(frame: { width: number; height: number }, image: { width: number; height: number }) {
+  if (frame.width < 768 || frame.height <= 0 || image.height <= 0 || image.width / image.height <= (frame.width / frame.height) * 1.35) return null;
+  const scale = Math.min(frame.width / image.width, frame.height / image.height, 1.35);
+  const width = image.width * scale, height = image.height * scale;
+  return { width, height, left: (frame.width - width) / 2, top: (frame.height - height) / 2 };
 }

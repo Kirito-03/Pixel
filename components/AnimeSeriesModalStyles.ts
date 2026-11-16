@@ -918,3 +918,29 @@ export const simStyles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 });
+
+// Detail surfaces use the selected theme; playback and image controls keep their own contrast.
+export function animeModalPalette(colors: typeof import('../theme').darkColors) {
+  const patch = <T extends Record<string, any>>(base: T, changes: Record<string, object>): T => Object.fromEntries(Object.entries(base).map(([key, value]) => [key, { ...value, ...(changes[key] || {}) }])) as T;
+  const text = { color: colors.text }, secondary = { color: colors.textSecondary }, muted = { color: colors.textMuted }, card = { backgroundColor: colors.card }, background = { backgroundColor: colors.background };
+  return {
+    styles: patch(styles, {
+      container: background, content: background, skeletonLine: card, detailsSection: card, relatedSection: background,
+      detailLabel: muted, detailValue: text, relatedTitle: text, noRelatedText: muted, streamingTitle: text, streamingSubtitle: secondary,
+      streamingLoadingText: secondary, seasonPickerButton: card, seasonPickerButtonText: text, seasonPickerList: card,
+      seasonModalContent: card, seasonModalHeaderText: text, seasonPickerItemText: text, streamingSeasonTitle: text,
+      seasonEpisodeCount: muted, episodeCard: card, episodeTitle: text, episodeDescription: secondary, noEpisodesText: secondary, noEpisodesSubtext: muted,
+      compactInfoLabel: muted, compactInfoValue: text,
+    }),
+    heroStyles: patch(heroStyles, {
+      heroSection: background, title: { ...text, textShadowRadius: 0 }, overview: secondary, metaText: secondary, dot: muted,
+      statusPill: card, statusPillText: text, genreChip: card, genreChipText: secondary,
+      btnPlay: { backgroundColor: colors.text }, btnPlayText: { color: colors.background },
+      btnSecondary: card, btnSecondaryText: text, btnIcon: card, btnIconText: text,
+    }),
+    continueStyles: patch(continueStyles, { card, epTitle: text, duration: muted, label: secondary }),
+    infoStyles: patch(infoStyles, { section: card, cell: { backgroundColor: colors.surfaceElevated, borderColor: colors.divider }, cellLabel: muted, cellValue: text, statusPill: { backgroundColor: colors.surfaceElevated }, statusPillText: text, genreChip: { backgroundColor: colors.surfaceElevated }, genreChipText: secondary }),
+    epStyles: patch(epStyles, { card: { ...card, borderColor: colors.divider }, thumb: { backgroundColor: colors.cardLight }, title: text, num: muted, desc: secondary }),
+    simStyles: patch(simStyles, { section: background, title: text, card, emptyText: muted }),
+  };
+}

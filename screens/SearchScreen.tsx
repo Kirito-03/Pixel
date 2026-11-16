@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import { readingFormat } from '../utils/readingFormat';
 import React, { useRef, useState, useEffect } from 'react';
 import { View, TextInput, FlatList, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Platform, SafeAreaView, useWindowDimensions, BackHandler, ScrollView } from 'react-native';
@@ -211,7 +212,7 @@ export default function SearchScreen() {
           <TextInput style={[styles.input, { color: colors.text, fontSize: native ? 17 : 22 }, inputPlatformStyles as any]}
             placeholder="Título, personaje o una nueva historia…" accessibilityLabel="Buscar anime y manga" placeholderTextColor={colors.textMuted}
             value={query} onChangeText={handleSearch} onSubmitEditing={({ nativeEvent }) => recordRecentSearch(nativeEvent.text)} onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)} autoFocus={!native} returnKeyType="search" />
-          {loading ? <ActivityIndicator size="small" color={colors.textMuted} /> : query.length > 0 && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar búsqueda" onPress={clearSearch} style={{ padding: 8 }}><Ionicons name="close-circle" size={20} color={colors.textMuted} /></TouchableOpacity>}
+          {!loading && query.length > 0 && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpiar búsqueda" onPress={clearSearch} style={{ padding: 8 }}><Ionicons name="close-circle" size={20} color={colors.textMuted} /></TouchableOpacity>}
         </View>
 
       </View>
@@ -240,7 +241,7 @@ export default function SearchScreen() {
           </>}
         </>}
         keyExtractor={item => item.key} renderItem={({ item }) => <DiscoveryCard width={cardWidth} title={item.title} poster={item.poster} type={item.kind === 'manga' ? readingFormat(item.manga) : 'Anime'} caption={item.kind === 'manga' ? `${readingFormat(item.manga)} · Leer capítulos` : 'Anime · Ver detalles'} onPress={() => handleResultPress(item)} />}
-        columnWrapperStyle={{ gap }} ListEmptyComponent={(query.trim().length >= 2 || selectedGenre) && !loading && !searchError ? <View style={styles.empty}><Ionicons name="search-outline" size={36} color={colors.textMuted} /><Text style={{ color: colors.textMuted }}>No encontramos títulos con esta selección.</Text></View> : null} />
+        columnWrapperStyle={{ gap }} ListEmptyComponent={loading ? <Loader /> : (query.trim().length >= 2 || selectedGenre) && !loading && !searchError ? <View style={styles.empty}><Ionicons name="search-outline" size={36} color={colors.textMuted} /><Text style={{ color: colors.textMuted }}>No encontramos títulos con esta selección.</Text></View> : null} />
       <MovieModal content={selectedContent} visible={modalVisible} onClose={() => setModalVisible(false)} />
     </View>
   );

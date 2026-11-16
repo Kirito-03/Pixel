@@ -12,6 +12,12 @@ export interface CreateProfilePayload {
 }
 
 export const profileService = {
+  async getProfile(profileId: number, expectedUid: string) {
+    if (!expectedUid || auth.currentUser?.uid !== expectedUid || !Number.isSafeInteger(profileId) || profileId <= 0) return null;
+    const snap = await getDoc(doc(db, `profiles/${expectedUid}/profiles/${profileId}`));
+    if (auth.currentUser?.uid !== expectedUid || !snap.exists()) return null;
+    return { ...snap.data(), id: profileId } as import('../../contexts/ProfileContext').Profile;
+  },
   async getProfiles(_userId: number) {
     const uid = auth.currentUser?.uid;
     if (!uid) return [];

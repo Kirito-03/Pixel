@@ -10,6 +10,10 @@ export interface CatalogAnime {
   title_english?: string | null;
   title_japanese?: string | null;
   description?: string | null;
+  description_original?: string | null;
+  description_es?: string | null;
+  description_language?: 'es' | 'en' | null;
+  translation_status?: 'ready' | 'pending';
   trailer_id?: string | null;
   trailer_site?: string | null;
   trailer_checked_at?: string | null;

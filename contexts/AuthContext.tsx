@@ -1,102 +1,61 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Storage } from '../services/storage';
 import { subscribeAuth, logout as firebaseLogout } from '../services/auth';
 
-interface User {
-  uid: string;
-  email: string | null;
-  role: 'user' | 'admin';
-}
-
+interface User { uid: string; email: string | null; role: 'user' | 'admin'; }
 interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  login: (user: User) => Promise<void>;
-  logout: () => Promise<void>;
-  loadSession: () => Promise<void>;
+  user: User | null; isLoading: boolean; profileSession: number;
+  login: (user: User) => Promise<void>; logout: () => Promise<void>; loadSession: () => Promise<void>;
 }
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  const loadSession = async () => {
+  const [profileSession, setProfileSession] = useState(0);
+  const subscription = useRef<(() => void) | undefined>(undefined);
+  const generation = useRef(0);
+  const observedUid = useRef<string | null | undefined>(undefined);
+  const loadSession = useCallback(async () => {
+    const request = ++generation.current;
+    subscription.current?.(); setIsLoading(true);
     try {
-      console.log('AuthContext: Loading session...');
-      const stored = Storage.getObject<User>('userSession');
-      if (stored) {
-        setUser(stored);
-      }
-      subscribeAuth(async (firebaseUser) => {
+      await Storage.ready();
+      if (request !== generation.current) return;
+      subscription.current = subscribeAuth(firebaseUser => {
+        if (request !== generation.current) return;
         if (firebaseUser) {
-          // Preserve existing role if login() was already called (avoids overwriting admin role)
-          const existingSession = Storage.getObject<User>('userSession');
-          const existingRole = (existingSession && existingSession.uid === firebaseUser.uid)
-            ? existingSession.role
-            : 'user';
-          const u: User = { uid: firebaseUser.uid, email: firebaseUser.email, role: existingRole };
-          setUser(u);
-          Storage.setObject('userSession', u);
+          // A restored first notification may resume a verified profile. A new sign-in must choose one.
+          if (observedUid.current !== undefined && observedUid.current !== firebaseUser.uid) {
+            Storage.delete('currentProfile'); Storage.delete(`pixel.selectedProfile:${firebaseUser.uid}`);
+            setProfileSession(value => value + 1);
+          }
+          observedUid.current = firebaseUser.uid;
+          const existing = Storage.getObject<User>('userSession');
+          const verified: User = { uid: firebaseUser.uid, email: firebaseUser.email, role: existing?.uid === firebaseUser.uid ? existing.role : 'user' };
+          Storage.setObject('userSession', verified); setUser(verified);
         } else {
-          setUser(null);
-          Storage.delete('userSession');
-          Storage.delete('currentProfile');
+          if (observedUid.current) Storage.delete(`pixel.selectedProfile:${observedUid.current}`);
+          observedUid.current = null;
+          setUser(null); Storage.delete('userSession'); Storage.delete('currentProfile');
         }
+        // Firebase's first notification, rather than subscription registration, finishes boot.
+        setIsLoading(false);
       });
-    } catch (error) {
-      console.error('Error loading session:', error);
-    } finally {
-      setIsLoading(false);
+    } catch {
+      if (request === generation.current) { setUser(null); setIsLoading(false); }
     }
-  };
-
-  const login = async (userData: User) => {
-    setUser(userData);
-    Storage.setObject('userSession', userData);
-  };
-
-  const logout = async () => {
-    console.log('AuthContext: Logging out user');
-    try {
-      await firebaseLogout();
-    } catch (e) { }
-    setUser(null);
-    Storage.delete('userSession');
-    // También limpiar el perfil actual y token de admin
-    Storage.delete('currentProfile');
-    Storage.delete('admin_token');
-    console.log('AuthContext: Session cleared from Storage');
-  };
-
-  useEffect(() => {
-    loadSession();
   }, []);
-
-  const value: AuthContextType = {
-    user,
-    isLoading,
-    login,
-    logout,
-    loadSession,
+  const login = async (data: User) => {
+    Storage.setObject('userSession', data); setUser(data);
   };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const logout = async () => {
+    await firebaseLogout();
+    if (user) Storage.delete(`pixel.selectedProfile:${user.uid}`);
+    Storage.delete('userSession'); Storage.delete('currentProfile'); Storage.delete('admin_token'); setUser(null);
+  };
+  useEffect(() => { void loadSession(); return () => { generation.current++; subscription.current?.(); }; }, [loadSession]);
+  return <AuthContext.Provider value={{ user, isLoading, profileSession, login, logout, loadSession }}>{children}</AuthContext.Provider>;
 };
-
 export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const context = useContext(AuthContext); if (!context) throw new Error('useAuth must be used within an AuthProvider'); return context;
 };

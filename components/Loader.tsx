@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
-export default function Loader({ onDark = false, label = 'Preparando tu espacioâ€¦' }: { onDark?: boolean; label?: string }) {
+export default function Loader({ onDark = false, label = 'Cargando', showLabel = false }: { onDark?: boolean; label?: string; showLabel?: boolean }) {
   const { colors } = useTheme();
   const tiles = useRef(Array.from({ length: 9 }, () => new Animated.Value(0.25))).current;
   const [reducedMotion, setReducedMotion] = useState(true);
@@ -29,7 +29,7 @@ export default function Loader({ onDark = false, label = 'Preparando tu espacioâ
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.matrix}>
       {tiles.map((tile, index) => <Animated.View key={index} style={[styles.tile, { backgroundColor: index === 4 ? '#83bdb4' : ink, opacity: tile, transform: [{ scale: tile.interpolate({ inputRange: [0.25, 1], outputRange: [0.82, 1] }) }] }]} />)}
     </View>
-    <Text style={[styles.label, { color: onDark ? '#b7c4c1' : colors.textMuted }]}>{label}</Text>
+    {showLabel && <Text style={[styles.label, { color: onDark ? '#b7c4c1' : colors.textMuted }]}>{label}</Text>}
   </View>;
 }
 const styles = StyleSheet.create({

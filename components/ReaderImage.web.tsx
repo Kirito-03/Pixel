@@ -19,8 +19,8 @@ export default function ReaderImage({ uri, page, active }: { uri: string; page: 
       onLoad={event => { setNaturalWidth(event.currentTarget.naturalWidth || 800); image.onLoad(); }} onError={image.onError}
       style={{ display: 'block', width: '100%', height: 'auto', opacity: image.loaded ? 1 : 0 }} />}
     {!image.loaded && <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 20 }}>
-      <ActivityIndicator color="#E50914" />
-      <Text style={{ color: '#ccc' }}>Página {page} · {image.failed ? image.paused ? 'En pausa' : 'Reintentando la imagen…' : 'Cargando…'}</Text>
+      <ActivityIndicator color="#83bdb4" />
+      <Text style={{ color: '#ccc' }}>Página {page}{image.failed ? image.paused ? ' · En pausa' : ' · Reintentando la imagen…' : ''}</Text>
       {image.failed && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Reintentar página ${page}`} onPress={image.retry} style={{ minHeight: 44, padding: 12, backgroundColor: '#252525' }}><Text style={{ color: '#fff' }}>Reintentar ahora</Text></TouchableOpacity>}
       {image.failed && <TouchableOpacity accessibilityRole="button" onPress={() => image.setPaused(!image.paused)} style={{ minHeight: 44, padding: 12 }}><Text style={{ color: '#aaa' }}>{image.paused ? 'Reanudar' : 'Pausar reintentos'}</Text></TouchableOpacity>}
     </View>}

@@ -12,7 +12,8 @@ router.get('/', async (req, res) => {
     const search = String(req.query?.search || '').trim();
     const order = String(req.query?.order || '').trim();
 
-    const result = await getMangaList(pool, { page, limit, status, search, order });
+    const publicationType = String(req.query?.publicationType || '').trim();
+    const result = await getMangaList(pool, { page, limit, status, search, order, publicationType });
     return res.json(result);
   } catch (e) {
     return res.status(500).json({ message: 'Error obteniendo mangas', error: e.message });

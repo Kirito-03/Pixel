@@ -1,5 +1,8 @@
 import { useReaderImage } from '../hooks/useReaderImage';
 import { mangaChapterKey, rememberMangaReader } from '../utils/mangaChapterNavigation';
+import { useTheme } from '../contexts/ThemeContext';
+import { detailPalette } from '../utils/detailPalette';
+import Loader from '../components/Loader';
 import { readingFormat } from '../utils/readingFormat';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
@@ -26,6 +29,14 @@ function fallbackDescription(title?: string | null) {
 }
 
 export default function MangaDetailScreen() {
+  const { colors, theme } = useTheme();
+  const styles = detailPalette(baseStyles, colors, {
+    text: ['title', 'sectionTitle', 'tagText', 'chapterNumberText', 'chapterCardTitle', 'secondaryText'],
+    secondary: ['metaText', 'excerpt'], muted: ['metaDot', 'availabilityNote', 'noChaptersText', 'chapterDate', 'emptyTitle'],
+    background: ['container'], surface: ['tag', 'secondaryBtn', 'chapterCard', 'chapterNumber', 'posterContainer'], border: ['tag', 'chapterCard', 'secondaryBtn', 'posterContainer'],
+  });
+  styles.primaryBtn = { ...styles.primaryBtn, backgroundColor: colors.text };
+  styles.primaryText = { ...styles.primaryText, color: colors.background };
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { navigateByLabel } = useTabNavigation();
@@ -186,7 +197,7 @@ export default function MangaDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#E50914" />
+            <Loader />
           </View>
         ) : !manga ? (
           <View style={styles.empty}>
@@ -200,15 +211,15 @@ export default function MangaDetailScreen() {
               {manga.cover_url && !imageError ? (
                 <Image
                   source={{ uri: manga.cover_url }}
-                  style={styles.backdropImage}
+                  style={[styles.backdropImage, theme === 'light' && { opacity: 0.25 }]}
                   blurRadius={Platform.OS === 'web' ? 10 : 5}
                   onError={() => setImageError(true)}
                   resizeMode="cover"
                 />
               ) : null}
-              <View style={styles.backdropOverlay} />
+              <View style={[styles.backdropOverlay, theme === 'light' && { backgroundColor: 'rgba(255,255,255,0.35)' }]} />
               <LinearGradient
-                colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)', '#0B0B0B', '#0B0B0B']}
+                colors={theme === 'light' ? ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.85)', colors.background, colors.background] : ['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)', colors.background, colors.background]}
                 locations={[0, 0.4, 0.7, 1]}
                 style={StyleSheet.absoluteFillObject}
               />
@@ -274,7 +285,7 @@ export default function MangaDetailScreen() {
 
                 <Text numberOfLines={descriptionExpanded ? undefined : 4} style={[styles.excerpt, { maxWidth: 720 }]}>{manga.description || fallbackDescription(manga.title)}</Text>
                 {(manga.description || '').length > 200 && <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: descriptionExpanded }} accessibilityLabel={descriptionExpanded ? 'Contraer descripción' : 'Expandir descripción'} onPress={() => setDescriptionExpanded(value => !value)} style={{ alignSelf: 'flex-start', paddingVertical: 12, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ color: '#ddd', fontSize: 13, fontWeight: '600' }}>{descriptionExpanded ? 'Ver menos' : 'Ver más'}</Text><Ionicons name={descriptionExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#ddd" />
+                  <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>{descriptionExpanded ? 'Ver menos' : 'Ver más'}</Text><Ionicons name={descriptionExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
                 </TouchableOpacity>}
 
                 <View style={styles.actions}>
@@ -288,7 +299,7 @@ export default function MangaDetailScreen() {
                     activeOpacity={0.9}
                     disabled={!chapters.length}
                   >
-                    <Ionicons name="play" size={18} color="#000" />
+                    <Ionicons name="play" size={18} color={colors.background} />
                     <Text numberOfLines={2} style={[styles.primaryText, { flexShrink: 1, textAlign: 'center' }]}>{primaryButtonLabel}</Text>
                   </TouchableOpacity>
 
@@ -307,7 +318,7 @@ export default function MangaDetailScreen() {
                       finally { setSavingList(false); }
                     }}
                   >
-                    {savingList ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color="#fff" />}
+                    {savingList ? <ActivityIndicator size="small" color={colors.text} /> : <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color={colors.text} />}
                     <Text numberOfLines={2} style={[styles.secondaryText, { flexShrink: 1, textAlign: 'center' }]}>{savingList ? 'Guardando…' : isInMyList(id, 'manga') ? 'En mi lista' : 'Mi lista'}</Text>
                   </TouchableOpacity>
 
@@ -364,7 +375,7 @@ export default function MangaDetailScreen() {
                           {isLastRead ? ' · Último leído' : ''}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color={isLastRead ? '#E50914' : 'rgba(255,255,255,0.4)'} />
+                      <Ionicons name="chevron-forward" size={18} color={isLastRead ? colors.primary : colors.textMuted} />
                     </TouchableOpacity>
                     );
                   })
@@ -378,7 +389,7 @@ export default function MangaDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0B0B0B' },
   scroll: { flexGrow: 1, paddingBottom: 60 },
   topBar: {

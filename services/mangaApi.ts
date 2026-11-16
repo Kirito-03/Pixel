@@ -73,7 +73,7 @@ export type MangaChapterPages = {
 };
 
 export const mangaApi = {
-  async list(params?: { page?: number; limit?: number; status?: string; search?: string; order?: string }) {
+  async list(params?: { page?: number; limit?: number; status?: string; search?: string; order?: string; publicationType?: string }) {
     const { data } = await backendClient.get('/api/manga', { params });
     return normalizeList(data) as { items: Manga[]; pagination: { page: number; limit: number; total: number }; meta?: any } | any;
   },

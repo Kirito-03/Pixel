@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
-import { artworkLayout } from '../utils/animeArtwork';
+import { Image, Platform, StyleSheet, View } from 'react-native';
+import { artworkLayout, panoramaLayout } from '../utils/animeArtwork';
 
 const dimensions = new Map<string, { width: number; height: number }>();
 
-export default function AnimeArtwork({ banner, poster, position, alignTop = false, topOffset = 0 }: { banner?: string; poster?: string; position?: string; alignTop?: boolean; topOffset?: number }) {
+export default function AnimeArtwork({ banner, poster, position, alignTop = false, topOffset = 0, cover = false, backgroundColor = '#050505', preservePanorama = false }: { banner?: string; poster?: string; position?: string; alignTop?: boolean; topOffset?: number; cover?: boolean; backgroundColor?: string; preservePanorama?: boolean }) {
   const [failedBanner, setFailedBanner] = useState(false);
   const uri = !failedBanner && banner ? banner : poster || '';
   const [frame, setFrame] = useState({ width: 0, height: 0 });
@@ -23,16 +23,18 @@ export default function AnimeArtwork({ banner, poster, position, alignTop = fals
     return () => { active = false; };
   }, [uri, banner]);
   const innerHeight = Math.max(0, frame.height - topOffset);
-  const layout = intrinsic?.uri === uri ? artworkLayout({ width: frame.width, height: innerHeight }, intrinsic, position) : null;
+  const layout = intrinsic?.uri === uri ? artworkLayout({ width: frame.width, height: innerHeight }, intrinsic, position, cover) : null;
+  const panorama = preservePanorama && intrinsic?.uri === uri ? panoramaLayout({ width: frame.width, height: innerHeight }, intrinsic) : null;
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor: '#050505' }]} onLayout={event => setFrame(event.nativeEvent.layout)}>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', backgroundColor }]} onLayout={event => setFrame(event.nativeEvent.layout)}>
       <View style={{ position: 'absolute', top: topOffset, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+        {uri && panorama ? <Image accessible={false} source={{ uri }} resizeMode="cover" blurRadius={24} style={[StyleSheet.absoluteFillObject, { opacity: 0.55 }]} /> : null}
         {uri && layout ? (
           <Image
             source={{ uri }}
             accessible={false}
             resizeMode="stretch"
-            style={[{ position: 'absolute' }, layout, alignTop ? { top: 0 } : null]}
+            style={[{ position: 'absolute' }, panorama || layout, panorama && Platform.OS === 'web' ? ({ maskImage: 'linear-gradient(to bottom, transparent, black 12%, black 82%, transparent)' } as any) : null, !panorama && alignTop && layout.height < innerHeight ? { top: 0 } : null]}
             onError={() => { if (uri === banner) setFailedBanner(true); }}
           />
         ) : null}

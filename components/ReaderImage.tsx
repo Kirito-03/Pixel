@@ -18,8 +18,8 @@ export default function ReaderImage({ uri, page, active }: ReaderImageProps) {
         image.onLoad();
       }} onError={image.onError} />}
     {!image.loaded && <View style={styles.status} pointerEvents="box-none">
-      <ActivityIndicator color="#E50914" />
-      <Text style={styles.text}>Página {page} · {image.failed ? image.paused ? 'En pausa' : 'Reintentando la imagen…' : 'Cargando…'}</Text>
+      <ActivityIndicator color="#83bdb4" />
+      <Text style={styles.text}>Página {page}{image.failed ? image.paused ? ' · En pausa' : ' · Reintentando la imagen…' : ''}</Text>
       {image.failed && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Reintentar página ${page}`} onPress={image.retry} style={styles.button}><Text style={styles.text}>Reintentar ahora</Text></TouchableOpacity>}
       {image.failed && <TouchableOpacity accessibilityRole="button" onPress={() => image.setPaused(!image.paused)} style={styles.button}><Text style={styles.text}>{image.paused ? 'Reanudar' : 'Pausar reintentos'}</Text></TouchableOpacity>}
     </View>}

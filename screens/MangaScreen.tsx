@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -38,6 +39,8 @@ export default function MangaScreen() {
   const cardWidth = Math.floor((width - gutter * 2 - (columns - 1) * gap) / columns);
 
   const [activeFilter, setActiveFilter] = useState<MangaFilter>('Todos');
+  const [publicationType, setPublicationType] = useState('');
+  const formats = ['Todos', 'Manga', 'Manhwa', 'Manhua', 'Webtoon', 'Novela ligera', 'Novela', 'Cómic', 'One-shot', 'Doujinshi', 'Por clasificar'];
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -83,6 +86,7 @@ export default function MangaScreen() {
             status,
             search: q || undefined,
             order: 'updated',
+            publicationType: publicationType || undefined,
           }),
           mangaApi.popular({ limit: 5 }).catch(() => ({ items: [] })),
         ]);
@@ -104,7 +108,7 @@ export default function MangaScreen() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [activeFilter, search, isSmallScreen]);
+  }, [activeFilter, publicationType, search, isSmallScreen]);
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -120,6 +124,7 @@ export default function MangaScreen() {
         status,
         search: q || undefined,
         order: 'updated',
+            publicationType: publicationType || undefined,
       });
       const rows = (list.items || list.data || []) as Manga[];
       setItems((prev) => {
@@ -150,7 +155,7 @@ export default function MangaScreen() {
     [popular]
   );
 
-  const showHero = !search.trim() && activeFilter === 'Todos' && heroItems.length > 0;
+  const showHero = !search.trim() && activeFilter === 'Todos' && !publicationType && heroItems.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -194,8 +199,8 @@ export default function MangaScreen() {
             ]}
           >
             <View style={[styles.titleRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 6 }]}>
-              <Text style={[styles.title, { color: colors.text }]}>Manga y más</Text>
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>Manga, manhwa y manhua para descubrir</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Lecturas</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>Historias en viñetas y otros formatos para descubrir</Text>
             </View>
 
             <View
@@ -236,6 +241,16 @@ export default function MangaScreen() {
             </ScrollView>
           </View>
 
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 20 }}>
+            {formats.map(label => {
+              const value = label === 'Todos' ? '' : label === 'Por clasificar' ? 'unknown' : label;
+              const selected = value === publicationType;
+              return <TouchableOpacity key={label} accessibilityRole="button" accessibilityLabel={`Formato: ${label}`} accessibilityState={{ selected }} onPress={() => setPublicationType(value)} style={{ paddingHorizontal: 13, paddingVertical: 10, backgroundColor: selected ? colors.text : colors.card, borderRadius: 3 }}>
+                <Text style={{ color: selected ? colors.background : colors.textSecondary, fontSize: 12, fontWeight: selected ? '700' : '400' }}>{label}</Text>
+              </TouchableOpacity>;
+            })}
+          </ScrollView>
+
           {/* ── RECIÉN ACTUALIZADOS (GRID) ── */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -245,13 +260,13 @@ export default function MangaScreen() {
 
             {loading ? (
               <View style={styles.loaderContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <Loader />
               </View>
             ) : mapped.length === 0 ? (
               <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
                 <Ionicons name="book-outline" size={42} color={colors.textMuted} />
                 <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                  No encontramos mangas para este filtro.
+                  No encontramos lecturas para este filtro.
                 </Text>
               </View>
             ) : (

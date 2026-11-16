@@ -1,138 +1,74 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Storage } from '../services/storage';
-
-export interface Profile {
-  id: number;
-  name: string;
-  avatar_url: string;
-  usuario_id: number;
-}
-
+import { useAuth } from './AuthContext';
+import { profileService } from '../services/db/profileService';
+import { restoreProfileSelection, type SavedProfileSelection } from '../services/profileSelection';
+export interface Profile { id: number; name: string; avatar_url: string; usuario_id: number; }
 interface ProfileContextType {
-  currentProfile: Profile | null;
-  setCurrentProfile: (profile: Profile | null) => void;
-  loadCurrentProfile: () => Promise<Profile | null>;
-  clearCurrentProfile: () => Promise<void>;
-  // Preferencias por perfil
-  adultContentEnabled: boolean;
-  setAdultContentEnabled: (enabled: boolean) => Promise<void>;
+  currentProfile: Profile | null; profileLoading: boolean;
+  setCurrentProfile: (profile: Profile | null) => Promise<void>;
+  loadCurrentProfile: () => Promise<Profile | null>; clearCurrentProfile: () => Promise<void>;
+  adultContentEnabled: boolean; setAdultContentEnabled: (enabled: boolean) => Promise<void>;
 }
-
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
-
-interface ProfileProviderProps {
-  children: ReactNode;
-}
-
-export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) => {
-  const { user } = useAuth();
-  const [currentProfile, setCurrentProfileState] = useState<Profile | null>(null);
-  const [adultContentEnabled, setAdultContentEnabledState] = useState(false);
-  useEffect(() => {
-    setCurrentProfileState(null);
-    setAdultContentEnabledState(false);
-    Storage.delete('currentProfile');
-  }, [user?.uid]);
-
-  const setCurrentProfile = async (profile: Profile | null) => {
-    console.log('ProfileContext: Setting current profile:', profile?.id, profile?.name);
-    setCurrentProfileState(profile);
+export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, isLoading, profileSession } = useAuth();
+  const uid = user?.uid || '';
+  const scope = `${uid}:${profileSession}`;
+  const liveScope = useRef(scope); liveScope.current = scope;
+  const generation = useRef(0);
+  const [state, setState] = useState<{ scope: string; profile: Profile | null; loading: boolean }>({ scope: '', profile: null, loading: true });
+  const [adult, setAdult] = useState(false);
+  const profileLoading = isLoading || state.scope !== scope || state.loading;
+  const currentProfile = !profileLoading ? state.profile : null;
+  const preference = (profile: Profile | null) => {
+    try { return !!profile && Storage.getString(`adultContentEnabled:${profile.id}`) === 'true'; } catch { return false; }
+  };
+  const persist = (profile: Profile | null) => {
     if (profile) {
+      Storage.setObject(`pixel.selectedProfile:${uid}`, { uid, profileId: profile.id });
       Storage.setObject('currentProfile', profile);
-      console.log('ProfileContext: Profile saved to Storage');
-      // Cargar preferencia de +18 asociada al perfil
-      try {
-        const raw = Storage.getString(`adultContentEnabled:${profile.id}`);
-        if (raw !== undefined) {
-          setAdultContentEnabledState(Boolean(JSON.parse(raw)));
-        } else {
-          setAdultContentEnabledState(false);
-        }
-      } catch (err) {
-        console.warn('ProfileContext: No se pudo cargar preferencia +18, usando false por defecto');
-        setAdultContentEnabledState(false);
-      }
-    } else {
-      Storage.delete('currentProfile');
-      console.log('ProfileContext: Profile removed from Storage');
-      setAdultContentEnabledState(false);
-    }
+    } else { if (uid) Storage.delete(`pixel.selectedProfile:${uid}`); Storage.delete('currentProfile'); }
+    setAdult(preference(profile)); setState({ scope, profile, loading: false });
   };
-
-  const loadCurrentProfile = async (): Promise<Profile | null> => {
-    try {
-      console.log('ProfileContext: Loading current profile...');
-      await Storage.ready();
-      const profile = Storage.getObject<Profile>('currentProfile');
-      if (profile) {
-        console.log('ProfileContext: Parsed profile ID:', profile?.id, 'Name:', profile?.name);
-        setCurrentProfileState(profile);
-        // Cargar preferencia de +18 para el perfil
-        try {
-          const raw = Storage.getString(`adultContentEnabled:${profile.id}`);
-          if (raw !== undefined) {
-            setAdultContentEnabledState(Boolean(JSON.parse(raw)));
-          } else {
-            setAdultContentEnabledState(false);
-          }
-        } catch (err) {
-          setAdultContentEnabledState(false);
-        }
-        return profile;
-      } else {
-        console.log('ProfileContext: No profile found in storage');
-        return null;
-      }
-    } catch (error) {
-      console.error('Error loading current profile:', error);
-      return null;
-    }
+  const loadCurrentProfile = async () => {
+    if (!uid) return null;
+    const requestScope = scope;
+    await Storage.ready();
+    let saved = Storage.getObject<SavedProfileSelection>(`pixel.selectedProfile:${uid}`);
+    // Upgrade an old selection only after checking that exact profile under the signed-in user's Firestore path.
+    const legacy = Storage.getObject<Profile>('currentProfile');
+    if (!saved && legacy?.id && !profileSession) saved = { uid, profileId: Number(legacy.id) };
+    const profile = await restoreProfileSelection(uid, saved, profileService.getProfile);
+    if (liveScope.current === requestScope) persist(profile);
+    return liveScope.current === requestScope ? profile : null;
   };
-
-  const clearCurrentProfile = async () => {
-    setCurrentProfileState(null);
-    Storage.delete('currentProfile');
-    setAdultContentEnabledState(false);
+  useEffect(() => {
+    if (isLoading) return;
+    const request = ++generation.current;
+    setState({ scope, profile: null, loading: true }); setAdult(false);
+    if (!uid || profileSession > 0) { persist(null); return; }
+    void loadCurrentProfile().catch(() => {
+      if (request === generation.current && liveScope.current === scope) persist(null);
+    });
+    return () => { generation.current++; };
+  }, [uid, profileSession, isLoading]);
+  const setCurrentProfile = async (profile: Profile | null) => {
+    const requestScope = scope;
+    if (!profile) { persist(null); return; }
+    if (!uid) throw new Error('Inicia sesión y elige un perfil.');
+    const verified = await profileService.getProfile(Number(profile.id), uid);
+    if (liveScope.current !== requestScope) return;
+    if (!verified) throw new Error('Este perfil ya no está disponible. Elige o crea otro.');
+    persist(verified);
   };
-
+  const clearCurrentProfile = async () => { persist(null); };
   const setAdultContentEnabled = async (enabled: boolean) => {
-    setAdultContentEnabledState(enabled);
-    const profileId = currentProfile?.id;
-    if (profileId) {
-      try {
-        Storage.setString(`adultContentEnabled:${profileId}`, JSON.stringify(enabled));
-      } catch (err) {
-        console.warn('ProfileContext: No se pudo guardar preferencia +18');
-      }
-    }
-    // This is a per-profile device preference, never a shared account-wide flag.
-
+    if (!currentProfile) return;
+    Storage.setString(`adultContentEnabled:${currentProfile.id}`, JSON.stringify(enabled)); setAdult(enabled);
   };
-
-
-
-
-  const value: ProfileContextType = {
-    currentProfile,
-    setCurrentProfile,
-    loadCurrentProfile,
-    clearCurrentProfile,
-    adultContentEnabled,
-    setAdultContentEnabled,
-  };
-
-  return (
-    <ProfileContext.Provider value={value}>
-      {children}
-    </ProfileContext.Provider>
-  );
+  return <ProfileContext.Provider value={{ currentProfile, profileLoading, setCurrentProfile, loadCurrentProfile, clearCurrentProfile, adultContentEnabled: !!currentProfile && adult, setAdultContentEnabled }}>{children}</ProfileContext.Provider>;
 };
-
 export const useProfile = (): ProfileContextType => {
-  const context = useContext(ProfileContext);
-  if (context === undefined) {
-    throw new Error('useProfile must be used within a ProfileProvider');
-  }
-  return context;
+  const context = useContext(ProfileContext); if (!context) throw new Error('useProfile must be used within a ProfileProvider'); return context;
 };

@@ -1,3 +1,4 @@
+import Loader from './Loader';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
@@ -587,8 +588,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   const renderVideoPlayer = useMemo(() => {
     if (!selectedSource) return (
       <View style={styles.videoPlaceholder}>
-        <ActivityIndicator size="large" color="#e50914" />
-        <Text style={styles.placeholderText}>Cargando video...</Text>
+        <Loader onDark />
       </View>
     );
 
@@ -717,8 +717,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
           {/* Indicador de carga propio del WebView */}
           {webViewLoading && (
             <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]} pointerEvents="none">
-              <ActivityIndicator size="large" color="#E50914" />
-              <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12, fontSize: 13 }}>Cargando reproductor...</Text>
+              <Loader onDark />
             </View>
           )}
           {/* Interfaz Animada */}
@@ -762,8 +761,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
       <View style={styles.container}>
         <PlayerSystemBars /><StatusBar hidden />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#e50914" />
-          <Text style={styles.loadingText}>Cargando episodio...</Text>
+          <Loader onDark />
         </View>
       </View>
     );

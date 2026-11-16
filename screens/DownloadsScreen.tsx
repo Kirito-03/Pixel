@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -182,8 +183,7 @@ export default function DownloadsScreen({ }: Props) {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Cargando descargas...</Text>
+        <Loader />
       </View>
     );
   }

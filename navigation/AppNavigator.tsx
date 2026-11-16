@@ -1,3 +1,4 @@
+import { profileNavigationScreens } from '../utils/profileNavigation';
 import React, { useEffect, Suspense } from 'react';
 import { NavigationContainer, DarkTheme, DefaultTheme, type LinkingOptions, type NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -381,14 +382,19 @@ const linking: LinkingOptions<LinkRoutes> = {
 export default function AppNavigator() {
   const { colors, theme } = useTheme();
   const { user, isLoading } = useAuth();
-  const { currentProfile } = useProfile();
+  const { currentProfile, profileLoading } = useProfile();
   const { isAdmin } = useAdmin();
-  if (isLoading) return <LoadingScreen />;
+  const activeLinking = React.useMemo(() => {
+    const screens = profileNavigationScreens(linking.config!.screens as any, !!user, !!currentProfile, isAdmin);
+    return { ...linking, config: { screens } };
+  }, [!!user, !!currentProfile, isAdmin]);
+  if (isLoading || profileLoading) return <LoadingScreen />;
   const initialRoute = !user ? 'Ingreso' : currentProfile ? 'Principal' : 'SeleccionPerfil';
 
   return (
     <NavigationContainer
-      linking={linking}
+      key={`${user?.uid || 'signed-out'}:${currentProfile?.id || 'choose-profile'}`}
+      linking={activeLinking}
       theme={{ ...(theme === 'dark' ? DarkTheme : DefaultTheme), colors: { ...(theme === 'dark' ? DarkTheme.colors : DefaultTheme.colors), background: colors.background, card: colors.card, text: colors.text, primary: colors.primary, border: colors.divider } }}
     >
       <RootStack.Navigator
@@ -417,8 +423,8 @@ export default function AppNavigator() {
             {currentProfile && Platform.OS !== 'web' && (
               <RootStack.Screen name="Perfil" component={ProfileScreen} />
             )}
-            <RootStack.Screen name="Apariencia" component={AppearanceScreen} />
-            <RootStack.Screen name="Descargas" component={DownloadsScreen as any} />
+            {currentProfile && <RootStack.Screen name="Apariencia" component={AppearanceScreen} />}
+            {currentProfile && <RootStack.Screen name="Descargas" component={DownloadsScreen as any} />}
             <RootStack.Screen name="LegalScreen" component={LegalScreen} />
             {currentProfile && isAdmin && <RootStack.Screen name="Admin" component={AdminNavigator} />}
           </>

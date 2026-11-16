@@ -256,7 +256,7 @@ function ttlMsFromEnv(key, fallbackMinutes) {
 // CACHÉ LISTA MANGAS
 // ----------------------------------------------------------------------
 
-async function queryMangaCache(pool, { page, limit, status, search, order }) {
+export async function queryMangaCache(pool, { page, limit, status, search, order, publicationType }) {
   const l = Math.min(50, Math.max(1, Number(limit || 24) || 24));
   const p = Math.max(1, Number(page || 1) || 1);
   const offset = (p - 1) * l;
@@ -274,6 +274,24 @@ async function queryMangaCache(pool, { page, limit, status, search, order }) {
   if (q) {
     where.push(`title ILIKE $${i++}`);
     params.push(`%${q}%`);
+  }
+
+  if (publicationType) {
+    // Prefer the dedicated field; legacy tags are used only when the field has no recognized format.
+    const aliases = { Manga: ['manga'], Manhwa: ['manhwa', 'manwha'], Manhua: ['manhua'], Webtoon: ['webtoon'],
+      'Novela ligera': ['novela ligera', 'light novel'], Novela: ['novela', 'novel', 'web novel', 'novela web'],
+      'Cómic': ['cómic', 'comic', 'comics'], 'One-shot': ['one shot', 'oneshot'], Doujinshi: ['doujinshi', 'doujin'] };
+    const knownFormats = Object.values(aliases).flat().map(value => "'" + value + "'").join(',');
+    const normalized = `lower(regexp_replace(trim(COALESCE(publication_type,'')), '[_-]+', ' ', 'g'))`;
+    const tagValues = `SELECT lower(regexp_replace(value, '[_-]+', ' ', 'g')) FROM jsonb_array_elements_text(COALESCE(tags,'[]'::jsonb))`;
+    if (publicationType === 'unknown') {
+      params.push(Object.values(aliases).flat());
+      where.push(`NOT (${normalized} = ANY($${i}::text[])) AND NOT EXISTS (${tagValues} AS t WHERE lower(regexp_replace(value, '[_-]+', ' ', 'g')) = ANY($${i}::text[]))`);
+    } else {
+      params.push(aliases[publicationType] || []);
+      where.push(`(${normalized} = ANY($${i}::text[]) OR (${normalized} NOT IN (${knownFormats}) AND EXISTS (${tagValues} AS t WHERE lower(regexp_replace(value, '[_-]+', ' ', 'g')) = ANY($${i}::text[]))))`);
+    }
+    i++;
   }
 
   const ord = String(order || '').trim().toLowerCase();
@@ -426,6 +444,10 @@ export async function getMangaList(pool, params) {
   const status = String(params?.status || '').trim();
   const search = String(params?.search || '').trim();
   const order = String(params?.order || '').trim() || 'latest';
+
+  const publicationType = String(params?.publicationType || '').trim();
+  // Type filters query the whole persisted catalog, never repeatedly scrape a remote page.
+  if (publicationType) return { ...(await queryMangaCache(pool, { page, limit, status, search, order, publicationType })), meta: { source: 'db', cache_hit: true } };
 
   const jobKey = `manga:list:${status || 'all'}:${order}:${search}`;
   const ttl = ttlMsFromEnv('MANGA_CACHE_TTL_MINUTES', 360);

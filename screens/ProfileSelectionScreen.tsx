@@ -120,7 +120,8 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
   };
 
   const handleSelectProfile = async (profile: Profile) => {
-    await setCurrentProfile(profile);
+    try { await setCurrentProfile(profile); }
+    catch (error) { Alert.alert('Perfil no disponible', error instanceof Error ? error.message : 'Elige otro perfil.'); }
     // The root navigator opens content only after an explicit profile selection.
   };
 

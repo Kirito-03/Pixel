@@ -1,3 +1,4 @@
+import Loader from './Loader';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -141,8 +142,7 @@ export default function HentaiVideoPlayer({
       <View style={styles.videoContainer}>
         {loadingServers ? (
           <View style={styles.statusContainer}>
-            <ActivityIndicator size="large" color="#a9c0bd" />
-            <Text style={styles.statusText}>Cargando episodio {episodeNumber}...</Text>
+            <Loader onDark />
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
@@ -164,7 +164,7 @@ export default function HentaiVideoPlayer({
           <>
             {loading && (
               <View style={styles.loaderContainer} pointerEvents="none">
-                <ActivityIndicator size="large" color="#a9c0bd" />
+                <Loader onDark />
               </View>
             )}
 
@@ -227,7 +227,7 @@ export default function HentaiVideoPlayer({
                 startInLoadingState={true}
                 renderLoading={() => (
                   <View style={[styles.loaderContainer, { backgroundColor: '#000' }]}>
-                    <ActivityIndicator size="large" color="#a9c0bd" />
+                    <Loader onDark />
                   </View>
                 )}
               />

@@ -24,3 +24,10 @@ test('source extractor uses explicit type labels and genres, not recommendations
  assert.equal(extractPublicationType(card,card('.acard')),'Manhwa');
  assert.equal(normalizePublicationType('one-shot'),'One-shot');
 });
+
+test('other explicitly identified reading formats stay distinct across backend and UI', () => {
+ for (const [value, expected] of [['comic','Cómic'],['web novel','Novela'],['doujin','Doujinshi'],['light novel','Novela ligera'],['one-shot','One-shot']]) {
+  assert.equal(normalizePublicationType(value), expected);
+  assert.equal(exports.readingFormat({publication_type:value}), expected);
+ }
+});

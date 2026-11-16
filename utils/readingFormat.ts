@@ -5,6 +5,9 @@ export function readingFormat(item: { publication_type?: string | null; format?:
     const type = String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
     if (type === 'manhwa' || type === 'manwha') return 'Manhwa';
     if (type === 'manhua') return 'Manhua';
+    if (type === 'comic' || type === 'cómic' || type === 'comics') return 'Cómic';
+    if (type === 'novel' || type === 'novela' || type === 'web novel' || type === 'novela web') return 'Novela';
+    if (type === 'doujinshi' || type === 'doujin') return 'Doujinshi';
     if (type === 'manga') return 'Manga';
     if (type === 'webtoon') return 'Webtoon';
     if (type === 'light novel' || type === 'novela ligera') return 'Novela ligera';

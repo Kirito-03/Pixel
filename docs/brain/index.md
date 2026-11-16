@@ -49,3 +49,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-15-emision-busqueda-imagenes]]: Emisión y Buscar con controles neutros, diseño adaptable, encuadre de Inicio y APK1.0.11/12; pruebas reales y límites de imágenes fuente.
 
 - [[2026-11-15-inicio-perfiles-y-lectura]]: hero/menu transparente, tipos de lectura, descripción plegable, organización de Perfil, carga propia y selección explícita tras iniciar sesión.
+
+- [[2026-11-15-sesion-tema-sinopsis-es]]: perfil verificado persistente, acceso obligatorio, tema claro, cargas silenciosas, encuadre de banners, sinopsis breves con traducción gratuita guardada, filtros de formatos y APK 1.0.14.

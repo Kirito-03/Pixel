@@ -1,3 +1,4 @@
+import { SPANISH_SYNOPSIS_SCHEMA } from '../services/spanishSynopsisService.js';
 import pool from '../db.js';
 
 export async function ensurePixelNoSekaiTables() {
@@ -207,4 +208,6 @@ export async function ensurePixelNoSekaiTables() {
   await pool.query(`ALTER TABLE anime_episodes ADD COLUMN IF NOT EXISTS stream_url VARCHAR(1000);`);
   await pool.query(`ALTER TABLE hentai_content ADD COLUMN IF NOT EXISTS synopsis TEXT;`);
   await pool.query(`ALTER TABLE hentai_content ADD COLUMN IF NOT EXISTS genres JSONB;`);
+  await pool.query(SPANISH_SYNOPSIS_SCHEMA);
+
 }

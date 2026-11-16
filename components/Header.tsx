@@ -28,6 +28,9 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
   const [searchFocused, setSearchFocused] = useState(false);
   const { currentProfile, adultContentEnabled } = useProfile();
   const { colors, theme } = useTheme();
+  const overlay = activeSection === 'Inicio' && !black;
+  const headerInk = overlay ? '#fff' : colors.text;
+  const headerMuted = overlay ? 'rgba(255,255,255,0.75)' : colors.textSecondary;
   const avatarUrl = currentProfile?.avatar_url || null;
   // activeNav es controlado por el prop activeSection — sin estado interno
   // para evitar que React Navigation cache un valor incorrecto entre navegaciones
@@ -115,7 +118,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+      backgroundColor: theme === 'dark' || overlay ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
       justifyContent: 'center' as const,
       alignItems: 'center' as const,
     },
@@ -171,7 +174,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
               {/* View con row: única forma fiable en RN Web de tener dos colores distintos en la misma línea */}
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={styles.logoPrimary}>PIXEL </Text>
-                <Text style={[styles.logoPrimary, { color: colors.text, fontWeight: '900' }]}>NO SEKAI</Text>
+                <Text style={[styles.logoPrimary, { color: headerInk, fontWeight: '900' }]}>NO SEKAI</Text>
               </View>
             </TouchableOpacity>
           </Animated.View>
@@ -192,13 +195,13 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
                   <Ionicons
                     name={link.icon as any}
                     size={15}
-                    color={activeSection === link.label ? colors.text : colors.textLight}
+                    color={activeSection === link.label ? headerInk : headerMuted}
                     style={{ marginRight: 5 }}
                   />
                   <Text style={[
                     styles.navLinkText,
-                    { color: colors.textLight },
-                    activeSection === link.label && { color: colors.text, fontWeight: '600' },
+                    { color: headerMuted },
+                    activeSection === link.label && { color: headerInk, fontWeight: '600' },
                   ]}>
                     {link.label}
                   </Text>
@@ -224,7 +227,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
                     onSearchPress?.();
                   }}
                 >
-                  <Ionicons name="search" size={isSmallScreen ? 18 : 20} color={colors.text} />
+                  <Ionicons name="search" size={isSmallScreen ? 18 : 20} color={headerInk} />
                 </TouchableOpacity>
               </Animated.View>
             )}
@@ -242,7 +245,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
                   onError={() => setAvatarError(true)}
                 />
               ) : (
-                <Ionicons name="person" size={isSmallScreen ? 16 : 18} color={colors.text} />
+                <Ionicons name="person" size={isSmallScreen ? 16 : 18} color={headerInk} />
               )}
             </TouchableOpacity>
           </View>

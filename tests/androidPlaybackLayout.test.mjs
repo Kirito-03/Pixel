@@ -27,7 +27,7 @@ function runtime(file, mocks = {}) {
     exports, console, Promise, AbortController, requestAnimationFrame: fn => fn(),
     setTimeout: fn => { timeouts.set(++clock, fn); return clock; }, clearTimeout: id => timeouts.delete(id),
     setInterval: fn => { intervals.set(++clock, fn); return clock; }, clearInterval: id => intervals.delete(id),
-    require(name) { if (name === 'react') return react; if (name === 'react-native') return native; return mocks[name] || {}; },
+    require(name) { if (name === 'react') return react; if (name === 'react-native') return native; if (name.endsWith('/ThemeContext')) return { useTheme: () => ({ theme: 'dark', colors: { text: '#fff', textSecondary: '#aaa', textMuted: '#999', background: '#000', card: '#141414', primary: '#e50914' } }) };  return mocks[name] || {}; },
   });
   return { exports, intervals, timeouts,
     render(props) { cursor = 0; const tree = exports.default(props); for (const { i, fn } of pending.splice(0)) { cleanups.get(i)?.(); cleanups.set(i, fn()); } return tree; },

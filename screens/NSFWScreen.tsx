@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -453,10 +454,8 @@ export default function NSFWScreen() {
               {/* Contenido principal: Carga / Error / Vacío / Hero + Filas */}
               {loading || searchLoading ? (
                 <View style={styles.stateContainer}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={[styles.stateSubtext, { color: colors.textMuted }]}>
-                    {searchLoading ? 'Buscando en el catálogo…' : 'Cargando catálogo…'}
-                  </Text>
+                  <Loader />
+
                 </View>
               ) : error || searchError ? (
                 <View style={[styles.stateCard, { backgroundColor: colors.card }]}>
@@ -547,10 +546,8 @@ export default function NSFWScreen() {
       {fetchingVideo && !showPlayer && (
         <View style={styles.fetchingOverlay}>
           <View style={[styles.fetchingBox, { backgroundColor: colors.card }]}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.fetchingText, { color: colors.text }]}>
-              Buscando servidores de video...
-            </Text>
+            <Loader />
+
           </View>
         </View>
       )}

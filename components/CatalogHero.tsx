@@ -1,7 +1,9 @@
+import { briefSynopsis } from '../utils/briefSynopsis';
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, AppState, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 import AnimeArtwork from './AnimeArtwork';
 
 export interface CatalogHeroItem {
@@ -14,6 +16,8 @@ export interface CatalogHeroItem {
 }
 
 export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DESTACADOS' }: { items: CatalogHeroItem[]; onOpen: (key: string) => void; eyebrow?: string }) {
+  const { colors, theme } = useTheme();
+  const light = theme === 'light';
   const { width, height } = useWindowDimensions();
   const compact = width < 768;
   const [index, setIndex] = useState(0);
@@ -39,29 +43,29 @@ export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DES
   const item = items[selected];
   const gutter = Math.max(compact ? 20 : 40, (width - 1120) / 2 + 20);
   const go = (direction: number) => { setInteraction(value => value + 1); setIndex(current => (current + direction + items.length) % items.length); };
-  return <Pressable accessibilityRole="none" onHoverIn={() => { if (Platform.OS === 'web') setPaused(true); }} onHoverOut={() => setPaused(false)} style={[styles.hero, { height: compact ? 460 : Math.max(480, Math.min(height * 0.74, 660)) }]}>
-    <AnimeArtwork banner={item.banner} poster={item.poster} />
-    <LinearGradient pointerEvents="none" colors={['rgba(8,8,8,0.75)', 'rgba(8,8,8,0.2)', 'transparent']} locations={[0, 0.22, 0.5]} style={StyleSheet.absoluteFill} />
-    <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-    <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.12)', '#080808']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
+  return <Pressable accessibilityRole="none" onHoverIn={() => { if (Platform.OS === 'web') setPaused(true); }} onHoverOut={() => setPaused(false)} style={[styles.hero, { backgroundColor: colors.background, height: compact ? 460 : Math.max(480, Math.min(height * 0.74, 660)) }]}>
+    <AnimeArtwork backgroundColor={colors.background} banner={item.banner} poster={item.poster} />
+    <LinearGradient pointerEvents="none" colors={light ? ['rgba(0,0,0,0.08)', 'transparent', 'transparent'] : ['rgba(8,8,8,0.75)', 'rgba(8,8,8,0.2)', 'transparent']} locations={[0, 0.22, 0.5]} style={StyleSheet.absoluteFill} />
+    <LinearGradient pointerEvents="none" colors={light ? ['rgba(255,255,255,0.97)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)'] : ['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+    <LinearGradient pointerEvents="none" colors={light ? ['rgba(255,255,255,0)', 'rgba(255,255,255,0.12)', colors.background] : ['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.12)', colors.background]} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
     <View style={[styles.copy, { left: gutter, right: compact ? 20 : undefined, bottom: compact ? 84 : 94, maxWidth: compact ? undefined : 650 }]}>
-      <Text style={styles.eyebrow}>{item.label ? `${item.label.toUpperCase()} · DESTACADOS` : eyebrow}</Text>
-      <Text style={[styles.title, { fontSize: compact ? 28 : 44, lineHeight: compact ? 34 : 50 }]} numberOfLines={2}>{item.title}</Text>
-      {item.description ? <Text style={styles.description} numberOfLines={compact ? 2 : 3}>{item.description}</Text> : null}
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Más información de ${item.title}`} style={styles.action} onPress={() => onOpen(item.key)}>
-        <Ionicons name="information-circle-outline" size={22} color="#111" /><Text style={styles.actionText}>Más información</Text>
+      <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>{item.label ? `${item.label.toUpperCase()} · DESTACADOS` : eyebrow}</Text>
+      <Text style={[styles.title, { color: colors.text, fontSize: compact ? 28 : 44, lineHeight: compact ? 34 : 50 }]} numberOfLines={2}>{item.title}</Text>
+      {item.description ? <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>{briefSynopsis(item.description)}</Text> : null}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Más información de ${item.title}`} style={[styles.action, { backgroundColor: colors.text }]} onPress={() => onOpen(item.key)}>
+        <Ionicons name="information-circle-outline" size={22} color={colors.background} /><Text style={[styles.actionText, { color: colors.background }]}>Más información</Text>
       </TouchableOpacity>
     </View>
     {items.length > 1 ? <View style={[styles.navigation, { left: gutter, right: gutter }]}>
       <View style={styles.dots}>
         {items.map((entry, i) => <TouchableOpacity key={entry.key} accessibilityRole="button" accessibilityLabel={`Mostrar destacado ${i + 1} de ${items.length}`} accessibilityState={{ selected: i === selected }} onPress={() => { setInteraction(value => value + 1); setIndex(i); }} style={[styles.dotTarget, compact && { minWidth: 24, paddingHorizontal: 3 }]}>
-          <View style={[styles.dot, compact && { width: 18 }, { backgroundColor: i === selected ? '#E50914' : 'rgba(255,255,255,0.38)' }]} />
+          <View style={[styles.dot, compact && { width: 18 }, { backgroundColor: i === selected ? colors.primary : colors.textMuted }]} />
         </TouchableOpacity>)}
       </View>
       <View style={styles.controls}>
-        <Text style={styles.counter}>{selected + 1} / {items.length}</Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Destacado anterior" onPress={() => go(-1)} style={styles.arrow}><Ionicons name="chevron-back" color="#fff" size={24} /></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Siguiente destacado" onPress={() => go(1)} style={styles.arrow}><Ionicons name="chevron-forward" color="#fff" size={24} /></TouchableOpacity>
+        <Text style={[styles.counter, { color: colors.textSecondary }]}>{selected + 1} / {items.length}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Destacado anterior" onPress={() => go(-1)} style={[styles.arrow, { backgroundColor: colors.card }]}><Ionicons name="chevron-back" color={colors.text} size={24} /></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Siguiente destacado" onPress={() => go(1)} style={[styles.arrow, { backgroundColor: colors.card }]}><Ionicons name="chevron-forward" color={colors.text} size={24} /></TouchableOpacity>
       </View>
     </View> : null}
   </Pressable>;

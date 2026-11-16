@@ -1,3 +1,4 @@
+import Loader from '../components/Loader';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -278,8 +279,7 @@ export default function MyListScreen() {
     return (
       <View style={[styles.loadingView, { backgroundColor: colors.background }]}>
         <Header black={theme === 'dark'} activeSection="Mi Lista" onNavPress={navigateByLabel} />
-        <ActivityIndicator size="large" color="#E50914" style={{ marginTop: 120 }} />
-        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Cargando Mi Lista...</Text>
+        <View style={{ marginTop: 120 }}><Loader /></View>
       </View>
     );
   }
