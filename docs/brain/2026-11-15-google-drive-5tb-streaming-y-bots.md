@@ -271,3 +271,15 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
   - `npx tsc --noEmit` (0 errores nuevos; solo 2 preexistentes en `services/offlineDownloads.ts:83`), `node --check server/services/mangaService.js`, `node --test tests/*.mjs` (**122/122** en verde).
   - `npm run build:web -- --output-dir dist` (`index-7a6c7e488be63c12c1350782b4d944eb.js`) desplegado en `arle` con `pm2 restart pixel-backend`.
   - Verificación visual en `https://pixelnosekai.com/` (escritorio `1280x800`, modo claro): `"Detener tráiler"` compacto (`153.8px`), `CatalogHero` claro sin caja negra ni niebla blanca en Manga y Hentai, `Header` blanco sólido al hacer scroll en Manga/Hentai/Mi Lista, `MangaCard` con texto integrado e ítem sin portada (`Toxicólogo del Clan Tang de Sichuan`) con monograma limpio sin badge duplicado, y flechas `<` / `>` funcionales en `Continuar viendo`.
+
+---
+
+## 11. Limpieza de Modo Claro, Sinopsis Única y Publicación APK `1.0.15 (16)`
+
+- **Modo claro refinado y sinopsis única (`components/FeaturedMovie.tsx`, `components/AnimeSeriesModal.tsx`, `components/MovieCard.tsx`, `utils/briefSynopsis.ts`):**
+  - Se redujo el velo blanco en modo claro tanto en `FeaturedMovie.tsx` como en `AnimeSeriesModal.tsx` y el popup hover de `MovieCard.tsx` (`rgba(255,255,255,0.42)` en el `40%` inferior).
+  - Se centralizó `cleanSynopsisText()` en `utils/briefSynopsis.ts` para eliminar `(Source: ...)`, `(Fuente: ...)` y nombres de plataformas externas.
+  - En `AnimeSeriesModal.tsx` se eliminó la segunda sinopsis duplicada debajo de las tarjetas de metadatos y la descripción única del hero usa `ScrollView` compacto (`maxHeight: 68`/`78`) para leer textos largos sin agrandar el hero.
+- **Compilación y publicación APK Android (`app.json`, `android/app/build/outputs/apk/release/app-release.apk`):**
+  - Compilada con `npm run build:android` usando JDK 21 (`/home/arle/Documents/Codex/2026-11-13/primero-lo-urgente-renueva-hoy-30-2/work/jdk21`), versión `1.0.15` (`versionCode: 16`).
+  - Empaquetada con `tools/android-release.mjs package`, subida a `arle` (`pixel-1.0.15-16.apk`, `123,557,802` bytes, SHA256 `1557919a565b771085b0a85fcae40e58a2be642eab74e0521e20eb7f1faa5369` verificado en destino antes de publicar `latest.json`).
