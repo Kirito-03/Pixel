@@ -43,17 +43,29 @@ export default function CatalogHero({ items, onOpen, eyebrow = 'H ANIME  ·  DES
   const item = items[selected];
   const gutter = Math.max(compact ? 20 : 40, (width - 1120) / 2 + 20);
   const go = (direction: number) => { setInteraction(value => value + 1); setIndex(current => (current + direction + items.length) % items.length); };
+  const lightPortrait = light && !item.banner;
+  const heroBg = light ? colors.background : '#050505';
+
   return <Pressable accessibilityRole="none" onHoverIn={() => { if (Platform.OS === 'web') setPaused(true); }} onHoverOut={() => setPaused(false)} style={[styles.hero, { backgroundColor: colors.background, height: compact ? 460 : Math.max(480, Math.min(height * 0.74, 660)) }]}>
-    <AnimeArtwork backgroundColor="#050505" banner={item.banner} poster={item.poster} />
-    <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.42)', 'transparent']} locations={[0, 0.35]} style={StyleSheet.absoluteFill} />
-    <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.74)', 'rgba(0,0,0,0.34)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-    <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.22)', colors.background]} locations={[0, 0.76, 1]} style={StyleSheet.absoluteFill} />
+    <AnimeArtwork backgroundColor={heroBg} banner={item.banner} poster={item.poster} />
+    {!lightPortrait && (
+      <>
+        <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.42)', 'transparent']} locations={[0, 0.35]} style={StyleSheet.absoluteFill} />
+        <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.74)', 'rgba(0,0,0,0.34)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+      </>
+    )}
+    <LinearGradient
+      pointerEvents="none"
+      colors={lightPortrait ? ['transparent', 'transparent', colors.background] : ['transparent', 'rgba(0,0,0,0.14)', colors.background]}
+      locations={lightPortrait ? [0, 0.9, 1] : [0, 0.86, 1]}
+      style={StyleSheet.absoluteFill}
+    />
     <View style={[styles.copy, { left: gutter, right: compact ? 20 : undefined, bottom: compact ? 84 : 94, maxWidth: compact ? undefined : 650 }]}>
-      <Text style={[styles.eyebrow, { color: 'rgba(255,255,255,0.85)' }]}>{item.label ? `${item.label.toUpperCase()} · DESTACADOS` : eyebrow}</Text>
-      <Text style={[styles.title, { color: '#FFFFFF', fontSize: compact ? 28 : 44, lineHeight: compact ? 34 : 50 }, Platform.OS === 'web' ? ({ textShadow: '0px 2px 14px rgba(0,0,0,0.7)' } as any) : null]} numberOfLines={2}>{item.title}</Text>
-      {item.description ? <Text style={[styles.description, { color: 'rgba(255,255,255,0.88)' }]} numberOfLines={2}>{briefSynopsis(item.description)}</Text> : null}
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Más información de ${item.title}`} style={[styles.action, { backgroundColor: '#FFFFFF' }]} onPress={() => onOpen(item.key)}>
-        <Ionicons name="information-circle-outline" size={22} color="#111111" /><Text style={[styles.actionText, { color: '#111111' }]}>Más información</Text>
+      <Text style={[styles.eyebrow, { color: lightPortrait ? colors.primary : 'rgba(255,255,255,0.85)' }]}>{item.label ? `${item.label.toUpperCase()} · DESTACADOS` : eyebrow}</Text>
+      <Text style={[styles.title, { color: lightPortrait ? colors.text : '#FFFFFF', fontSize: compact ? 28 : 44, lineHeight: compact ? 34 : 50 }, !lightPortrait && Platform.OS === 'web' ? ({ textShadow: '0px 2px 14px rgba(0,0,0,0.7)' } as any) : null]} numberOfLines={2}>{item.title}</Text>
+      {item.description ? <Text style={[styles.description, { color: lightPortrait ? colors.textSecondary : 'rgba(255,255,255,0.88)' }]} numberOfLines={2}>{briefSynopsis(item.description)}</Text> : null}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Más información de ${item.title}`} style={[styles.action, { backgroundColor: lightPortrait ? '#111111' : '#FFFFFF' }]} onPress={() => onOpen(item.key)}>
+        <Ionicons name="information-circle-outline" size={22} color={lightPortrait ? '#FFFFFF' : '#111111'} /><Text style={[styles.actionText, { color: lightPortrait ? '#FFFFFF' : '#111111' }]}>Más información</Text>
       </TouchableOpacity>
     </View>
     {items.length > 1 ? <View style={[styles.navigation, { left: gutter, right: gutter }]}>

@@ -927,7 +927,7 @@ export default function AnimeSeriesModal({
               {/* Backdrop + gradiente cinematográfico */}
               {trailerDelay && trailerKey && !trailerFinished ? (
                 <View style={[styles.trailerBackground, { paddingTop: 40 }, androidCompact && { position: 'relative', height: undefined, paddingTop: insets.top + 64, paddingBottom: 12 }]}>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Detener tráiler" style={[styles.trailerCloseButton, { top: 4, left: 16, right: undefined, paddingVertical: 4 }, androidCompact && { position: 'relative', top: 0, left: 0, alignSelf: 'flex-start', marginLeft: 16, marginBottom: 10, minHeight: 44 }]} onPress={handleCloseTrailer}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Detener tráiler" style={[styles.trailerCloseButton, { top: 4, left: 16, paddingVertical: 4 }, androidCompact && { position: 'relative', top: 0, left: 0, alignSelf: 'flex-start', marginLeft: 16, marginBottom: 10, minHeight: 44 }]} onPress={handleCloseTrailer}>
                     <Ionicons name="close" size={20} color="#FFFFFF" />
                     <Text style={styles.trailerCloseText}>Detener tráiler</Text>
                   </TouchableOpacity>

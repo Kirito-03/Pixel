@@ -211,7 +211,8 @@ export const styles = StyleSheet.create({
   trailerCloseButton: {
     position: 'absolute',
     top: 16,
-    right: 16,
+    left: 16,
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.6)',

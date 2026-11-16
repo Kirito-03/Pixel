@@ -179,7 +179,7 @@ export default function MangaScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
-        black={theme === 'dark'}
+        black
         activeSection="Manga"
         onProfilePress={() => navigateByLabel('Perfil')}
         onSearchPress={() => navigateByLabel('Buscar')}

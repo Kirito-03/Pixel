@@ -41,27 +41,32 @@ export interface MangaItemUI {
   popular?: boolean;
 }
 
-function PremiumCoverFallback({ label, status }: { label?: string; status?: string }) {
+function getInitials(value?: string): string {
+  const words = String(value || '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length >= 2) return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return 'PX';
+}
+
+function PremiumCoverFallback({ label, title }: { label?: string; title?: string; status?: string }) {
+  const initials = getInitials(title || label);
   return (
     <View style={styles.fallbackWrap}>
       <LinearGradient
-        colors={['#191919', '#111111', '#0A0A0A']}
-        locations={[0, 0.62, 1]}
+        colors={['#241013', '#141418', '#0A0A0D']}
+        locations={[0, 0.58, 1]}
         style={StyleSheet.absoluteFillObject}
       />
-      <LinearGradient
-        colors={['rgba(229,9,20,0.18)', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-      <Ionicons name="book-outline" size={26} color="rgba(255,255,255,0.28)" style={{ marginBottom: 8 }} />
-      <Text style={styles.fallbackBrand}>{label || 'PIXEL NO SEKAI'}</Text>
-      {status ? (
-        <View style={styles.fallbackBadge}>
-          <Text style={styles.fallbackBadgeText}>{String(status).toUpperCase()}</Text>
-        </View>
-      ) : null}
+      <View style={styles.fallbackAccentBar} />
+      <Text style={styles.fallbackMonogram}>{initials}</Text>
+      <View style={styles.fallbackBrandRow}>
+        <Ionicons name="book-outline" size={16} color="rgba(255,255,255,0.36)" />
+        <Text style={styles.fallbackBrand}>{label || 'LECTURA'}</Text>
+      </View>
     </View>
   );
 }
@@ -75,15 +80,17 @@ interface MangaCardProps {
 }
 
 export function MangaCard({ item, onPress }: MangaCardProps) {
-  const { colors, theme } = useTheme();
+  const { theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   const isWeb = Platform.OS === 'web';
   const [imageError, setImageError] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
-  const onIn = () =>
-    Animated.spring(scale, { toValue: 1.03, useNativeDriver: true, friction: 6 }).start();
-  const onOut = () =>
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6 }).start();
+  const animateTo = (value: number) =>
+    Animated.spring(scale, { toValue: value, useNativeDriver: true, friction: 7 }).start();
+
+  const onIn = () => animateTo(1.03);
+  const onOut = () => animateTo(hovered ? 1.02 : 1);
 
   const formattedDate = formatMangaDate(item.updatedAt);
   const metaText = [item.publicationType || 'Lectura', formattedDate || (item.year ? String(item.year) : '')].filter(Boolean).join(' · ');
@@ -91,10 +98,22 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
 
   return (
     <TouchableOpacity
-      activeOpacity={0.88}
+      activeOpacity={0.9}
       onPress={onPress}
       onPressIn={onIn}
       onPressOut={onOut}
+      {...(isWeb
+        ? {
+            onMouseEnter: () => {
+              setHovered(true);
+              animateTo(1.02);
+            },
+            onMouseLeave: () => {
+              setHovered(false);
+              animateTo(1);
+            },
+          }
+        : {})}
       accessibilityRole="button"
       accessibilityLabel={item.title}
       style={[styles.cardOuter, isWeb ? ({ cursor: 'pointer' } as any) : null]}
@@ -104,12 +123,16 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
           style={[
             styles.posterBox,
             {
-              borderColor: theme === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)',
+              borderColor: hovered
+                ? 'rgba(229,9,20,0.75)'
+                : theme === 'dark'
+                ? 'rgba(255,255,255,0.09)'
+                : 'rgba(0,0,0,0.09)',
             },
           ]}
         >
           {!item.image || imageError ? (
-            <PremiumCoverFallback label={item.publicationType || 'LECTURA'} status={item.status} />
+            <PremiumCoverFallback label={item.publicationType || 'LECTURA'} title={item.title} status={item.status} />
           ) : (
             <Image
               source={{ uri: item.image }}
@@ -120,7 +143,8 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
           )}
 
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.88)']}
+            colors={['transparent', 'rgba(0,0,0,0.58)', 'rgba(0,0,0,0.92)']}
+            locations={[0, 0.45, 1]}
             style={styles.gradientOverlay}
             pointerEvents="none"
           />
@@ -131,26 +155,30 @@ export function MangaCard({ item, onPress }: MangaCardProps) {
             </Text>
           </View>
 
-          <View style={styles.chapterPill}>
-            <Ionicons name="book-outline" size={11} color="#FFF" />
-            <Text style={styles.chapterPillText} numberOfLines={1}>
-              {chapterLabel}
+          <View style={styles.cardOverlay}>
+            <View style={styles.cardOverlayMetaRow}>
+              <View style={[styles.chapterPill, hovered && styles.chapterPillHover]}>
+                <Ionicons name="book-outline" size={10} color="#FFF" />
+                <Text style={styles.chapterPillText} numberOfLines={1}>
+                  {chapterLabel}
+                </Text>
+              </View>
+              {metaText ? (
+                <Text style={styles.cardMetaText} numberOfLines={1}>
+                  {metaText}
+                </Text>
+              ) : null}
+            </View>
+            <Text
+              style={[
+                styles.cardTitle,
+                isWeb ? ({ textShadow: '0px 1px 6px rgba(0,0,0,0.9)' } as any) : null,
+              ]}
+              numberOfLines={2}
+            >
+              {item.title}
             </Text>
           </View>
-        </View>
-
-        <View style={styles.cardInfo}>
-          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          {metaText ? (
-            <View style={styles.cardMeta}>
-              <Ionicons name="time-outline" size={11} color={colors.textMuted} />
-              <Text style={[styles.cardMetaText, { color: colors.textMuted }]} numberOfLines={1}>
-                {metaText}
-              </Text>
-            </View>
-          ) : null}
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -306,66 +334,72 @@ const styles = StyleSheet.create({
   posterBox: {
     width: '100%',
     aspectRatio: 2 / 3,
-    borderRadius: 0,
+    borderRadius: 4,
     borderWidth: 1,
     overflow: 'hidden',
     backgroundColor: '#121216',
     position: 'relative',
   },
   chapterPill: {
-    position: 'absolute',
-    left: 8,
-    bottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.82)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 2,
-    maxWidth: '85%',
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  chapterPillHover: {
+    backgroundColor: '#E50914',
+    borderColor: '#E50914',
   },
   chapterPillText: {
     color: '#FFF',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
   },
   gradientOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 84,
+    height: '44%',
   },
   fallbackWrap: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
+    paddingBottom: 44,
+  },
+  fallbackAccentBar: {
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#E50914',
+    marginBottom: 10,
+    opacity: 0.85,
+  },
+  fallbackMonogram: {
+    color: 'rgba(255,255,255,0.84)',
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  fallbackBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   fallbackBrand: {
     color: 'rgba(255,255,255,0.48)',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.8,
-    textAlign: 'center',
-  },
-  fallbackBadge: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 2,
-  },
-  fallbackBadgeText: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 1.4,
+    textAlign: 'center',
   },
   statusBadge: {
     position: 'absolute',
@@ -382,26 +416,33 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  cardInfo: {
-    paddingTop: 8,
-    paddingBottom: 4,
+  cardOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    paddingTop: 6,
     gap: 4,
+  },
+  cardOverlayMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'nowrap',
   },
   cardTitle: {
     color: '#FFFFFF',
     fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    lineHeight: 17,
+    fontWeight: '800',
   },
   cardMetaText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-    fontWeight: '500',
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 10,
+    fontWeight: '600',
+    flexShrink: 1,
   },
 
   /* RANKING */

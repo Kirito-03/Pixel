@@ -48,6 +48,10 @@ export default function MyListScreen() {
     width >= 1320 ? 5 : width >= 1040 ? 4 : width >= 720 ? 3 : 2;
   const containerWidth = Math.min(width, 1440);
   const cardWidth = Math.floor((containerWidth - gutter * 2 - (columns - 1) * gap) / columns);
+  const continueScrollRef = useRef<ScrollView>(null);
+  const [continueScrollX, setContinueScrollX] = useState(0);
+  const [continueViewportWidth, setContinueViewportWidth] = useState(0);
+  const [continueContentWidth, setContinueContentWidth] = useState(0);
   const { currentProfile, adultContentEnabled } = useProfile();
   const { user } = useAuth();
   const { refreshMyList, removeFromMyList } = useMyList();
@@ -247,7 +251,7 @@ export default function MyListScreen() {
   const continueItems = (loadedScope === currentScope ? continueRows : [])
     .filter((row) => row.current_time > 0 || row.position_known === false)
     .filter((row) => row.duration <= 0 || row.current_time < row.duration * 0.95)
-    .slice(0, 6)
+    .slice(0, 30)
     .map((row) => {
       const item: ContentItem = {
         id: Number(row.anime_id),
@@ -278,16 +282,35 @@ export default function MyListScreen() {
   if (loading) {
     return (
       <View style={[styles.loadingView, { backgroundColor: colors.background }]}>
-        <Header black={theme === 'dark'} activeSection="Mi Lista" onNavPress={navigateByLabel} />
+        <Header black activeSection="Mi Lista" onNavPress={navigateByLabel} />
         <View style={{ marginTop: 120 }}><Loader /></View>
       </View>
     );
   }
 
+  const showContinueLeft = !isSmallScreen && continueScrollX > 8;
+  const showContinueRight =
+    !isSmallScreen &&
+    continueContentWidth > continueViewportWidth + 8 &&
+    continueScrollX + continueViewportWidth < continueContentWidth - 8;
+
+  const scrollContinueBy = (direction: -1 | 1) => {
+    const step = Math.max(320, Math.floor((continueViewportWidth || 800) * 0.78));
+    const nextX = Math.max(
+      0,
+      Math.min(
+        Math.max(0, continueContentWidth - continueViewportWidth),
+        continueScrollX + direction * step
+      )
+    );
+    continueScrollRef.current?.scrollTo({ x: nextX, animated: true });
+    setContinueScrollX(nextX);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
-        black={theme === 'dark'}
+        black
         activeSection="Mi Lista"
         onNavPress={navigateByLabel}
         onSearchPress={() => navigateByLabel('Buscar')}
@@ -317,48 +340,85 @@ export default function MyListScreen() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Continuar viendo</Text>
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.continueRow}
-            >
-              {continueItems.map(({ row, item }) => (
-                (() => {
-                  const meta = metaByAnimeId.get(item.id);
-                  const currentEpisode = typeof row.episode_number === 'number' ? row.episode_number : (meta?.episode_number ?? 1);
-                  const totalEpisodes = typeof meta?.total_episodes === 'number' ? meta.total_episodes : undefined;
-                  const progress = Number(row.progress_percent ?? 0) / 100;
-                  return (
-                <ContinueWatchingCard
-                  key={`${item.type}:${item.id}`}
-                  item={item}
-                  currentEpisode={currentEpisode}
-                  totalEpisodes={totalEpisodes}
-                  progress={progress}
-                  positionKnown={row.position_known}
-                  onPress={() => {
-                    (async () => {
-                      let targetEpisodeId: number | null = row.episode_id ?? null;
-                      let targetTime = typeof row.current_time === 'number' ? row.current_time : Number(row.current_time || 0);
-                      if (currentProfile?.id) {
-                        try {
-                          const target = await getResumeTarget(Number(item.id), Number(currentProfile.id));
-                          targetEpisodeId = target.episodeId ?? targetEpisodeId;
-                          targetTime = Number(target.resumeTime || targetTime || 0);
-                        } catch { }
-                      }
-                      setStartFromEpisodeId(targetEpisodeId);
-                      setStartFromTimeSeconds(targetTime);
-                      setSelectedContent(item);
-                      setModalVisible(true);
-                    })();
-                  }}
-                  onRemove={() => openConfirmRemove({ animeId: item.id, title: item.title, source: 'continue', episodeId: row.episode_id })}
-                />
-                  );
-                })()
-              ))}
-            </ScrollView>
+            <View style={styles.continueCarouselWrap}>
+              <ScrollView
+                ref={continueScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.continueRow}
+                scrollEventThrottle={16}
+                onScroll={(e) => setContinueScrollX(e.nativeEvent.contentOffset.x)}
+                onLayout={(e) => setContinueViewportWidth(e.nativeEvent.layout.width)}
+                onContentSizeChange={(w) => setContinueContentWidth(w)}
+              >
+                {continueItems.map(({ row, item }) => (
+                  (() => {
+                    const meta = metaByAnimeId.get(item.id);
+                    const currentEpisode = typeof row.episode_number === 'number' ? row.episode_number : (meta?.episode_number ?? 1);
+                    const totalEpisodes = typeof meta?.total_episodes === 'number' ? meta.total_episodes : undefined;
+                    const progress = Number(row.progress_percent ?? 0) / 100;
+                    return (
+                  <ContinueWatchingCard
+                    key={`${item.type}:${item.id}`}
+                    item={item}
+                    currentEpisode={currentEpisode}
+                    totalEpisodes={totalEpisodes}
+                    progress={progress}
+                    positionKnown={row.position_known}
+                    onPress={() => {
+                      (async () => {
+                        let targetEpisodeId: number | null = row.episode_id ?? null;
+                        let targetTime = typeof row.current_time === 'number' ? row.current_time : Number(row.current_time || 0);
+                        if (currentProfile?.id) {
+                          try {
+                            const target = await getResumeTarget(Number(item.id), Number(currentProfile.id));
+                            targetEpisodeId = target.episodeId ?? targetEpisodeId;
+                            targetTime = Number(target.resumeTime || targetTime || 0);
+                          } catch { }
+                        }
+                        setStartFromEpisodeId(targetEpisodeId);
+                        setStartFromTimeSeconds(targetTime);
+                        setSelectedContent(item);
+                        setModalVisible(true);
+                      })();
+                    }}
+                    onRemove={() => openConfirmRemove({ animeId: item.id, title: item.title, source: 'continue', episodeId: row.episode_id })}
+                  />
+                    );
+                  })()
+                ))}
+              </ScrollView>
+
+              {showContinueLeft && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Desplazar Continuar viendo a la izquierda"
+                  onPress={() => scrollContinueBy(-1)}
+                  style={[
+                    styles.continueNavButton,
+                    styles.continueNavLeft,
+                    { backgroundColor: theme === 'dark' ? 'rgba(10,10,10,0.82)' : 'rgba(255,255,255,0.92)' },
+                  ]}
+                >
+                  <Ionicons name="chevron-back" size={22} color={colors.text} />
+                </TouchableOpacity>
+              )}
+
+              {showContinueRight && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Desplazar Continuar viendo a la derecha"
+                  onPress={() => scrollContinueBy(1)}
+                  style={[
+                    styles.continueNavButton,
+                    styles.continueNavRight,
+                    { backgroundColor: theme === 'dark' ? 'rgba(10,10,10,0.82)' : 'rgba(255,255,255,0.92)' },
+                  ]}
+                >
+                  <Ionicons name="chevron-forward" size={22} color={colors.text} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
 
@@ -533,9 +593,30 @@ const styles = StyleSheet.create({
   },
 
   /* CONTINUE WATCHING ROW */
+  continueCarouselWrap: {
+    position: 'relative',
+  },
   continueRow: {
     gap: 14,
     paddingRight: 20,
+  },
+  continueNavButton: {
+    position: 'absolute',
+    top: 32,
+    width: 38,
+    height: 76,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(128,128,128,0.22)',
+  },
+  continueNavLeft: {
+    left: 6,
+  },
+  continueNavRight: {
+    right: 6,
   },
 
   /* ALL LIST */

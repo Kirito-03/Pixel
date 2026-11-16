@@ -345,7 +345,81 @@ export async function queryMangaCache(pool, { page, limit, status, search, order
   };
 }
 
+async function resolveFallbackMangaCover(title) {
+  const cleanTitle = String(title || '').replace(/\s+/g, ' ').trim();
+  if (!cleanTitle) return null;
+
+  // Plan B-1: AniList GraphQL (MANGA)
+  try {
+    const res = await fetch('https://graphql.anilist.co', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        query: 'query ($search: String) { Media(search: $search, type: MANGA) { coverImage { extraLarge large } } }',
+        variables: { search: cleanTitle },
+      }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const img = json?.data?.Media?.coverImage?.extraLarge || json?.data?.Media?.coverImage?.large || null;
+      if (img) return img;
+    }
+  } catch {
+    // try MangaDex next
+  }
+
+  // Plan B-2: MangaDex public API
+  try {
+    const res = await fetch(
+      `https://api.mangadex.org/manga?title=${encodeURIComponent(cleanTitle)}&limit=1&includes[]=cover_art`,
+      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(4000) }
+    );
+    if (res.ok) {
+      const json = await res.json();
+      const item = json?.data?.[0];
+      const coverRel = item?.relationships?.find((r) => r.type === 'cover_art');
+      const fileName = coverRel?.attributes?.fileName;
+      if (item?.id && fileName) {
+        return `https://uploads.mangadex.org/covers/${item.id}/${fileName}.512.jpg`;
+      }
+    }
+  } catch {
+    // ignore fallback failure
+  }
+
+  return null;
+}
+
+export async function backfillMissingMangaCovers(pool, limit = 10) {
+  const { rows } = await pool.query(
+    `SELECT manga_id, title FROM manga_cache WHERE (cover_url IS NULL OR cover_url = '') AND is_active = true ORDER BY cached_at DESC LIMIT $1`,
+    [limit]
+  );
+  let updated = 0;
+  for (const row of rows) {
+    const cover = await resolveFallbackMangaCover(row.title);
+    if (cover) {
+      await pool.query(`UPDATE manga_cache SET cover_url = $2 WHERE manga_id = $1`, [row.manga_id, cover]);
+      updated += 1;
+    }
+  }
+  return { checked: rows.length, updated };
+}
+
 export async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
+  let coverUrl = manga.cover_url || null;
+  if (!coverUrl && manga.title) {
+    try {
+      const existing = await pool.query(`SELECT cover_url FROM manga_cache WHERE manga_id = $1 LIMIT 1`, [manga.id]);
+      if (!existing.rows[0]?.cover_url) {
+        coverUrl = await resolveFallbackMangaCover(manga.title);
+      }
+    } catch {
+      // keep null if lookup fails
+    }
+  }
+
   await pool.query(
     `
     INSERT INTO manga_cache
@@ -375,7 +449,7 @@ export async function upsertManga(pool, manga, { popularityScore = 0 } = {}) {
       manga.id,
       manga.title,
       manga.description || null,
-      manga.cover_url || null,
+      coverUrl,
       manga.status,
       JSON.stringify(manga.tags || []),
       manga.content_rating || null,

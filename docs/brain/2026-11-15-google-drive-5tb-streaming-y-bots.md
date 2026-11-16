@@ -254,3 +254,20 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
 
 
 
+
+---
+
+## 10. Ajustes de Cabecera, Hero en Modo Claro, "Detener tráiler", Carrusel en Mi Lista y Rediseño de Tarjetas Manga
+
+- **Botón `"Detener tráiler"` compacto (`components/AnimeSeriesModalStyles.ts`, `components/AnimeSeriesModal.tsx`):** Se eliminó `right: 16` de `trailerCloseButton` y se aplicó `left: 16, alignSelf: 'flex-start'` para evitar que se estirara al 100% del modal en React Native Web.
+- **Cabecera sólida en modo claro y oscuro (`components/Header.tsx`, `screens/MangaScreen.tsx`, `screens/MyListScreen.tsx`):** `MangaScreen` y `MyListScreen` ahora pasan `black` (igual que `NSFWScreen`) y `Header.tsx` usa `'rgba(255, 255, 255, 0.96)'` en modo claro / `'rgba(5, 5, 5, 0.96)'` en modo oscuro para evitar barras transparentes al hacer scroll.
+- **`CatalogHero` en modo claro (`components/CatalogHero.tsx`):** Cuando `theme === 'light'` y no hay banner panorámico (`lightPortrait`, usado en Manga y Hentai), `AnimeArtwork` usa `colors.background` en lugar de `#050505`, el texto pasa a color oscuro legible y la transición inferior se acorta al 10% (`locations={[0, 0.9, 1]}`) para no lavar la parte inferior del póster vertical.
+- **Carrusel `<` / `>` en `"Continuar viendo"` (`screens/MyListScreen.tsx`):** Se amplió el límite a 30 ítems y se añadieron botones laterales `<` y `>` en escritorio para navegar horizontalmente en ambas direcciones.
+- **Rediseño `MangaCard` y Plan B sin portada (`components/MangaComponents.tsx`, `server/services/mangaService.js`):**
+  - Título, capítulo (`Cap. X`) y formato/fecha ahora viven dentro de la parte inferior de `posterBox` sobre un gradiente compacto (`44%` inferior), con estado `hovered` en web sin tapar el arte superior.
+  - `PremiumCoverFallback` reemplaza el antiguo badge duplicado `ONGOING` por un monograma limpio con iniciales del título, barra roja de acento y etiqueta de formato.
+  - En `server/services/mangaService.js`, `resolveFallbackMangaCover()` y `backfillMissingMangaCovers()` consultan AniList GraphQL y MangaDex cuando `cover_url` llega vacío.
+- **Validaciones reales:**
+  - `npx tsc --noEmit` (0 errores nuevos; solo 2 preexistentes en `services/offlineDownloads.ts:83`), `node --check server/services/mangaService.js`, `node --test tests/*.mjs` (**122/122** en verde).
+  - `npm run build:web -- --output-dir dist` (`index-7a6c7e488be63c12c1350782b4d944eb.js`) desplegado en `arle` con `pm2 restart pixel-backend`.
+  - Verificación visual en `https://pixelnosekai.com/` (escritorio `1280x800`, modo claro): `"Detener tráiler"` compacto (`153.8px`), `CatalogHero` claro sin caja negra ni niebla blanca en Manga y Hentai, `Header` blanco sólido al hacer scroll en Manga/Hentai/Mi Lista, `MangaCard` con texto integrado e ítem sin portada (`Toxicólogo del Clan Tang de Sichuan`) con monograma limpio sin badge duplicado, y flechas `<` / `>` funcionales en `Continuar viendo`.
