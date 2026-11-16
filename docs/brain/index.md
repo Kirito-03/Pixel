@@ -54,3 +54,5 @@ En estas notas se distinguen explícitamente:
 
 - [[2026-11-16-detalles-ruta-trailer-refresh]]: restauración del detalle por URL, tráiler Drive, relacionados y refresco por sección.
 - [[2026-11-16-detalle-contraste-y-lista]]: contraste, primer/último episodio, respuestas tardías, perfil en fila y formatos de Mi Lista; APK1.0.17/código18.
+
+- [[2026-11-16-hero-sin-saltos]]: altura estable de Inicio, sin saltos de En emisión durante cambios del carrusel.

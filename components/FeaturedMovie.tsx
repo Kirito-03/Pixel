@@ -1,6 +1,6 @@
 import { briefSynopsis, cleanSynopsisText } from '../utils/briefSynopsis';
 import React, { useState } from 'react';
-import { View, Image, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { MovieDetail, AnimeDetail } from '../types';
@@ -33,7 +33,6 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   const [isToggling, setIsToggling] = useState(false);
   const [playHover, setPlayHover] = useState(false);
   const [infoHover, setInfoHover] = useState(false);
-  const [artRatio, setArtRatio] = useState<number | null>(null);
 
   const isAnime = !('release_date' in movie);
   const releaseYear = isAnime ? getAnimeYear((movie as AnimeDetail).startDate) : (movie.release_date ? new Date(movie.release_date).getFullYear() : '');
@@ -86,22 +85,6 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     ? getAnimeImageUrl(((movie as AnimeDetail).coverImage as any)?.extraLarge || (movie as AnimeDetail).coverImage?.large || (movie as AnimeDetail).bannerImage || '')
     : getImageUrl(movie.poster_path || movie.backdrop_path, 'original');
   const bannerUri = isSmallScreen ? undefined : isAnime ? (movie as AnimeDetail).bannerImage || undefined : getImageUrl(movie.backdrop_path, 'original');
-  const heroArtUri = bannerUri || posterUri;
-
-  React.useEffect(() => {
-    let active = true;
-    setArtRatio(null);
-    if (!heroArtUri) return;
-    Image.getSize(
-      heroArtUri,
-      (w, h) => {
-        if (active && w > 0 && h > 0) setArtRatio(w / h);
-      },
-      () => {}
-    );
-    return () => { active = false; };
-  }, [heroArtUri]);
-
   const isLight = theme === 'light';
   // Keep the image vivid in light mode with minimal white veil; only the very bottom joins the page surface.
   const heroTopColors = isLight
@@ -115,22 +98,11 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     : ['rgba(0,0,0,0.68)', 'rgba(0,0,0,0.22)', 'transparent'];
 
   const headerOffset = isSmallScreen ? 0 : (isWeb ? 72 : 64);
-  const desktopAdaptedHeight = (() => {
-    if (artRatio && artRatio >= 2.6) {
-      // Very wide banners (e.g. 1900x400): keep hero crisp without heavy vertical blur or excessive crop
-      return Math.min(560, Math.max(440, Math.round(height * 0.64)));
-    }
-    if (artRatio && artRatio >= 1.15) {
-      // Medium-wide banners (~1920x800 or 16:9): adapt height to image proportion
-      const proportional = Math.round(layoutWidth / Math.max(1.75, artRatio)) + Math.round(headerOffset * 0.6);
-      return Math.min(760, Math.max(540, Math.min(proportional, Math.round(height * 0.82))));
-    }
-    return Math.min(740, Math.max(560, Math.round(height * 0.78)));
-  })();
-
+  // Reserve one viewport-based frame for every slide, before artwork metadata arrives.
+  // Image aspect ratios only affect AnimeArtwork's crop, never the following rows.
   const heroHeight = isSmallScreen
     ? Math.min(640, Math.max(480, Math.round(height * 0.72)))
-    : desktopAdaptedHeight;
+    : Math.min(740, Math.max(560, Math.round(height * 0.78)));
 
   return (
     <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: heroHeight }]}>
