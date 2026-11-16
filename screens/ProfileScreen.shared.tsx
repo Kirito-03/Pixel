@@ -80,12 +80,12 @@ export default function ProfileScreen() {
           <View style={[styles.nav, wide ? styles.navWide : styles.navMobile]}>
             {sections.map(item => <TouchableOpacity key={item.key} accessibilityRole="button" accessibilityLabel={`Perfil: ${item.label}`}
               accessibilityState={{ selected: section === item.key }} onPress={() => setSection(item.key)}
-              style={[styles.navItem, !wide && { paddingHorizontal: 10, gap: 6 }, { backgroundColor: section === item.key ? colors.card : 'transparent' }]}>
+              style={[styles.navItem, !wide && { flex: 1, minWidth: 0, paddingHorizontal: 2, gap: 4, justifyContent: 'center' }, { backgroundColor: section === item.key ? colors.card : 'transparent' }]}>
               <Ionicons name={item.icon} size={18} color={section === item.key ? colors.primary : colors.textMuted} />
-              <Text style={[styles.navLabel, { color: section === item.key ? colors.text : colors.textMuted }]}>{item.label}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.navLabel, !wide && { fontSize: 12, flexShrink: 1 }, { color: section === item.key ? colors.text : colors.textMuted }]}>{item.label}</Text>
             </TouchableOpacity>)}
             {wide && isAdmin && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir administrador" style={styles.navItem} onPress={p.handleAdminAccess}>
-              <Ionicons name="grid-outline" size={18} color={colors.textMuted} /><Text style={[styles.navLabel, { color: colors.textMuted }]}>Administrador</Text>
+              <Ionicons name="grid-outline" size={18} color={colors.textMuted} /><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.navLabel, !wide && { fontSize: 12, flexShrink: 1 }, { color: colors.textMuted }]}>Administrador</Text>
             </TouchableOpacity>}
           </View>
           <View style={styles.content}>
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   themeArea: { gap: 8 }, themeLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 }, themePicker: { flexDirection: 'row', padding: 4, gap: 4, borderRadius: 4 },
   themeOption: { minHeight: 44, minWidth: 108, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 2 },
   layout: { flexDirection: 'row', gap: 48 }, layoutMobile: { flexDirection: 'column', gap: 24 }, nav: { gap: 4 }, navWide: { width: 210 },
-  navMobile: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 }, navItem: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 3 },
+  navMobile: { flexDirection: 'row', flexWrap: 'nowrap', gap: 4 }, navItem: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 3 },
   navLabel: { fontSize: 13, fontWeight: '600' }, content: { flex: 1, minWidth: 0, maxWidth: 780 }, heading: { fontSize: 30, lineHeight: 38, fontWeight: '800' },
   subtitle: { fontSize: 14, lineHeight: 21, marginTop: 6, marginBottom: 24 }, surface: { marginBottom: 20, borderRadius: 3, paddingHorizontal: 20 },
   row: { minHeight: 84, paddingVertical: 18, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 16, rowGap: 12, borderBottomWidth: StyleSheet.hairlineWidth },

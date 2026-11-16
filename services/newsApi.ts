@@ -22,13 +22,13 @@ export type NewsArticle = {
 };
 
 export const newsApi = {
-  async list(params?: { category?: string; page?: number; limit?: number; featured?: boolean }) {
-    const { data } = await backendClient.get('/api/news', { params });
+  async list(params?: { category?: string; page?: number; limit?: number; featured?: boolean }, refresh = false) {
+    const { data } = await backendClient.get('/api/news', { params, ...(refresh ? { cache: false as const } : {}) });
     return data as { data: NewsArticle[]; pagination: { page: number; limit: number; total: number } };
   },
 
-  async featured(params?: { limit?: number }) {
-    const { data } = await backendClient.get('/api/news/featured', { params });
+  async featured(params?: { limit?: number }, refresh = false) {
+    const { data } = await backendClient.get('/api/news/featured', { params, ...(refresh ? { cache: false as const } : {}) });
     return data as { featured: NewsArticle | null; items: NewsArticle[]; meta?: { used_fallback_hero?: boolean } };
   },
 

@@ -29,8 +29,8 @@ export default function NewsScreen() {
     const generation = ++requestGeneration.current;
     setLoading(true); setLoadingMore(false); setError(''); setItems([]); setFeatured(null); setPage(1); setTotal(0);
     void Promise.all([
-      newsApi.list({ category: category || undefined, page: 1, limit: 24 }),
-      category ? Promise.resolve({ featured: null }) : newsApi.featured({ limit: 1 }).catch(() => ({ featured: null })),
+      newsApi.list({ category: category || undefined, page: 1, limit: 24 }, retry > 0),
+      category ? Promise.resolve({ featured: null }) : newsApi.featured({ limit: 1 }, retry > 0).catch(() => ({ featured: null })),
     ]).then(([list, highlights]) => {
       if (generation !== requestGeneration.current) return;
       setItems(list.data || []); setTotal(list.pagination.total); setFeatured(highlights.featured);
@@ -58,7 +58,7 @@ export default function NewsScreen() {
   return <View style={{ flex: 1, backgroundColor: colors.background }}>
     <Header black={theme === 'dark'} activeSection="Noticias" onProfilePress={() => navigateByLabel('Perfil')} onSearchPress={() => navigateByLabel('Buscar')} onNavPress={navigateByLabel} />
     <View style={{ height: Platform.OS === 'web' ? 90 : 56 + insets.top }} />
-    {Platform.OS === 'android' ? <AndroidNewsFeed items={items} featured={featured} loading={loading} colors={colors} bottomInset={insets.bottom} category={category} categories={categories} onCategoryChange={setCategory} onOpen={open} />
+    {Platform.OS === 'android' ? <AndroidNewsFeed onRefresh={() => setRetry(value => value + 1)} items={items} featured={featured} loading={loading} colors={colors} bottomInset={insets.bottom} category={category} categories={categories} onCategoryChange={setCategory} onOpen={open} />
       : <WebNewsFeed items={items} featured={featured} loading={loading} loadingMore={loadingMore} total={total} error={error} colors={colors} category={category} categories={categories} onCategoryChange={setCategory} onOpen={open} onMore={loadMore} onRetry={() => setRetry(value => value + 1)} />}
   </View>;
 }

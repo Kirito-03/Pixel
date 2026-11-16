@@ -5,6 +5,7 @@ import {
   Text,
   TextInput,
   ScrollView,
+  RefreshControl,
   StyleSheet,
   ActivityIndicator,
   Platform,
@@ -324,6 +325,7 @@ export default function NSFWScreen() {
       />
 
       <ScrollView
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={retryContent} />}
         style={styles.scrollView}
         contentContainerStyle={{
           paddingTop: hasHero ? (headerHeight + (isSmallScreen ? 8 : 14)) : headerHeight + 20,

@@ -126,7 +126,7 @@ export default function SearchScreen() {
     setLoading(true);
     typingTimer.current = setTimeout(async () => {
       try {
-        const response = await universalSearch(text);
+        const response = await universalSearch(text, retryIndex > 0);
         if (!active || searchRequestRef.current !== requestId) return;
         setResults(response.items);
         setSearchNotice(response.unavailable.length ? `No se pudo consultar ${response.unavailable.join(' y ')}. Mostrando los resultados disponibles.` : '');
@@ -217,7 +217,7 @@ export default function SearchScreen() {
 
       </View>
       {!!historyNotice && <Text accessibilityRole="alert" style={[styles.notice, { color: colors.textMuted, width: contentWidth }]}>{historyNotice}</Text>}
-      <FlatList data={filteredResults} numColumns={numCols} key={`search-${numCols}`} style={{ width: contentWidth, alignSelf: 'center' }}
+      <FlatList refreshing={loading} onRefresh={() => setRetryIndex(value => value + 1)} data={filteredResults} numColumns={numCols} key={`search-${numCols}`} style={{ width: contentWidth, alignSelf: 'center' }}
         contentContainerStyle={{ paddingTop: native ? 24 : 32, paddingBottom: 110 + insets.bottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
         ListHeaderComponent={<>
           {!!searchError && <Text accessibilityRole="alert" style={[styles.notice, { color: colors.text }]}>{searchError}</Text>}

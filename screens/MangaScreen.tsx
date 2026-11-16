@@ -1,5 +1,6 @@
+import { dailySelection, localDayKey } from '../utils/catalogSections';
 import Loader from '../components/Loader';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   useWindowDimensions,
   Platform,
   ActivityIndicator,
+  RefreshControl,
   TextInput,
   TouchableOpacity,
   Modal,
@@ -59,6 +61,11 @@ export default function MangaScreen() {
   ];
   const activeFiltersCount = (activeFilter !== 'Todos' ? 1 : 0) + (publicationType ? 1 : 0) + (selectedGenre ? 1 : 0);
   const [search, setSearch] = useState('');
+  const listGeneration = useRef(0);
+  const [refreshingSection, setRefreshingSection] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [heroDay, setHeroDay] = useState(localDayKey);
+  useEffect(() => { const timer = setInterval(() => setHeroDay(localDayKey()), 60000); return () => clearInterval(timer); }, []);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -89,13 +96,15 @@ export default function MangaScreen() {
 
   useEffect(() => {
     let cancelled = false;
+    const generation = ++listGeneration.current;
+    setLoadingMore(false);
     const run = async () => {
-      setLoading(true);
+      if (!refreshingSection) setLoading(true);
       setPage(1);
       try {
         const status = activeFilter === 'Todos' ? undefined : activeFilter;
         const q = search.trim();
-        const limit = isSmallScreen ? 24 : 36;
+        const limit = 36;
         const [list, pop] = await Promise.all([
           mangaApi.list({
             page: 1,
@@ -105,8 +114,8 @@ export default function MangaScreen() {
             order: 'updated',
             publicationType: publicationType || undefined,
             genre: selectedGenre || undefined,
-          }),
-          mangaApi.popular({ limit: 5 }).catch(() => ({ items: [] })),
+          }, refreshingSection),
+          mangaApi.popular({ limit: 30 }, refreshingSection).catch(() => ({ items: [] })),
         ]);
         if (cancelled) return;
         const rows = (list.items || list.data || []) as Manga[];
@@ -118,24 +127,26 @@ export default function MangaScreen() {
         setItems([]);
         setHasMore(false);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) { setLoading(false); setRefreshingSection(false); }
       }
     };
     const t = setTimeout(run, 240);
     return () => {
       cancelled = true;
+      if (listGeneration.current === generation) listGeneration.current++;
       clearTimeout(t);
     };
-  }, [activeFilter, publicationType, selectedGenre, search, isSmallScreen]);
+  }, [activeFilter, publicationType, selectedGenre, search, refreshVersion]);
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
+    const generation = listGeneration.current;
     try {
       const nextPage = page + 1;
       const status = activeFilter === 'Todos' ? undefined : activeFilter;
       const q = search.trim();
-      const limit = isSmallScreen ? 24 : 36;
+      const limit = 36;
       const list = await mangaApi.list({
         page: nextPage,
         limit,
@@ -145,6 +156,7 @@ export default function MangaScreen() {
         publicationType: publicationType || undefined,
         genre: selectedGenre || undefined,
       });
+      if (generation !== listGeneration.current) return;
       const rows = (list.items || list.data || []) as Manga[];
       setItems((prev) => {
         const seen = new Set(prev.map((x) => x.id));
@@ -153,16 +165,16 @@ export default function MangaScreen() {
       setPage(nextPage);
       setHasMore(rows.length >= limit);
     } catch {
-      setHasMore(false);
+      if (generation === listGeneration.current) setHasMore(false);
     } finally {
-      setLoadingMore(false);
+      if (generation === listGeneration.current) setLoadingMore(false);
     }
   };
 
   const mapped = useMemo(() => items.map(toUI), [items]);
   const heroItems: CatalogHeroItem[] = useMemo(
     () =>
-      popular.slice(0, 5).map((p) => ({
+      dailySelection(popular, heroDay, 5).map((p) => ({
         key: p.id,
         title: p.title,
         poster: p.cover_url || undefined,
@@ -171,7 +183,7 @@ export default function MangaScreen() {
           p.description ||
           'Explora los capítulos disponibles y continúa tu lectura al instante.',
       })),
-    [popular]
+    [popular, heroDay]
   );
 
   const showHero = !search.trim() && activeFilter === 'Todos' && !publicationType && !selectedGenre && heroItems.length > 0;
@@ -187,6 +199,7 @@ export default function MangaScreen() {
       />
 
       <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshingSection} onRefresh={() => { setRefreshingSection(true); setRefreshVersion(value => value + 1); }} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,

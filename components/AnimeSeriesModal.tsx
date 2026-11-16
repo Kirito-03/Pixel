@@ -1,3 +1,5 @@
+import { resolveAnimeTrailer, relatedAnime, seriesSearchTerm } from '../services/animePresentation';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { briefSynopsis, cleanSynopsisText } from '../utils/briefSynopsis';
 import MovieRow from './MovieRow';
 import TrailerPreview from './TrailerPreview';
@@ -38,8 +40,7 @@ import { useMyList } from '../contexts/MyListContext';
 import EpisodePlayer from './EpisodePlayer';
 import { canReachUrl } from '../services/connectivity';
 import { offlineDownloads } from '../services/offlineDownloads';
-import { getResumeTarget } from '../services/resumeTarget';
-import { seriesPlaybackTarget } from '../services/seriesPlaybackTarget';
+import { latestAiringEpisode, seriesPlaybackTarget } from '../services/seriesPlaybackTarget';
 import { animeModalPalette } from './AnimeSeriesModalStyles';
 import { useTheme } from '../contexts/ThemeContext';
 import Loader from './Loader';
@@ -50,6 +51,7 @@ interface AnimeSeriesModalProps {
   content: ContentItem | null;
   visible: boolean;
   onClose: () => void;
+  onContentChange?: (content: ContentItem) => void;
   playback?: React.ReactNode;
   onClosePlayback?: () => void;
   onPlayEpisode?: (episode: AnimeEpisode, season: AnimeSeason, resumeTimeSeconds?: number) => void;
@@ -59,19 +61,33 @@ export default function AnimeSeriesModal({
   content,
   visible: modalVisible,
   onClose,
+  onContentChange,
   onPlayEpisode,
   playback,
   onClosePlayback,
 }: AnimeSeriesModalProps) {
   const { colors, theme } = useTheme();
+  const detailNavigation = useNavigation<any>();
+  const detailFocused = useIsFocused();
   const { styles, heroStyles, continueStyles, infoStyles, epStyles, simStyles } = React.useMemo(() => animeModalPalette(colors), [colors]);
   const visible = modalVisible && !playback;
-  const [currentContent, setCurrentContent] = useState<ContentItem | null>(null);
+  const currentContent = content;
+  const requestScope = useRef({ id: content?.id, visible: modalVisible, details: 0, streams: 0 });
+  if (requestScope.current.id !== content?.id || requestScope.current.visible !== modalVisible) {
+    requestScope.current = { id: content?.id, visible: modalVisible, details: requestScope.current.details + 1, streams: requestScope.current.streams + 1 };
+  }
   const detailScrollRef = useRef<ScrollView>(null);
-  const [detailData, setDetailData] = useState<MovieDetail | TVShowDetail | AnimeDetail | null>(null);
-  const [trailerKey, setTrailerKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (Platform.OS === 'web' && detailFocused && visible && currentContent?.type === 'anime') detailNavigation.setParams({ anime: currentContent.id });
+  }, [detailFocused, visible, currentContent?.id]);
+  const [loadedDetailData, setDetailData] = useState<MovieDetail | TVShowDetail | AnimeDetail | null>(null);
+  const [trailerFallback, setTrailerFallback] = useState<string | undefined>();
+  const [loadedTrailerKey, setTrailerKey] = useState<string | null>(null);
+  const trailerKey = loadedDetailData && String(loadedDetailData.id) === String(currentContent?.id) ? loadedTrailerKey : null;
   const [loading, setLoading] = useState(true);
   // Lista de contenido relacionado en formato unificado
+  const relatedGeneration = useRef(0);
+  const relatedScope = useRef(currentContent?.id); relatedScope.current = currentContent?.id;
   const [relatedContent, setRelatedContent] = useState<ContentItem[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
   const [showTrailer, setShowTrailer] = useState(false);
@@ -79,8 +95,10 @@ export default function AnimeSeriesModal({
   const [trailerFinished, setTrailerFinished] = useState(false);
 
   // Streaming states
-  const [streamingInfo, setStreamingInfo] = useState<StreamingInfo | null>(null);
+  const [loadedStreamingInfo, setStreamingInfo] = useState<StreamingInfo | null>(null);
   const [loadingStreaming, setLoadingStreaming] = useState(true);
+  const detailData = loadedDetailData && String(loadedDetailData.id) === String(currentContent?.id) ? loadedDetailData : null;
+  const streamingInfo = loadedStreamingInfo && loadedStreamingInfo.animeId === String(currentContent?.id) ? loadedStreamingInfo : null;
   const [showEpisodePlayer, setShowEpisodePlayer] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<AnimeEpisode | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<AnimeSeason | null>(null);
@@ -97,24 +115,9 @@ export default function AnimeSeriesModal({
   const isSmallScreen = width < 768;
   const androidCompact = Platform.OS === 'android' && isSmallScreen;
   const insets = useSafeAreaInsets();
-  const [continueTarget, setContinueTarget] = useState<ReturnType<typeof seriesPlaybackTarget>>(null);
-  const [loadingContinue, setLoadingContinue] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    setContinueTarget(null);
-    if (!visible || currentContent?.type !== 'anime' || !streamingInfo || loadingStreaming) return;
-    const seasons = streamingInfo.seasons;
-    setLoadingContinue(true);
-    const resolve = async () => {
-      try {
-        const resume = currentProfile?.id ? await getResumeTarget(Number(currentContent.id), Number(currentProfile.id)) : undefined;
-        if (!cancelled) setContinueTarget(seriesPlaybackTarget(seasons, resume));
-      } catch { if (!cancelled) setContinueTarget(seriesPlaybackTarget(seasons)); }
-      finally { if (!cancelled) setLoadingContinue(false); }
-    };
-    void resolve();
-    return () => { cancelled = true; };
-  }, [visible, currentContent?.id, currentProfile?.id, streamingInfo, loadingStreaming, showEpisodePlayer]);
+  const firstPlayable = seriesPlaybackTarget(streamingInfo?.seasons || []);
+  const continueTarget = latestAiringEpisode(streamingInfo?.seasons || [], (detailData as any)?.status || streamingInfo?.status);
+  const loadingContinue = false;
   const [refreshing, setRefreshing] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -136,12 +139,12 @@ export default function AnimeSeriesModal({
 
   useEffect(() => {
     if (content) {
-      setCurrentContent(content);
+      setShowTrailer(false); setTrailerDelay(false); setTrailerFinished(false);
       setDetailData(null);
       setStreamingInfo(null);
       setLoadingStreaming(true);
       setSelectedSeason(null);
-      setTrailerKey(null);
+      setTrailerKey(null); setTrailerFallback(undefined);
       descSlideAnim.setValue(12);
       Animated.sequence([
         Animated.timing(contentFadeAnim, { toValue: 0, duration: 160, useNativeDriver: true }),
@@ -227,34 +230,22 @@ export default function AnimeSeriesModal({
       setCurrentInDownloads(false);
       return;
     }
+    let active = true;
     offlineDownloads
       .getSeasonSummary(profileId, episodeIds)
-      .then((s) => setCurrentInDownloads(s.total > 0 && s.downloaded === s.total))
-      .catch(() => setCurrentInDownloads(false));
-  }, [visible, currentProfile?.id, selectedSeason?.id]);
+      .then((s) => { if (active) setCurrentInDownloads(s.total > 0 && s.downloaded === s.total); })
+      .catch(() => { if (active) setCurrentInDownloads(false); });
+    return () => { active = false; };
+  }, [visible, currentProfile?.id, currentContent?.id, selectedSeason]);
 
 
-
-  useEffect(() => {
-    if (!currentContent) return;
-    setDetailData(null);
-    setStreamingInfo(null);
-    setSelectedSeason(null);
-    setTrailerKey(null);
-    descSlideAnim.setValue(12);
-    Animated.sequence([
-      Animated.timing(contentFadeAnim, { toValue: 0, duration: 160, useNativeDriver: true }),
-      Animated.parallel([
-        Animated.timing(contentFadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.timing(descSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]),
-    ]).start();
-  }, [currentContent?.id]);
 
   const loadContentDetails = async () => {
     if (!currentContent) return;
 
-    console.log('Loading content details for:', currentContent);
+    const request = ++requestScope.current.details;
+    const id = currentContent.id;
+    const active = () => requestScope.current.visible && requestScope.current.id === id && requestScope.current.details === request;
     setLoading(true);
     try {
       let details;
@@ -271,8 +262,9 @@ export default function AnimeSeriesModal({
             english: anime.title_english || undefined,
             native: anime.title_japanese || anime.title,
           },
-          trailer: anime.trailer_id ? { id: anime.trailer_id, site: anime.trailer_site || 'youtube' } : undefined,
+          trailer: anime.trailer_id || anime.trailer_site?.toLowerCase() === 'gdrive' ? { id: anime.trailer_id || '', site: anime.trailer_site || 'youtube' } : undefined,
           description: anime.description || '',
+          franchise_key: anime.franchise_key,
           translation_status: anime.translation_status,
           coverImage: {
             large: anime.poster_url || '',
@@ -294,6 +286,7 @@ export default function AnimeSeriesModal({
         details = await getMovieDetails(currentContent.id);
       }
 
+      if (!active()) return;
       setDetailData(details);
 
       // Extraer trailer
@@ -302,11 +295,9 @@ export default function AnimeSeriesModal({
 
       if (currentContent.type === 'anime' && 'trailer' in details && (details as AnimeDetail).trailer) {
         const t = (details as AnimeDetail).trailer;
-        if (t && t.site && t.site.toLowerCase() === 'youtube' && t.id) {
-          setTrailerKey(String(t.id));
-        } else {
-          setTrailerKey(null);
-        }
+        const source = resolveAnimeTrailer({ id: currentContent.id, trailer_id: t?.id, trailer_site: t?.site });
+        setTrailerKey(source?.id || null);
+        setTrailerFallback(source?.fallbackYoutubeId);
       } else if ('videos' in details && (details as any).videos) {
         trailer = (details as any).videos.results.find(
           (video: any) => video.type === 'Trailer' && video.site === 'YouTube'
@@ -321,22 +312,25 @@ export default function AnimeSeriesModal({
         } else if (anyVideo) {
           setTrailerKey(anyVideo.key);
         } else {
-          setTrailerKey(null);
+          setTrailerKey(null); setTrailerFallback(undefined);
         }
       } else {
-        setTrailerKey(null);
+        setTrailerKey(null); setTrailerFallback(undefined);
       }
     } catch (error) {
+      if (!active()) return;
       console.error('Error loading content details:', error);
-      setTrailerKey(null);
+      setTrailerKey(null); setTrailerFallback(undefined);
     } finally {
-      setLoading(false);
+      if (active()) setLoading(false);
     }
   };
 
   const loadStreamingInfo = async () => {
     if (!currentContent || currentContent.type !== 'anime') return;
-
+    const request = ++requestScope.current.streams;
+    const id = currentContent.id;
+    const active = () => requestScope.current.visible && requestScope.current.id === id && requestScope.current.streams === request;
     setLoadingStreaming(true);
     try {
       const [anime, episodes] = await Promise.all([
@@ -344,6 +338,7 @@ export default function AnimeSeriesModal({
         catalogService.getAnimeEpisodes(currentContent.id),
       ]);
 
+      if (!active()) return;
       const grouped = new Map<number, AnimeEpisode[]>();
       for (const ep of episodes) {
         const season = typeof ep.season === 'number' ? ep.season : 1;
@@ -388,6 +383,7 @@ export default function AnimeSeriesModal({
       setStreamingInfo(info);
       setSelectedSeason(info.seasons[0] || null);
     } catch (error) {
+      if (!active()) return;
       console.error('Error loading streaming data:', error);
       setStreamingInfo({
         animeId: String(currentContent.id),
@@ -401,7 +397,7 @@ export default function AnimeSeriesModal({
       });
       setSelectedSeason(null);
     } finally {
-      setLoadingStreaming(false);
+      if (active()) setLoadingStreaming(false);
     }
   };
 
@@ -423,6 +419,7 @@ export default function AnimeSeriesModal({
 
   const loadRelatedContent = async () => {
     if (!currentContent) return;
+    const request = ++relatedGeneration.current, animeId = currentContent.id;
 
     setLoadingRelated(true);
     try {
@@ -431,14 +428,12 @@ export default function AnimeSeriesModal({
 
       if (currentContent.type === 'anime') {
         try {
-          const genres = currentContent.genres || [];
-          if (genres.length > 0) {
-            const response = await catalogService.getAnimeList({ genre: genres[0], limit: 15 });
-            similar = (response.data || []).filter(a => String(a.id) !== String(currentContent.id));
-          } else {
-            const response = await catalogService.getAnimeList({ limit: 15 });
-            similar = (response.data || []).filter(a => String(a.id) !== String(currentContent.id));
-          }
+          const current = await catalogService.getAnimeById(currentContent.id);
+          const [genrePool, franchisePool] = await Promise.all([
+            catalogService.getAnimeList({ genre: current.genres?.[0] || undefined, limit: 40 }),
+            current.franchise_key ? catalogService.getAnimeList({ franchise: current.franchise_key, limit: 40 }) : seriesSearchTerm(current.title).length >= 6 ? catalogService.getAnimeList({ search: seriesSearchTerm(current.title), limit: 40 }) : Promise.resolve({ data: [] }),
+          ]);
+          similar = relatedAnime(current, franchisePool.data || [], genrePool.data || []);
         } catch (error) {
           console.log('Error loading related anime');
         }
@@ -489,12 +484,11 @@ export default function AnimeSeriesModal({
         mapped = unique.map((show: any) => tmdbToContentItem(show as any, 'tv'));
       }
 
-      setRelatedContent(mapped.slice(0, 15));
+      if (request === relatedGeneration.current && relatedScope.current === animeId) setRelatedContent(mapped.slice(0, 15));
     } catch (error) {
-      console.error('Error loading related content:', error);
-      setRelatedContent([]);
+      if (request === relatedGeneration.current && relatedScope.current === animeId) setRelatedContent([]);
     } finally {
-      setLoadingRelated(false);
+      if (request === relatedGeneration.current && relatedScope.current === animeId) setLoadingRelated(false);
     }
   };
 
@@ -555,34 +549,9 @@ export default function AnimeSeriesModal({
       Array.isArray(streamingInfo.seasons) &&
       streamingInfo.seasons.length > 0
     ) {
-      const firstSeason = streamingInfo.seasons[0];
-      const firstEpisode = firstSeason?.episodes?.[0];
-      if (!firstEpisode) return;
-
-      if (!currentProfile?.id || !currentContent?.id) {
-        handlePlayEpisode(firstEpisode, firstSeason, 0);
-        return;
-      }
-
-      try {
-        const target = await getResumeTarget(Number(currentContent.id), Number(currentProfile.id));
-        const targetEpisodeId = target.episodeId ? String(target.episodeId) : '';
-        const resumeTime = Number(target.resumeTime || 0);
-        if (targetEpisodeId) {
-          for (const s of streamingInfo.seasons) {
-            const ep = s.episodes?.find((e) => String(e.id) === targetEpisodeId);
-            if (ep) {
-              handlePlayEpisode(ep, s, resumeTime);
-              return;
-            }
-          }
-        }
-        handlePlayEpisode(firstEpisode, firstSeason, 0);
-        return;
-      } catch {
-        handlePlayEpisode(firstEpisode, firstSeason, 0);
-        return;
-      }
+      if (!firstPlayable) return;
+      handlePlayEpisode(firstPlayable.episode, firstPlayable.season, 0);
+      return;
     }
 
     // Películas de anime: abrir trailer si está disponible
@@ -744,15 +713,17 @@ export default function AnimeSeriesModal({
   // Fallback para Web: abrir el trailer directamente en YouTube si el iframe falla
   const openExternalTrailer = (key?: string | null) => {
     if (!key) return;
+    const target = /^https:\/\/pixelnosekai\.com\/api\/stream\/Anime\/\d+\/trailer\.mp4$/.test(key) ? key : /^[A-Za-z0-9_-]{11}$/.test(key) ? `https://www.youtube.com/watch?v=${key}` : null;
+    if (!target) return;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       try {
-        window.open(`https://www.youtube.com/watch?v=${key}`, '_blank');
+        window.open(target, '_blank');
       } catch (e) {
 
       }
     } else {
       try {
-        Linking.openURL(`https://www.youtube.com/watch?v=${key}`);
+        Linking.openURL(target);
       } catch (e) {
 
       }
@@ -886,7 +857,7 @@ export default function AnimeSeriesModal({
             : currentContent?.backdrop_path
         );
         const isLight = theme === 'light';
-        const lightPortrait = isLight;
+        const lightPortrait = false; // Artwork controls retain cinematic contrast in both themes.
         const heroBg = isLight ? colors.background : '#050505';
         return (
       <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
@@ -920,15 +891,15 @@ export default function AnimeSeriesModal({
             }
           >
             {/* HERO SECTION */}
-            <View style={[heroStyles.heroSection, androidCompact ? { height: undefined, minHeight: trailerDelay ? undefined : 500 } : { height: isSmallScreen ? Math.min(height * 0.55, 430) : Math.min(height * 0.62, 560) }]}>
+            <View style={[heroStyles.heroSection, isSmallScreen ? { height: 'auto', minHeight: trailerDelay ? 0 : 500 } : { height: isSmallScreen ? Math.min(height * 0.55, 430) : Math.min(height * 0.62, 560) }]}>
               {/* Backdrop + gradiente cinematográfico */}
               {trailerDelay && trailerKey && !trailerFinished ? (
-                <View style={[styles.trailerBackground, { paddingTop: 40 }, androidCompact && { position: 'relative', height: undefined, paddingTop: insets.top + 64, paddingBottom: 12 }]}>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Detener tráiler" style={[styles.trailerCloseButton, { top: 4, left: 16, paddingVertical: 4 }, androidCompact && { position: 'relative', top: 0, left: 0, alignSelf: 'flex-start', marginLeft: 16, marginBottom: 10, minHeight: 44 }]} onPress={handleCloseTrailer}>
+                <View style={[styles.trailerBackground, { paddingTop: 40 }, isSmallScreen && { position: 'relative', height: 'auto', minHeight: 0, paddingTop: insets.top + 64, paddingBottom: 12 }]}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Detener tráiler" style={[styles.trailerCloseButton, { top: 4, left: 16, paddingVertical: 4 }, isSmallScreen && { position: 'relative', top: 0, left: 0, alignSelf: 'flex-start', marginLeft: 16, marginBottom: 10, minHeight: 44 }]} onPress={handleCloseTrailer}>
                     <Ionicons name="close" size={20} color="#FFFFFF" />
                     <Text style={styles.trailerCloseText}>Detener tráiler</Text>
                   </TouchableOpacity>
-                  {androidCompact ? <View style={{ width: '100%', aspectRatio: 16 / 9 }}><TrailerPreview id={trailerKey} onEnded={handleCloseTrailer} /></View> : <TrailerPreview id={trailerKey} onEnded={handleCloseTrailer} />}
+                  {isSmallScreen ? <View style={{ width: '100%', aspectRatio: 16 / 9 }}><TrailerPreview id={trailerKey} fallbackYoutubeId={trailerFallback} onEnded={handleCloseTrailer} /></View> : <TrailerPreview id={trailerKey} fallbackYoutubeId={trailerFallback} onEnded={handleCloseTrailer} />}
                 </View>
               ) : (
                 <>
@@ -946,25 +917,9 @@ export default function AnimeSeriesModal({
                       ? ((currentContent as any)?.poster_position || '50% 18%')
                       : (currentContent as any)?.banner_position}
                   />
-                  {/* En modo claro sin degradado negro y con velo mínimo; en modo oscuro conserva sombreado cinematográfico */}
-                  {isLight && hasLandscapeBanner && (
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.38)', 'rgba(255,255,255,0.08)', 'transparent']}
-                      start={{ x: 0, y: 0.5 }}
-                      end={{ x: 1, y: 0.5 }}
-                      locations={[0, 0.48, 0.82]}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  )}
                   <LinearGradient
-                    colors={isLight ? ['transparent', 'transparent', 'rgba(255,255,255,0.14)', colors.background] : [
-                      'rgba(0,0,0,0.22)',
-                      'rgba(0,0,0,0.12)',
-                      'rgba(0,0,0,0.52)',
-                      'rgba(0,0,0,0.78)',
-                      colors.background,
-                    ]}
-                    locations={isLight ? [0, 0.8, 0.92, 1] : [0, 0.45, 0.72, 0.9, 1]}
+                    colors={['rgba(0,0,0,0.12)', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.88)', '#080808']}
+                    locations={[0, 0.35, 0.78, 1]}
                     style={StyleSheet.absoluteFill}
                   />
                 </>
@@ -972,7 +927,7 @@ export default function AnimeSeriesModal({
 
               {/* Contenido sobre el backdrop */}
               {!trailerDelay && (
-                <View style={[heroStyles.heroContent, androidCompact && { position: 'relative', top: undefined, bottom: undefined, right: undefined, width: '100%', transform: [{ translateY: 0 }], paddingTop: insets.top + 88, paddingBottom: 28, paddingHorizontal: 20, maxWidth: undefined }, !isSmallScreen && { left: Math.max(24, (width - 1120) / 2), maxWidth: 740 }] }>
+                <View style={[heroStyles.heroContent, isSmallScreen && { position: 'relative', top: undefined, bottom: undefined, right: undefined, width: '100%', transform: [{ translateY: 0 }], paddingTop: insets.top + 88, paddingBottom: 28, paddingHorizontal: 20, maxWidth: undefined }, !isSmallScreen && { left: Math.max(24, (width - 1120) / 2), maxWidth: 740 }] }>
                   {/* Rating + año + estado */}
                   <View style={heroStyles.metaRow}>
                     {currentContent?.vote_average != null && currentContent.vote_average > 0 && (
@@ -1032,14 +987,14 @@ export default function AnimeSeriesModal({
 
                   {/* Botones de acción */}
                   {currentContent?.type === 'anime' && (isRealAnime() || isAnimeMovie()) && (
-                    <View style={[heroStyles.actionRow, androidCompact && { flexWrap: 'nowrap', width: '100%', gap: 8 }]}>
-                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reproducir anime" disabled={loadingStreaming || !streamingInfo?.seasons?.some(s => s.episodes.length > 0)} style={[heroStyles.btnPlay, lightPortrait && { backgroundColor: '#111111' }, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, (!streamingInfo?.seasons?.some(s => s.episodes.length > 0)) && { opacity: 0.45 }]} onPress={handleWatchNow}>
+                    <View style={[heroStyles.actionRow, isSmallScreen && { flexWrap: 'nowrap', width: '100%', gap: 8 }]}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reproducir anime" disabled={loadingStreaming || !firstPlayable} style={[heroStyles.btnPlay, isSmallScreen && { flex: 1, minWidth: 0, paddingHorizontal: 8 }, lightPortrait && { backgroundColor: '#111111' }, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, (!firstPlayable) && { opacity: 0.45 }]} onPress={handleWatchNow}>
                         <Ionicons name="play" size={18} color={lightPortrait ? '#FFFFFF' : '#111111'} />
-                        <Text numberOfLines={1} style={[heroStyles.btnPlayText, { color: lightPortrait ? '#FFFFFF' : '#111111' }, androidCompact && { fontSize: 13, flexShrink: 1 }]}>{androidCompact ? 'Ver ahora' : 'Reproducir'}</Text>
+                        <Text numberOfLines={1} style={[heroStyles.btnPlayText, { color: lightPortrait ? '#FFFFFF' : '#111111' }, isSmallScreen && { fontSize: 13, flexShrink: 1 }]}>{width < 390 ? 'Play' : 'Reproducir'}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[heroStyles.btnSecondary, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.14)' }, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, isTogglingMyList && { opacity: 0.6 }]}
+                        style={[heroStyles.btnSecondary, isSmallScreen && { flex: 1, minWidth: 0, paddingHorizontal: 8 }, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.14)' }, androidCompact && { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' }, isTogglingMyList && { opacity: 0.6 }]}
                         accessibilityRole="button" accessibilityLabel={currentInMyList ? "Quitar de Mi Lista" : "Añadir a Mi Lista"}
                         onPress={handleToggleList}
                         accessibilityState={{ busy: isTogglingMyList, disabled: isTogglingMyList }} disabled={isTogglingMyList}
@@ -1047,15 +1002,15 @@ export default function AnimeSeriesModal({
                         {isTogglingMyList
                           ? <ActivityIndicator size="small" color={lightPortrait ? colors.text : '#FFFFFF'} />
                           : <Ionicons name={currentInMyList ? 'checkmark' : 'add'} size={18} color={lightPortrait ? colors.text : '#FFFFFF'} />}
-                        <Text numberOfLines={1} style={[heroStyles.btnSecondaryText, lightPortrait && { color: colors.text }, androidCompact && { flexShrink: 1, fontSize: 13 }]}>
+                        <Text numberOfLines={1} style={[heroStyles.btnSecondaryText, lightPortrait && { color: colors.text }, isSmallScreen && { flexShrink: 1, fontSize: 13 }]}>
                           {isTogglingMyList ? 'Guardando…' : currentInMyList ? 'En mi lista' : 'Mi lista'}
                         </Text>
                       </TouchableOpacity>
 
                       {trailerKey && (
-                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tráiler" style={[heroStyles.btnIcon, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.14)' }, androidCompact && { width: 48, minHeight: 48, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={handlePlayTrailer}>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ver tráiler" style={[heroStyles.btnIcon, isSmallScreen && { width: 44, minWidth: 44, height: 44, minHeight: 44, paddingHorizontal: 0, paddingVertical: 0, gap: 0, alignItems: 'center', justifyContent: 'center' }, lightPortrait && { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.14)' }, androidCompact && { width: 48, minHeight: 48, paddingHorizontal: 0, justifyContent: 'center' }]} onPress={handlePlayTrailer}>
                           <Ionicons name="play-circle-outline" size={22} color={lightPortrait ? colors.text : '#FFFFFF'} />
-                          {!androidCompact && <Text style={[heroStyles.btnIconText, lightPortrait && { color: colors.text }]}>Trailer</Text>}
+                          {!isSmallScreen && <Text style={[heroStyles.btnIconText, lightPortrait && { color: colors.text }]}>Trailer</Text>}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1073,15 +1028,15 @@ export default function AnimeSeriesModal({
                   accessibilityRole="button"
                   accessibilityLabel={`Ver episodio ${nextEp.number} de la temporada ${targetSeason.season}`}
                   accessibilityState={{ busy: loadingContinue, disabled: loadingContinue }} disabled={loadingContinue}
-                  style={[continueStyles.card, Platform.OS === 'android' && { marginTop: 0 }]}
+                  style={[continueStyles.card, { marginTop: 0 }]}
                   onPress={() => handlePlayEpisode(nextEp, targetSeason, resumeTime)}
                   activeOpacity={0.92}
                 >
                   {/* Miniatura */}
-                  <View style={continueStyles.thumb}>
-                    {currentContent.poster_path ? (
+                  <View style={[continueStyles.thumb, isSmallScreen && { width: width < 350 ? 78 : 88 }]}>
+                    {(nextEp.image || currentContent.poster_path) ? (
                       <Image
-                        source={{ uri: currentContent.type === 'anime' ? getAnimeImageUrl(currentContent.poster_path) : getImageUrl(currentContent.poster_path, 'w500') }}
+                        source={{ uri: currentContent.type === 'anime' ? getAnimeImageUrl(nextEp.image || currentContent.poster_path) : getImageUrl(currentContent.poster_path, 'w500') }}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="cover"
                       />
@@ -1096,16 +1051,16 @@ export default function AnimeSeriesModal({
                   </View>
 
                   {/* Info */}
-                  <View style={continueStyles.info}>
-                    <Text style={continueStyles.label}>{resumeTime > 0 ? 'CONTINUAR VIENDO' : 'VER EPISODIO'}</Text>
+                  <View style={[continueStyles.info, isSmallScreen && { paddingHorizontal: 8, paddingVertical: 8 }]}>
+                    <Text numberOfLines={1} style={[continueStyles.label, isSmallScreen && { fontSize: 8, letterSpacing: 0.2 }]}>ÚLTIMO DISPONIBLE</Text>
                     <Text style={continueStyles.epTitle} numberOfLines={1}>
                       Ep. {nextEp.number} — {nextEp.title}
                     </Text>
-                    <Text style={continueStyles.duration}>Temporada {targetSeason.season}{resumeTime > 0 ? ` · Minuto ${Math.floor(resumeTime / 60)}` : ''}</Text>
+                    <Text numberOfLines={1} style={continueStyles.duration}>Temporada {targetSeason.season}{resumeTime > 0 ? ` · Minuto ${Math.floor(resumeTime / 60)}` : ''}</Text>
                   </View>
 
                   {/* CTA horizontal premium */}
-                  <View style={continueStyles.playBtn}>
+                  <View style={[continueStyles.playBtn, isSmallScreen && { minWidth: 80, paddingHorizontal: 8 }]}>
                     <Ionicons name="play" size={16} color="#181818" />
                     <Text style={continueStyles.playBtnText}>Ver ahora</Text>
                   </View>
@@ -1364,7 +1319,7 @@ export default function AnimeSeriesModal({
                 <Text style={simStyles.title}>
                   {currentContent?.type === 'movie' ? 'Más películas similares' :
                    currentContent?.type === 'tv' ? 'Más series similares' :
-                   currentContent?.type === 'anime' && isRealAnime() ? 'Más anime similar' :
+                   currentContent?.type === 'anime' && isRealAnime() ? 'Más temporadas y anime similar' :
                    'Más títulos similares'}
                 </Text>
               </View>
@@ -1382,9 +1337,9 @@ export default function AnimeSeriesModal({
                       setStreamingInfo(null);
                       setSelectedSeason(null);
                       setLoadingStreaming(true);
-                      setTrailerKey(null);
+                      setTrailerKey(null); setTrailerFallback(undefined);
                       detailScrollRef.current?.scrollTo({ y: 0, animated: false });
-                      setCurrentContent(item);
+                      onContentChange?.(item);
                     }} />
                   ) : (
                     <View style={simStyles.emptyWrap}>

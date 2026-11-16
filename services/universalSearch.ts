@@ -20,21 +20,21 @@ export function animeSearchResult(anime: any): Extract<UniversalSearchResult, { 
 }
 
 // Small public-only cache: suggestions and the results grid share one request.
-export function createUniversalSearch(deps: { anime: (q: string) => Promise<any[]>; manga: (q: string) => Promise<any> }) {
+export function createUniversalSearch(deps: { anime: (q: string) => Promise<any[]>; manga: (q: string, refresh?: boolean) => Promise<any> }) {
   const cache = new Map<string, { expires: number; response: UniversalSearchResponse }>();
   const pending = new Map<string, Promise<UniversalSearchResponse>>();
-  return async function search(query: string): Promise<UniversalSearchResponse> {
+  return async function search(query: string, refresh = false): Promise<UniversalSearchResponse> {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return { items: [], unavailable: [] };
     const stored = cache.get(q);
-    if (stored && stored.expires > Date.now()) return stored.response;
+    if (!refresh && stored && stored.expires > Date.now()) return stored.response;
     if (pending.has(q)) return pending.get(q)!;
     const request = (async () => {
       const animeTask = Promise.resolve().then(() => deps.anime(q)).then(value => {
         if (!Array.isArray(value)) throw new Error('Invalid anime response');
         return value;
       });
-      const mangaTask = Promise.resolve().then(() => deps.manga(q)).then(value => {
+      const mangaTask = Promise.resolve().then(() => deps.manga(q, refresh)).then(value => {
         const list = Array.isArray(value) ? value : value?.items || value?.data;
         if (!Array.isArray(list)) throw new Error('Invalid manga response');
         return list;
@@ -72,5 +72,5 @@ export function createUniversalSearch(deps: { anime: (q: string) => Promise<any[
 
 export const universalSearch = createUniversalSearch({
   anime: q => catalogService.searchAnime(q),
-  manga: q => mangaApi.list({ search: q, page: 1, limit: 30 }),
+  manga: (q, refresh) => mangaApi.list({ search: q, page: 1, limit: 30 }, refresh),
 });

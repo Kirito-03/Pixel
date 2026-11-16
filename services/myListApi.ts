@@ -19,6 +19,8 @@ export interface MyListEntry {
   content_type: MyListContentType;
   added_at: string;
   anime_title?: string | null;
+  publication_type?: string | null;
+  tags?: string[];
   poster_url?: string | null;
   banner_url?: string | null;
   total_episodes: number | null;
@@ -255,11 +257,15 @@ async function enrichEntryMetadata(entry: MyListEntry): Promise<MyListEntry> {
       const manga = data as {
         title?: string | null;
         cover_url?: string | null;
+        publication_type?: string | null;
+        tags?: string[];
         chapter_count?: number | string | null;
       };
       return {
         ...entry,
         anime_title: manga.title ?? entry.anime_title ?? null,
+        publication_type: typeof manga.publication_type === 'string' ? manga.publication_type : entry.publication_type,
+        tags: Array.isArray(manga.tags) ? manga.tags : entry.tags,
         poster_url: manga.cover_url ?? entry.poster_url ?? null,
         banner_url: entry.banner_url ?? null,
         total_episodes: toNullableNumber(manga.chapter_count) ?? entry.total_episodes,

@@ -87,7 +87,7 @@ export default function AiringScreen() {
   return <View style={{ flex: 1, backgroundColor: colors.background }}>
     <Header black={theme === 'dark'} activeSection="Emisión" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} />
     <View style={{ height: Platform.OS === 'web' ? 90 : 56 + insets.top }} />
-    <FlatList key={`${columns}:${tab}`} data={loading || error ? [] : data} numColumns={columns} keyExtractor={(item: any) => String(tab === 'local' ? item.id : item.mal_id)} ListHeaderComponent={listHeader}
+    <FlatList refreshing={loading} onRefresh={() => setRetry(value => value + 1)} key={`${columns}:${tab}`} data={loading || error ? [] : data} numColumns={columns} keyExtractor={(item: any) => String(tab === 'local' ? item.id : item.mal_id)} ListHeaderComponent={listHeader}
       style={{ width: contentWidth, alignSelf: 'center' }} contentContainerStyle={{ paddingBottom: 110 }} columnWrapperStyle={{ gap }} showsVerticalScrollIndicator={false}
       renderItem={({ item }: any) => <DiscoveryCard width={itemWidth} title={item.title} poster={tab === 'local' ? item.poster_url : item.images?.jpg?.large_image_url || item.images?.webp?.large_image_url}
         rating={Number(tab === 'local' ? item.rating : item.score) || undefined} caption={tab === 'local' ? (item.total_episodes ? `${item.total_episodes} ${Number(item.total_episodes) === 1 ? 'episodio' : 'episodios'} · En emisión` : 'En emisión') : item.broadcast?.time ? `${item.broadcast.time} · Japón` : 'Horario por confirmar'}

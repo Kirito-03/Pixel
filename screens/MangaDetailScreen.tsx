@@ -5,7 +5,7 @@ import { detailPalette } from '../utils/detailPalette';
 import Loader from '../components/Loader';
 import { readingFormat } from '../utils/readingFormat';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
+import { Alert, ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -51,6 +51,7 @@ export default function MangaDetailScreen() {
   const [listError, setListError] = useState('');
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   useEffect(() => setDescriptionExpanded(false), [id]);
+  const [refreshRevision, setRefreshRevision] = useState(0);
   const [manga, setManga] = useState<Manga | null>(null);
   const [chapters, setChapters] = useState<MangaChapter[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
@@ -125,7 +126,7 @@ export default function MangaDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, preferredLanguage, allowEnglishFallback]);
+  }, [id, preferredLanguage, allowEnglishFallback, refreshRevision]);
 
   const tags = useMemo(() => {
     const t = manga?.tags || [];
@@ -194,7 +195,7 @@ export default function MangaDetailScreen() {
         onProfilePress={() => navigateByLabel('Perfil')}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={() => setRefreshRevision(value => value + 1)} />} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {loading ? (
           <View style={styles.loading}>
             <Loader />

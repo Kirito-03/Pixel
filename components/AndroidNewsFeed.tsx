@@ -7,7 +7,7 @@ type FeedColors = { background: string; card: string; text: string; textMuted: s
 type Props = {
   items: NewsArticle[]; featured: NewsArticle | null; loading: boolean;
   category: string; categories: string[]; colors: FeedColors; bottomInset: number;
-  onCategoryChange: (category: string) => void; onOpen: (article: NewsArticle) => void;
+  onCategoryChange: (category: string) => void; onOpen: (article: NewsArticle) => void; onRefresh?: () => void;
 };
 const categoryLabels: Record<string, string> = { '': 'Todo', estreno: 'Estrenos', temporada: 'Temporadas', película: 'Películas', tráiler: 'Tráilers', industria: 'Industria', manga: 'Manga', evento: 'Eventos' };
 function shortDate(value: string | null) {
@@ -32,7 +32,7 @@ function Metadata({ article, colors }: { article: NewsArticle; colors: FeedColor
   </View>;
 }
 
-export default function AndroidNewsFeed({ items, featured, loading, category, categories, colors, bottomInset, onCategoryChange, onOpen }: Props) {
+export default function AndroidNewsFeed({ items, featured, loading, category, categories, colors, bottomInset, onCategoryChange, onOpen, onRefresh }: Props) {
   const { width } = useWindowDimensions();
   const [measuredWidth, setMeasuredWidth] = useState(Math.min(width, 1120));
   const columns = measuredWidth >= 720 ? 2 : 1;
@@ -63,7 +63,7 @@ export default function AndroidNewsFeed({ items, featured, loading, category, ca
         </Pressable>)}
       </ScrollView>
     </View>
-    <FlatList key={`news-${columns}-${category}`} data={stories} numColumns={columns} showsVerticalScrollIndicator={false}
+    <FlatList refreshing={loading} onRefresh={onRefresh} key={`news-${columns}-${category}`} data={stories} numColumns={columns} showsVerticalScrollIndicator={false}
       keyExtractor={article => String(article.slug || article.id)} columnWrapperStyle={columns > 1 ? styles.columns : undefined}
       contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Math.max(20, bottomInset), flexGrow: stories.length ? undefined : 1 }}
       initialNumToRender={8} maxToRenderPerBatch={6} windowSize={7}

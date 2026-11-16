@@ -1,3 +1,4 @@
+import { readingFormat } from '../utils/readingFormat';
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
@@ -207,7 +208,7 @@ const cwStyles = StyleSheet.create({
 // ─────────────────────────────────────────────
 // WATCH LIST ITEM (fila horizontal)
 // ─────────────────────────────────────────────
-export type SavedListItem = Omit<ContentItem, 'id' | 'type'> & { id: string | number; type: 'anime' | 'manga' | 'h_anime' | 'movie' | 'tv' };
+export type SavedListItem = Omit<ContentItem, 'id' | 'type'> & { id: string | number; type: 'anime' | 'manga' | 'h_anime' | 'movie' | 'tv'; publication_type?: string | null; tags?: string[] };
 
 interface WatchListItemProps {
   item: SavedListItem;
@@ -228,8 +229,8 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, mangaChapte
   useEffect(() => { setImageFailed(false); }, [poster]);
   const progressValue = Math.max(0, Math.min(1, progress ?? 0));
   const percent = Math.round(progressValue * 100);
-  const label = item.type === 'manga' ? 'MANGA' : item.type === 'h_anime' ? 'H ANIME · 18+' : item.type === 'anime' ? 'ANIME' : item.type === 'movie' ? 'PELÍCULA' : 'SERIE';
-  const accent = item.type === 'manga' ? colors.accentBlue : colors.primary;
+  const label = item.type === 'manga' ? readingFormat(item).toUpperCase() : item.type === 'h_anime' ? 'H ANIME · 18+' : item.type === 'anime' ? 'ANIME' : item.type === 'movie' ? 'PELÍCULA' : 'SERIE';
+  const accent = item.type === 'manga' ? colors.textSecondary : colors.primary;
   return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver detalles de ${item.title}`} activeOpacity={0.9} onPress={onPress}
     onPressIn={() => Animated.spring(scale, { toValue: 0.98, useNativeDriver: true }).start()}
     onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}>
@@ -266,7 +267,7 @@ export function WatchListItem({ item, currentEpisode, totalEpisodes, mangaChapte
         ) : progressValue > 0 ? (
           <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{percent}% visto</Text>
         ) : (
-          <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{item.type === 'manga' ? 'Leer manga →' : 'Ver detalles →'}</Text>
+          <Text style={[wlStyles.meta, { color: colors.textMuted }]}>{item.type === 'manga' ? 'Continuar lectura →' : 'Ver detalles →'}</Text>
         )}
       </View>
     </Animated.View>

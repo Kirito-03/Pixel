@@ -73,3 +73,9 @@ test('manga is visible among initial suggestions even when many anime match', as
   assert.equal(result.items[1].kind, 'manga');
   assert.equal(result.items.length, 13);
 });
+test('explicit refresh bypasses cached search and forwards the refresh to manga without disabling normal reuse', async()=>{
+ let calls=0, refreshed=false;
+ const search=createUniversalSearch({anime:async()=>{calls++;return[{id:1}];},manga:async(q,refresh)=>{refreshed=refresh;return{items:[]};}});
+ await search('query');await search('query');assert.equal(calls,1);
+ await search('query',true);assert.equal(calls,2);assert.equal(refreshed,true);
+});

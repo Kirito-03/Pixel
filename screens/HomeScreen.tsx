@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions, Alert, Platform, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Dimensions, Alert, Platform, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList, MovieDetail, ContentItem, AnimeDetail } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -130,6 +130,8 @@ export default function HomeScreen({ navigation }: Props) {
         loadContent();
     }, []);
 
+    const [refreshingSection, setRefreshingSection] = useState(false);
+    const refreshSection = async () => { setRefreshingSection(true); try { await loadContent(); } finally { setRefreshingSection(false); } };
     const loadContent = async () => {
         try {
             setLoading(true);
@@ -289,6 +291,7 @@ export default function HomeScreen({ navigation }: Props) {
                 onNavPress={navigateByLabel}
             />
             <ScrollView
+                refreshControl={<RefreshControl refreshing={refreshingSection} onRefresh={refreshSection} />}
                 ref={scrollViewRef}
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}

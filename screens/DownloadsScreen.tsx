@@ -227,6 +227,7 @@ export default function DownloadsScreen({ }: Props) {
 
       {selectedContent?.type === 'anime' ? (
         <AnimeSeriesModal
+          onContentChange={setSelectedContent}
           content={selectedContent}
           visible={modalVisible}
           onClose={() => {

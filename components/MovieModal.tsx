@@ -1,3 +1,5 @@
+import LoadingScreen from './LoadingScreen';
+import { useAnimeDetailLocation } from '../hooks/useAnimeDetailLocation';
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Modal,
@@ -52,16 +54,17 @@ interface MovieModalProps {
 }
 
 export default function MovieModal({ 
-  content, 
+  content: inputContent,
   movie, 
-  visible, 
-  onClose,
+  visible: inputVisible,
+  onClose: requestClose,
   startFromEpisodeId = null,
   startFromTimeSeconds = null,
   onAddToList,
   onRemoveFromList,
   isInList = false 
 }: MovieModalProps) {
+  const { content, visible, onClose, restoring, onContentChange } = useAnimeDetailLocation(inputContent, inputVisible, requestClose);
   const [currentContent, setCurrentContent] = useState<ContentItem | null>(null);
   const [detailData, setDetailData] = useState<MovieDetail | TVShowDetail | null>(null);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
@@ -110,7 +113,7 @@ export default function MovieModal({
     if (content) {
       setCurrentContent(content);
     }
-  }, [content]);
+  }, [content, visible]);
 
   useEffect(() => {
     if (visible && currentContent) {
@@ -514,17 +517,19 @@ export default function MovieModal({
     }
   };
 
-  if (!currentContent && !movie) return null;
+  if (Platform.OS === 'web' && (restoring || (visible && content && (!currentContent || (inputVisible && content.id !== currentContent.id && currentContent.type !== content.type))))) return <Modal visible animationType="none" onRequestClose={onClose}><LoadingScreen /></Modal>;
+  if (!content && !currentContent && !movie) return null;
 
   // Si es anime o serie, usar el componente específico
-  if (currentContent && (currentContent.type === 'anime' || currentContent.type === 'tv')) {
+  if (content && (content.type === 'anime' || content.type === 'tv')) {
     return (
       <AnimeSeriesModalWrapper
-        content={currentContent}
+        content={content}
+        onContentChange={item => { onContentChange(item); setCurrentContent(item); }}
         visible={visible}
         onClose={onClose}
-        startFromEpisodeId={currentContent.type === 'anime' ? startFromEpisodeId : null}
-        startFromTimeSeconds={currentContent.type === 'anime' ? startFromTimeSeconds : null}
+        startFromEpisodeId={content.type === 'anime' ? startFromEpisodeId : null}
+        startFromTimeSeconds={content.type === 'anime' ? startFromTimeSeconds : null}
       />
     );
   }

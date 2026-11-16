@@ -1,3 +1,4 @@
+import { resolveAnimeTrailer } from '../services/animePresentation';
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   TouchableOpacity,
@@ -137,13 +138,8 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
       try {
         const hasTrailerMetadata = 'trailer_checked_at' in movie && movie.trailer_checked_at;
         const detail = hasTrailerMetadata ? movie as ContentItem : await catalogService.getAnimeById(movie.id);
-        const site = detail.trailer_site?.toLowerCase();
-        if (active && site === 'gdrive') {
-          setPreviewId(`https://pixelnosekai.com/api/stream/Anime/${detail.id}/trailer.mp4`);
-          setPreviewFallbackId(detail.trailer_id || undefined);
-        } else if (active && site === 'youtube' && detail.trailer_id && /^[A-Za-z0-9_-]{11}$/.test(detail.trailer_id)) {
-          setPreviewId(detail.trailer_id);
-        }
+        const source = resolveAnimeTrailer(detail as any);
+        if (active && source) { setPreviewId(source.id); setPreviewFallbackId(source.fallbackYoutubeId); }
       } catch { /* Poster remains if trailer metadata is unavailable. */ }
     }, 4500); // Card opens after 500ms: trailer starts at >=5s total hover.
     return () => { active = false; clearTimeout(timer); };

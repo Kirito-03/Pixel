@@ -61,3 +61,13 @@ test('an in-flight connectivity check cannot reopen playback after the user clos
   const reopened = f.render(props);
   assert.equal(details(reopened).props.playback, null);
 });
+
+test('related-title selection is forwarded to the owner so details and the episode player use the same anime',()=>{
+ let selected;
+ const f=fixture();
+ let tree=f.render({...props,onContentChange:item=>{selected=item;}});
+ details(tree).props.onContentChange({id:52,type:'anime',title:'Related'});
+ assert.equal(selected.id,52);
+ tree=f.render({...props,content:selected});
+ assert.equal(details(tree).props.content.id,52);
+});

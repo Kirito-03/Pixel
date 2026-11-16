@@ -13,6 +13,7 @@ interface AnimeSeriesModalWrapperProps {
   content: ContentItem | null;
   visible: boolean;
   onClose: () => void;
+  onContentChange?: (content: ContentItem) => void;
   startFromEpisodeId?: number | null;
   startFromTimeSeconds?: number | null;
 }
@@ -21,6 +22,7 @@ export default function AnimeSeriesModalWrapper({
   content,
   visible,
   onClose,
+  onContentChange,
   startFromEpisodeId = null,
   startFromTimeSeconds = null,
 }: AnimeSeriesModalWrapperProps) {
@@ -170,7 +172,7 @@ export default function AnimeSeriesModalWrapper({
   const sharedWindow = Platform.OS === 'android';
   return (
     <>
-      <AnimeSeriesModal content={content} visible={visible && (sharedWindow || !showEpisodePlayer)}
+      <AnimeSeriesModal onContentChange={onContentChange} content={content} visible={visible && (sharedWindow || !showEpisodePlayer)}
         onClose={onClose} onPlayEpisode={handlePlayEpisode}
         playback={sharedWindow ? player : null} onClosePlayback={handleCloseEpisodePlayer} />
       {!sharedWindow && player && <Modal visible animationType="slide" transparent={false}

@@ -22,3 +22,9 @@ test('no pending episode or missing target does not advertise episode one as nex
   assert.equal(seriesPlaybackTarget(seasons, { episodeId: null, resumeTime: 0 }), null);
   assert.equal(seriesPlaybackTarget(seasons, { episodeId: 999, resumeTime: 0 }), null);
 });
+test('latest shortcut is only for airing series with multiple playable episodes and respects season order', () => {
+  assert.equal(exports.latestAiringEpisode(seasons, 'RELEASING').episode.id, '203');
+  assert.equal(exports.latestAiringEpisode(seasons, 'FINISHED'), null);
+  assert.equal(exports.latestAiringEpisode(seasons, undefined), null);
+  assert.equal(exports.latestAiringEpisode([{ season: 1, episodes: [{ id: '1', number: 1, url: 'video' }, { id: '2', number: 2 }] }], 'RELEASING'), null);
+});

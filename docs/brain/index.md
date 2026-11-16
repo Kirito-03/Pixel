@@ -51,3 +51,6 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-15-inicio-perfiles-y-lectura]]: hero/menu transparente, tipos de lectura, descripción plegable, organización de Perfil, carga propia y selección explícita tras iniciar sesión.
 
 - [[2026-11-15-sesion-tema-sinopsis-es]]: perfil verificado persistente, acceso obligatorio, tema claro, cargas silenciosas, encuadre de banners, sinopsis breves con traducción gratuita guardada, filtros de formatos y APK 1.0.14.
+
+- [[2026-11-16-detalles-ruta-trailer-refresh]]: restauración del detalle por URL, tráiler Drive, relacionados y refresco por sección.
+- [[2026-11-16-detalle-contraste-y-lista]]: contraste, primer/último episodio, respuestas tardías, perfil en fila y formatos de Mi Lista; APK1.0.17/código18.

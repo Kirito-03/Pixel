@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl,
   TouchableOpacity,
   Platform,
   useWindowDimensions,
@@ -59,6 +60,7 @@ export default function MyListScreen() {
   const navigation = useNavigation<any>();
 
   const [items, setItems] = useState<SavedListItem[]>([]);
+  const [refreshingSection, setRefreshingSection] = useState(false);
   const [loading, setLoading] = useState(true);
   const [kind, setKind] = useState('all');
   const [alphabetical, setAlphabetical] = useState(false);
@@ -130,6 +132,8 @@ export default function MyListScreen() {
               type: entry.content_type,
               isAdult: entry.content_type === 'h_anime',
               title: entry.anime_title || `${entry.content_type === 'h_anime' ? 'H Anime' : 'Manga'} #${entry.content_id}`,
+              publication_type: entry.publication_type,
+              tags: entry.tags,
               overview: '',
               poster_path: normalizeImagePath(entry.poster_url),
               backdrop_path: normalizeImagePath(entry.banner_url),
@@ -238,6 +242,7 @@ export default function MyListScreen() {
   };
 
   const closeModal = () => {
+    if (Platform.OS === 'web') navigation.setParams({ anime: undefined });
     setModalVisible(false);
     setStartFromEpisodeId(null);
     setStartFromTimeSeconds(null);
@@ -270,7 +275,7 @@ export default function MyListScreen() {
   const matchesKind = (item: SavedListItem, value: string) => value === 'all' || (value === 'video' ? item.type === 'movie' || item.type === 'tv' : item.type === value);
   const listFilters = [
     { key: 'all', label: 'Todo' }, { key: 'anime', label: 'Anime' },
-    { key: 'manga', label: 'Manga' }, { key: 'h_anime', label: 'H Anime' }, { key: 'video', label: 'Películas y series' },
+    { key: 'manga', label: 'Lecturas' }, { key: 'h_anime', label: 'H Anime' }, { key: 'video', label: 'Películas y series' },
   ].map(filter => ({ ...filter, count: allItems.filter(item => matchesKind(item, filter.key)).length }))
     .filter(filter => filter.key === 'all' || filter.count > 0);
   const visibleItems = useMemo(() => {
@@ -318,6 +323,7 @@ export default function MyListScreen() {
       />
 
       <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshingSection} onRefresh={async () => { setRefreshingSection(true); try { await Promise.all([loadMyList(), refreshMyList(), getAllMangaProgress().then(setMangaProgressById)]); } finally { setRefreshingSection(false); } }} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingTop: Platform.OS === 'web' ? 96 : insets.top + 80, paddingBottom: Math.max(40, insets.bottom + 24), paddingHorizontal: gutter }]}
       >
@@ -500,6 +506,7 @@ export default function MyListScreen() {
       {/* ── MODALES ── */}
       {selectedContent?.type === 'anime' ? (
         <AnimeSeriesModalWrapper
+          onContentChange={setSelectedContent}
           content={selectedContent}
           visible={modalVisible}
           startFromEpisodeId={startFromEpisodeId}

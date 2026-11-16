@@ -73,13 +73,13 @@ export type MangaChapterPages = {
 };
 
 export const mangaApi = {
-  async list(params?: { page?: number; limit?: number; status?: string; search?: string; order?: string; publicationType?: string; genre?: string }) {
-    const { data } = await backendClient.get('/api/manga', { params });
+  async list(params?: { page?: number; limit?: number; status?: string; search?: string; order?: string; publicationType?: string; genre?: string }, refresh = false) {
+    const { data } = await backendClient.get('/api/manga', { params, ...(refresh ? { cache: false as const } : {}) });
     return normalizeList(data) as { items: Manga[]; pagination: { page: number; limit: number; total: number }; meta?: any } | any;
   },
 
-  async popular(params?: { limit?: number }) {
-    const { data } = await backendClient.get('/api/manga/popular', { params });
+  async popular(params?: { limit?: number }, refresh = false) {
+    const { data } = await backendClient.get('/api/manga/popular', { params, ...(refresh ? { cache: false as const } : {}) });
     return normalizeList(data) as { items: (Manga & { rank: number })[]; meta?: any };
   },
 
