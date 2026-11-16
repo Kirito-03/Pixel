@@ -42,6 +42,7 @@ export default function MangaReaderScreen() {
   const setPages = (value: string[]) => setPageState({ id: chapterId, pages: value });
   const [visibleCount, setVisibleCount] = useState(STEP);
   const [activePage, setActivePage] = useState(1);
+  const [atTop, setAtTop] = useState(true);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [retryAttempt, setRetryAttempt] = useState(0);
@@ -88,7 +89,7 @@ export default function MangaReaderScreen() {
   }, [mangaId, preferredLanguage, retryKey, active, paused]);
   useEffect(() => {
     loadedChapter.current = '';
-    setPages([]); setVisibleCount(STEP); setActivePage(1); setPaused(false); setRetryAttempt(0); setMessage('');
+    setPages([]); setVisibleCount(STEP); setActivePage(1); setAtTop(true); setPaused(false); setRetryAttempt(0); setMessage('');
     offsets.current = {};
     listRef.current?.scrollToOffset?.({ offset: 0, animated: false });
     listRef.current?.scrollTo?.({ y: 0, animated: false });
@@ -130,6 +131,21 @@ export default function MangaReaderScreen() {
   }, [legacyChapterId, current?.id]);
   const reload = () => { loadedChapter.current = ''; setPaused(false); setRetryKey(value => value + 1); };
   const loadMore = () => setVisibleCount(count => Math.min(count + STEP, pages.length));
+  const scrollToTop = () => {
+    setAtTop(true);
+    setActivePage(1);
+    listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+    listRef.current?.scrollTo?.({ y: 0, animated: true });
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  const titleBar = (
+    <View style={[styles.topBar, { marginTop: Platform.OS === 'web' ? (width < 768 ? 64 : 72) : 56 + insets.top }]}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()} style={styles.backButton}><Ionicons name="arrow-back" color="#fff" size={22} /></TouchableOpacity>
+      <View style={{ flex: 1, minWidth: 0 }}><Text style={styles.title} numberOfLines={1}>{mangaTitle}</Text><Text style={styles.hint}>{chapterLabel}{pages.length ? ` · Página ${activePage} de ${pages.length}` : ''}</Text></View>
+    </View>
+  );
   const chapterNavigation = (_location: string) => <View style={styles.chapterNavigation}>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Capítulo anterior" disabled={!previous}
       onPress={() => openChapter(previous)} style={[styles.chapterButton, !previous && styles.disabled]}>
@@ -143,15 +159,19 @@ export default function MangaReaderScreen() {
   const footer = hasMore ? <View style={styles.footer}>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cargar más páginas" onPress={loadMore} style={styles.loadMore}><Text style={styles.buttonText}>Cargar más páginas</Text><Ionicons name="chevron-down" size={18} color="#fff" /></TouchableOpacity>
     <Text style={styles.hint}>Mostrando {visibleCount} de {pages.length} páginas</Text>
-  </View> : <View style={styles.footer}><Text style={styles.hint}>Fin del capítulo</Text>{chapterNavigation('final')}</View>;
+  </View> : <View style={styles.footer}>
+    <Text style={styles.hint}>Fin del capítulo</Text>
+    {chapterNavigation('final')}
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ir al inicio del capítulo" onPress={scrollToTop} style={styles.scrollTopButton}>
+      <Ionicons name="arrow-up" size={18} color="#fff" />
+      <Text style={styles.buttonText}>Ir al inicio</Text>
+    </TouchableOpacity>
+  </View>;
 
   return <View style={styles.container}>
     <Header black activeSection="Manga" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} />
-    <View style={[styles.topBar, { marginTop: Platform.OS === 'web' ? width < 768 ? 64 : 72 : 56 + insets.top }]}>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()} style={styles.backButton}><Ionicons name="arrow-back" color="#fff" size={22} /></TouchableOpacity>
-      <View style={{ flex: 1, minWidth: 0 }}><Text style={styles.title} numberOfLines={1}>{mangaTitle}</Text><Text style={styles.hint}>{chapterLabel}{pages.length ? ` · Página ${activePage} de ${pages.length}` : ''}</Text></View>
-    </View>
     {!pages.length ? <ScrollView contentContainerStyle={styles.stateContent}>
+      {titleBar}
       {chapterNavigation('inicio')}
       <View style={styles.status}>
         {(!paused && active) && <Loader onDark />}
@@ -164,15 +184,20 @@ export default function MangaReaderScreen() {
     </ScrollView> : Platform.OS === 'web' ? <ScrollView ref={listRef} contentContainerStyle={styles.listContent} scrollEventThrottle={100}
       onScroll={event => {
         const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+        setAtTop(contentOffset.y <= 24);
         if (hasMore && contentSize.height - contentOffset.y - layoutMeasurement.height < layoutMeasurement.height) loadMore();
         const page = Object.entries(offsets.current).filter(([, y]) => y <= contentOffset.y + layoutMeasurement.height * 0.3).map(([key]) => Number(key)).pop();
         if (page !== undefined) setActivePage(page + 1);
       }}>
+      {titleBar}
       {chapterNavigation('inicio')}
       {visiblePages.map((uri, page) => <View key={`${chapterId}-${page}`} onLayout={event => { offsets.current[page] = event.nativeEvent.layout.y; }}><ReaderImage uri={uri} page={page + 1} active={active} /></View>)}
       {footer}
-    </ScrollView> : <NativeMangaPages key={chapterId} pages={pages} previous={previous ? previous.chapter || '' : null} next={next ? next.chapter || '' : null}
-      active={active} onPrevious={() => openChapter(previous)} onNext={() => openChapter(next)} onPage={setActivePage} />}
+    </ScrollView> : <>
+      {atTop && titleBar}
+      <NativeMangaPages key={chapterId} pages={pages} previous={previous ? previous.chapter || '' : null} next={next ? next.chapter || '' : null}
+        active={active} onPrevious={() => openChapter(previous)} onNext={() => openChapter(next)} onPage={setActivePage} onAtTop={setAtTop} />
+    </>}
   </View>;
 }
 
@@ -191,6 +216,7 @@ const styles = StyleSheet.create({
   statusTitle: { color: '#fff', fontSize: 20, fontWeight: '700', textAlign: 'center' },
   statusCopy: { color: '#bbb', fontSize: 14, lineHeight: 22, textAlign: 'center' },
   loadMore: { minHeight: 48, backgroundColor: '#252525', paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  scrollTopButton: { minHeight: 48, backgroundColor: '#1c1c1c', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 22, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   pauseButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 },
   footer: { width: '100%', maxWidth: 840, alignSelf: 'center', alignItems: 'center', paddingVertical: 24, gap: 12 },
 });

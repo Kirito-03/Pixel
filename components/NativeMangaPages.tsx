@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { WebView } from 'react-native-webview';
 import { nativeReaderHtml } from '../utils/nativeReaderHtml';
 
-export default function NativeMangaPages({ pages, previous, next, active, onPrevious, onNext, onPage }: {
+export default function NativeMangaPages({ pages, previous, next, active, onPrevious, onNext, onPage, onAtTop }: {
   pages: string[]; previous?: string | null; next?: string | null; active: boolean;
-  onPrevious: () => void; onNext: () => void; onPage: (page: number) => void;
+  onPrevious: () => void; onNext: () => void; onPage: (page: number) => void; onAtTop?: (atTop: boolean) => void;
 }) {
   const ref = useRef<WebView>(null);
   const html = useMemo(() => nativeReaderHtml(pages, previous, next), [pages, previous, next]);
@@ -19,5 +19,6 @@ export default function NativeMangaPages({ pages, previous, next, active, onPrev
       if (message.type === 'previous' && previous != null) onPrevious();
       if (message.type === 'next' && next != null) onNext();
       if (message.type === 'page' && Number.isInteger(message.value) && message.value > 0 && message.value <= pages.length) onPage(message.value);
+      if (message.type === 'atTop' && typeof message.value === 'boolean') onAtTop?.(message.value);
     } catch {} }} />;
 }
