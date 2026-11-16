@@ -24,12 +24,12 @@ export default function Loader({ onDark = false, label = 'Cargando', showLabel =
     animation.start();
     return () => animation.stop();
   }, [reducedMotion, tiles]);
-  const ink = onDark ? '#edf4f2' : colors.text;
+  const ink = onDark ? '#FFFFFF' : colors.text;
   return <View accessibilityRole="progressbar" accessibilityLabel={label} accessibilityState={{ busy: true }} style={styles.container}>
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.matrix}>
-      {tiles.map((tile, index) => <Animated.View key={index} style={[styles.tile, { backgroundColor: index === 4 ? '#83bdb4' : ink, opacity: tile, transform: [{ scale: tile.interpolate({ inputRange: [0.25, 1], outputRange: [0.82, 1] }) }] }]} />)}
+      {tiles.map((tile, index) => <Animated.View key={index} style={[styles.tile, { backgroundColor: index === 4 ? colors.primary : ink, opacity: tile, transform: [{ scale: tile.interpolate({ inputRange: [0.25, 1], outputRange: [0.82, 1] }) }] }]} />)}
     </View>
-    {showLabel && <Text style={[styles.label, { color: onDark ? '#b7c4c1' : colors.textMuted }]}>{label}</Text>}
+    {showLabel && <Text style={[styles.label, { color: onDark ? 'rgba(255, 255, 255, 0.72)' : colors.textMuted }]}>{label}</Text>}
   </View>;
 }
 const styles = StyleSheet.create({

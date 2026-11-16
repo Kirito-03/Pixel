@@ -13,7 +13,8 @@ router.get('/', async (req, res) => {
     const order = String(req.query?.order || '').trim();
 
     const publicationType = String(req.query?.publicationType || '').trim();
-    const result = await getMangaList(pool, { page, limit, status, search, order, publicationType });
+    const genre = String(req.query?.genre || '').trim();
+    const result = await getMangaList(pool, { page, limit, status, search, order, publicationType, genre });
     return res.json(result);
   } catch (e) {
     return res.status(500).json({ message: 'Error obteniendo mangas', error: e.message });

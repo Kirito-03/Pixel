@@ -26,6 +26,7 @@ const RCLONE_REMOTE = 'pixel-drive:PixelNoSekai';
 const RCLONE_BIN = existsSync('/data/data/com.termux/files/usr/bin/rclone') ? '/data/data/com.termux/files/usr/bin/rclone' : 'rclone';
 const YTDLP_BIN = process.env.PIXEL_YTDLP_BIN || join(homedir(), 'server/tools/media-resolver/bin/yt-dlp');
 const FFMPEG_BIN = process.env.PIXEL_FFMPEG_BIN || 'ffmpeg';
+const FFPROBE_BIN = process.env.PIXEL_FFPROBE_BIN || 'ffprobe';
 const BASE_STREAM_URL = 'https://pixelnosekai.com/api/stream';
 
 if (!existsSync(INGEST_DIR)) {
@@ -205,7 +206,7 @@ function resolveVideoUrl(externalServers) {
 /** Process a single episode: download, optimize (720p or remux), upload to Drive, update DB */
 export async function ingestEpisode(episodeId) {
   const { rows } = await pool.query(
-    'SELECT id, anime_id, episode_number, title, external_servers, stream_url FROM anime_episodes WHERE id = $1',
+    'SELECT id, anime_id, episode_number, title, external_servers, stream_url, thumbnail_url FROM anime_episodes WHERE id = $1',
     [episodeId]
   );
   if (!rows.length) {
@@ -295,6 +296,13 @@ export async function ingestEpisode(episodeId) {
 
     // 5. Update Database
     await updateDatabaseRecord(episodeId, publicStreamUrl, verifiedSize);
+
+    // 6. Generate single-frame thumbnail from temp file before deleting it (if not already set)
+    if (!ep.thumbnail_url) {
+      await generateAndUploadEpisodeThumbnail(episodeId, animeId, epNum, tmpProcessed).catch((e) => {
+        console.warn(`[DriveIngest] No se pudo generar miniatura para Ep ${episodeId}:`, e.message);
+      });
+    }
     return true;
   } catch (err) {
     console.error(`[DriveIngest] Fallo en episodio ${episodeId}:`, err.message);
@@ -333,6 +341,121 @@ async function updateDatabaseRecord(episodeId, streamUrl, fileSize = null) {
   console.log(`[DriveIngest] ✓ Base de datos actualizada para Ep ${episodeId}: Servidor VIP disponible (GDrive).`);
 }
 
+function getVideoDurationSeconds(inputPathOrUrl) {
+  try {
+    const out = runCapture(FFPROBE_BIN, [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      inputPathOrUrl,
+    ]);
+    const secs = parseFloat(out);
+    return Number.isFinite(secs) && secs > 0 ? Math.floor(secs) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function pickThumbnailTimestamp(durationSeconds) {
+  const minTarget = 6 * 60; // 360s (minuto 6)
+  const maxTarget = 19 * 60; // 1140s (minuto 19)
+  if (durationSeconds >= maxTarget + 20) {
+    return Math.floor(minTarget + Math.random() * (maxTarget - minTarget + 1));
+  }
+  if (durationSeconds > minTarget + 40) {
+    const upper = Math.floor(durationSeconds - 20);
+    return Math.floor(minTarget + Math.random() * Math.max(1, upper - minTarget + 1));
+  }
+  if (durationSeconds > 20) {
+    const low = Math.max(5, Math.floor(durationSeconds * 0.25));
+    const high = Math.max(low + 1, Math.floor(durationSeconds * 0.8));
+    return Math.floor(low + Math.random() * (high - low + 1));
+  }
+  return 5;
+}
+
+/** Extract 1 JPEG frame from local file or Drive HTTP stream without re-encoding video */
+export async function generateAndUploadEpisodeThumbnail(episodeId, animeId, epNum, sourcePathOrUrl) {
+  const thumbRemote = `${RCLONE_REMOTE}/Anime/${animeId}/${epNum}/thumb.jpg`;
+  const publicThumbUrl = `${BASE_STREAM_URL}/Anime/${animeId}/${epNum}/thumb.jpg`;
+
+  const existingThumbSize = getRemoteFileSize(thumbRemote);
+  if (existingThumbSize > 1000) {
+    await pool.query(
+      `UPDATE anime_episodes SET thumbnail_url = COALESCE(NULLIF(thumbnail_url, ''), $1), updated_at = NOW() WHERE id = $2`,
+      [publicThumbUrl, episodeId]
+    );
+    return true;
+  }
+
+  const durationSecs = getVideoDurationSeconds(sourcePathOrUrl);
+  const captureAt = pickThumbnailTimestamp(durationSecs);
+  const tmpThumb = join(INGEST_DIR, `tmp_thumb_${episodeId}.jpg`);
+
+  try {
+    console.log(`[DriveThumb] Extrayendo fotograma único Ep ${episodeId} en t=${captureAt}s (duración=${durationSecs || '?'}s)...`);
+    await runCommand(FFMPEG_BIN, [
+      '-y',
+      '-ss', String(captureAt),
+      '-i', sourcePathOrUrl,
+      '-frames:v', '1',
+      '-vf', 'scale=480:-2',
+      '-q:v', '4',
+      tmpThumb,
+    ]);
+    const localSize = existsSync(tmpThumb) ? statSync(tmpThumb).size : 0;
+    if (localSize <= 1000) {
+      throw new Error(`Miniatura inválida o vacía (${localSize} bytes)`);
+    }
+    await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpThumb, thumbRemote]);
+    const verifiedThumb = getRemoteFileSize(thumbRemote);
+    if (verifiedThumb <= 1000) {
+      throw new Error(`Verificación de miniatura en Drive falló (${verifiedThumb} bytes)`);
+    }
+    await pool.query(
+      `UPDATE anime_episodes
+       SET thumbnail_url = $1,
+           duration = COALESCE(duration, $2),
+           updated_at = NOW()
+       WHERE id = $3 AND (thumbnail_url IS NULL OR thumbnail_url = '')`,
+      [publicThumbUrl, durationSecs > 0 ? durationSecs : null, episodeId]
+    );
+    console.log(`[DriveThumb] ✓ Miniatura guardada y verificada (${verifiedThumb} B): ${publicThumbUrl}`);
+    return true;
+  } finally {
+    if (existsSync(tmpThumb)) unlinkSync(tmpThumb);
+  }
+}
+
+/** Generate thumbnails 1-at-a-time for episodes already in Drive missing thumbnail_url */
+export async function ingestBatchThumbnails(limit = 1) {
+  const safeLimit = Math.min(5, Math.max(1, Number(limit) || 1));
+  console.log(`[DriveThumb] Buscando hasta ${safeLimit} episodios en Drive sin miniatura...`);
+  const { rows } = await pool.query(
+    `SELECT id, anime_id, episode_number
+     FROM anime_episodes
+     WHERE is_active = true
+       AND stream_url LIKE '%/api/stream/Anime/%'
+       AND (thumbnail_url IS NULL OR thumbnail_url = '')
+     ORDER BY anime_id ASC, episode_number ASC
+     LIMIT $1`,
+    [safeLimit]
+  );
+  let done = 0;
+  for (const row of rows) {
+    const httpSrc = `http://127.0.0.1:8086/Anime/${row.anime_id}/${row.episode_number}/episode.mp4`;
+    try {
+      if (await generateAndUploadEpisodeThumbnail(row.id, row.anime_id, row.episode_number, httpSrc)) {
+        done++;
+      }
+    } catch (e) {
+      console.warn(`[DriveThumb] Error en Ep ${row.id}:`, e.message);
+    }
+  }
+  console.log(`[DriveThumb] ✓ Lote de miniaturas terminado: ${done}/${rows.length}`);
+  return { total: rows.length, done };
+}
+
 /** Sync pending anime trailers to Google Drive in small batches */
 export async function ingestBatchTrailers(limit = 3) {
   console.log(`[DriveIngest] Buscando hasta ${limit} trailers pendientes para Drive...`);
@@ -364,7 +487,10 @@ async function main() {
   const limitIdx = args.indexOf('--limit');
   const parsedLimit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : NaN;
 
-  if (args.includes('--trailers')) {
+  if (args.includes('--thumbnails')) {
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 1;
+    await ingestBatchThumbnails(limit);
+  } else if (args.includes('--trailers')) {
     if (args.includes('--anime-id')) {
       const animeId = Number(args[args.indexOf('--anime-id') + 1]);
       if (!animeId) throw new Error('ID de anime inválido');

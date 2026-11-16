@@ -33,6 +33,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   const [isToggling, setIsToggling] = useState(false);
   const [playHover, setPlayHover] = useState(false);
   const [infoHover, setInfoHover] = useState(false);
+  const [artRatio, setArtRatio] = useState<number | null>(null);
 
   const isAnime = !('release_date' in movie);
   const releaseYear = isAnime ? getAnimeYear((movie as AnimeDetail).startDate) : (movie.release_date ? new Date(movie.release_date).getFullYear() : '');
@@ -85,16 +86,44 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
     ? getAnimeImageUrl(((movie as AnimeDetail).coverImage as any)?.extraLarge || (movie as AnimeDetail).coverImage?.large || (movie as AnimeDetail).bannerImage || '')
     : getImageUrl(movie.poster_path || movie.backdrop_path, 'original');
   const bannerUri = isSmallScreen ? undefined : isAnime ? (movie as AnimeDetail).bannerImage || undefined : getImageUrl(movie.backdrop_path, 'original');
+  const heroArtUri = bannerUri || posterUri;
+
+  React.useEffect(() => {
+    let active = true;
+    setArtRatio(null);
+    if (!heroArtUri) return;
+    Image.getSize(
+      heroArtUri,
+      (w, h) => {
+        if (active && w > 0 && h > 0) setArtRatio(w / h);
+      },
+      () => {}
+    );
+    return () => { active = false; };
+  }, [heroArtUri]);
 
   // Keep the image cinematic in both themes; only the very bottom joins the page surface.
-  const heroTopColors = ['rgba(0,0,0,0.48)', 'transparent'];
-  const heroBottomColors = ['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.64)', colors.background];
-  const heroLeftColors = ['rgba(0,0,0,0.72)', 'rgba(0,0,0,0.25)', 'transparent'];
+  const heroTopColors = ['rgba(0,0,0,0.42)', 'transparent'];
+  const heroBottomColors = ['transparent', 'rgba(0,0,0,0.14)', 'rgba(0,0,0,0.68)', colors.background];
+  const heroLeftColors = ['rgba(0,0,0,0.68)', 'rgba(0,0,0,0.22)', 'transparent'];
 
   const headerOffset = isSmallScreen ? 0 : (isWeb ? 72 : 64);
+  const desktopAdaptedHeight = (() => {
+    if (artRatio && artRatio >= 2.6) {
+      // Very wide banners (e.g. 1900x400): keep hero crisp without heavy vertical blur or excessive crop
+      return Math.min(560, Math.max(440, Math.round(height * 0.64)));
+    }
+    if (artRatio && artRatio >= 1.15) {
+      // Medium-wide banners (~1920x800 or 16:9): adapt height to image proportion
+      const proportional = Math.round(layoutWidth / Math.max(1.75, artRatio)) + Math.round(headerOffset * 0.6);
+      return Math.min(760, Math.max(540, Math.min(proportional, Math.round(height * 0.82))));
+    }
+    return Math.min(740, Math.max(560, Math.round(height * 0.78)));
+  })();
+
   const heroHeight = isSmallScreen
-    ? Math.min(680, Math.max(500, height * 0.75))
-    : Math.min(820, Math.max(620, Math.round(height * 0.82)));
+    ? Math.min(640, Math.max(480, Math.round(height * 0.72)))
+    : desktopAdaptedHeight;
 
   return (
     <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: heroHeight }]}>
@@ -103,14 +132,14 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
       {/* Top vignette para navbar */}
       <LinearGradient
         colors={heroTopColors as any}
-        style={[StyleSheet.absoluteFillObject, { top: 0, height: '28%' }]}
+        style={[StyleSheet.absoluteFillObject, { top: 0, height: '24%' }]}
         pointerEvents="none"
       />
 
-      {/* Bottom gradient — cinematográfico */}
+      {/* Bottom gradient — zona nítida más alta, transición corta al final */}
       <LinearGradient
         colors={heroBottomColors as any}
-        locations={[0, 0.4, 0.94, 1]}
+        locations={[0, 0.72, 0.91, 1]}
         style={[StyleSheet.absoluteFillObject, { top: 0 }]}
         pointerEvents="none"
       />

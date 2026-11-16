@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   TextInput,
   TouchableOpacity,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { readingFormat } from '../utils/readingFormat';
 import Header from '../components/Header';
 import CatalogHero, { CatalogHeroItem } from '../components/CatalogHero';
-import { MangaCard, MangaRankingItem, MangaFilterChips, MangaFilter, MangaItemUI } from '../components/MangaComponents';
+import { MangaCard, MangaRankingItem, MangaFilter, MangaItemUI } from '../components/MangaComponents';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { mangaApi, Manga } from '../services/mangaApi';
 
@@ -40,7 +42,22 @@ export default function MangaScreen() {
 
   const [activeFilter, setActiveFilter] = useState<MangaFilter>('Todos');
   const [publicationType, setPublicationType] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState('');
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const formats = ['Todos', 'Manga', 'Manhwa', 'Manhua', 'Webtoon', 'Novela ligera', 'Novela', 'Cómic', 'One-shot', 'Doujinshi', 'Por clasificar'];
+  const statusOptions: Array<{ label: string; value: MangaFilter }> = [
+    { label: 'Todos', value: 'Todos' },
+    { label: 'En emisión', value: 'En emisión' },
+    { label: 'Finalizado', value: 'Finalizado' },
+    { label: 'Hiatus', value: 'Hiatus' },
+    { label: 'Cancelado', value: 'Cancelado' },
+  ];
+  const genreOptions = [
+    'Acción', 'Aventura', 'Comedia', 'Drama', 'Fantasía', 'Romance', 'Ciencia Ficción',
+    'Recuentos de la vida', 'Sobrenatural', 'Misterio', 'Terror', 'Psicológico',
+    'Artes Marciales', 'Isekai', 'Reencarnación', 'Magia', 'Escolar', 'Seinen', 'Shounen', 'Shoujo',
+  ];
+  const activeFiltersCount = (activeFilter !== 'Todos' ? 1 : 0) + (publicationType ? 1 : 0) + (selectedGenre ? 1 : 0);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -87,6 +104,7 @@ export default function MangaScreen() {
             search: q || undefined,
             order: 'updated',
             publicationType: publicationType || undefined,
+            genre: selectedGenre || undefined,
           }),
           mangaApi.popular({ limit: 5 }).catch(() => ({ items: [] })),
         ]);
@@ -108,7 +126,7 @@ export default function MangaScreen() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [activeFilter, publicationType, search, isSmallScreen]);
+  }, [activeFilter, publicationType, selectedGenre, search, isSmallScreen]);
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -124,7 +142,8 @@ export default function MangaScreen() {
         status,
         search: q || undefined,
         order: 'updated',
-            publicationType: publicationType || undefined,
+        publicationType: publicationType || undefined,
+        genre: selectedGenre || undefined,
       });
       const rows = (list.items || list.data || []) as Manga[];
       setItems((prev) => {
@@ -155,7 +174,7 @@ export default function MangaScreen() {
     [popular]
   );
 
-  const showHero = !search.trim() && activeFilter === 'Todos' && !publicationType && heroItems.length > 0;
+  const showHero = !search.trim() && activeFilter === 'Todos' && !publicationType && !selectedGenre && heroItems.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -204,52 +223,105 @@ export default function MangaScreen() {
             </View>
 
             <View
-              style={[
-                styles.searchBox,
-                {
-                  backgroundColor: colors.card,
-                  width: isSmallScreen ? '100%' : 380,
-                },
-              ]}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                width: isSmallScreen ? '100%' : 'auto',
+              }}
             >
-              <Ionicons name="search" size={18} color={colors.textMuted || '#888'} />
-              <TextInput
-                accessibilityLabel="Buscar manga"
-                placeholder="Buscar en esta sección…"
-                placeholderTextColor={colors.textMuted || '#777'}
-                value={search}
-                onChangeText={setSearch}
+              <View
                 style={[
-                  styles.searchInput,
-                  { color: colors.text },
-                  isWeb ? ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any) : {},
+                  styles.searchBox,
+                  {
+                    backgroundColor: colors.card,
+                    flex: isSmallScreen ? 1 : undefined,
+                    width: isSmallScreen ? undefined : 320,
+                    borderRadius: 4,
+                  },
                 ]}
-                returnKeyType="search"
-              />
-              {search ? (
-                <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
-                  <Ionicons name="close" size={18} color={colors.text} />
-                </TouchableOpacity>
-              ) : null}
+              >
+                <Ionicons name="search" size={18} color={colors.textMuted || '#888'} />
+                <TextInput
+                  accessibilityLabel="Buscar manga"
+                  placeholder="Buscar en esta sección…"
+                  placeholderTextColor={colors.textMuted || '#777'}
+                  value={search}
+                  onChangeText={setSearch}
+                  style={[
+                    styles.searchInput,
+                    { color: colors.text },
+                    isWeb ? ({ outlineStyle: 'none', outlineWidth: 0, boxShadow: 'none', borderWidth: 0 } as any) : {},
+                  ]}
+                  returnKeyType="search"
+                />
+                {search ? (
+                  <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
+                    <Ionicons name="close" size={18} color={colors.text} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Abrir categorías y filtros"
+                onPress={() => setCategoriesOpen(true)}
+                style={[
+                  styles.categoriesBtn,
+                  {
+                    backgroundColor: activeFiltersCount > 0 ? colors.primary : colors.card,
+                    borderColor: activeFiltersCount > 0 ? colors.primary : colors.divider,
+                  },
+                ]}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="options-outline"
+                  size={18}
+                  color={activeFiltersCount > 0 ? '#FFFFFF' : colors.text}
+                />
+                <Text
+                  style={{
+                    color: activeFiltersCount > 0 ? '#FFFFFF' : colors.text,
+                    fontSize: 13,
+                    fontWeight: '700',
+                  }}
+                >
+                  Categorías{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* ── FILTROS ── */}
-          <View style={styles.filtersRow}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-              <MangaFilterChips active={activeFilter} onChange={setActiveFilter} />
-            </ScrollView>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 20 }}>
-            {formats.map(label => {
-              const value = label === 'Todos' ? '' : label === 'Por clasificar' ? 'unknown' : label;
-              const selected = value === publicationType;
-              return <TouchableOpacity key={label} accessibilityRole="button" accessibilityLabel={`Formato: ${label}`} accessibilityState={{ selected }} onPress={() => setPublicationType(value)} style={{ paddingHorizontal: 13, paddingVertical: 10, backgroundColor: selected ? colors.text : colors.card, borderRadius: 3 }}>
-                <Text style={{ color: selected ? colors.background : colors.textSecondary, fontSize: 12, fontWeight: selected ? '700' : '400' }}>{label}</Text>
-              </TouchableOpacity>;
-            })}
-          </ScrollView>
+          {activeFiltersCount > 0 ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+              {selectedGenre ? (
+                <TouchableOpacity onPress={() => setSelectedGenre('')} style={[styles.activeTag, { backgroundColor: colors.card, borderColor: colors.divider }]}>
+                  <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>Género: {selectedGenre} ✕</Text>
+                </TouchableOpacity>
+              ) : null}
+              {publicationType ? (
+                <TouchableOpacity onPress={() => setPublicationType('')} style={[styles.activeTag, { backgroundColor: colors.card, borderColor: colors.divider }]}>
+                  <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>Formato: {publicationType === 'unknown' ? 'Por clasificar' : publicationType} ✕</Text>
+                </TouchableOpacity>
+              ) : null}
+              {activeFilter !== 'Todos' ? (
+                <TouchableOpacity onPress={() => setActiveFilter('Todos')} style={[styles.activeTag, { backgroundColor: colors.card, borderColor: colors.divider }]}>
+                  <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>Estado: {activeFilter} ✕</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedGenre('');
+                  setPublicationType('');
+                  setActiveFilter('Todos');
+                }}
+                style={{ paddingHorizontal: 8, paddingVertical: 6 }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>Limpiar todo</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           {/* ── RECIÉN ACTUALIZADOS (GRID) ── */}
           <View style={styles.section}>
@@ -334,6 +406,164 @@ export default function MangaScreen() {
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={categoriesOpen}
+        transparent
+        animationType={isSmallScreen ? 'slide' : 'fade'}
+        onRequestClose={() => setCategoriesOpen(false)}
+      >
+        <Pressable
+          style={[
+            styles.modalBackdrop,
+            { justifyContent: isSmallScreen ? 'flex-end' : 'center', alignItems: 'center' },
+          ]}
+          onPress={() => setCategoriesOpen(false)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.divider,
+                width: isSmallScreen ? '100%' : Math.min(620, width - 48),
+                maxHeight: isSmallScreen ? '82%' : '80%',
+                borderRadius: isSmallScreen ? 0 : 12,
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                paddingBottom: isSmallScreen ? Math.max(20, insets.bottom + 12) : 20,
+              },
+            ]}
+          >
+            <View style={[styles.modalHeader, { borderBottomColor: colors.divider }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Categorías de Lecturas</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar categorías"
+                onPress={() => setCategoriesOpen(false)}
+                style={{ padding: 6 }}
+              >
+                <Ionicons name="close" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, gap: 20 }}>
+              <View style={{ gap: 10 }}>
+                <Text style={[styles.groupTitle, { color: colors.textMuted }]}>ESTADO</Text>
+                <View style={styles.chipWrap}>
+                  {statusOptions.map((opt) => {
+                    const selected = activeFilter === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        onPress={() => setActiveFilter(opt.value)}
+                        style={[
+                          styles.catChip,
+                          {
+                            backgroundColor: selected ? colors.primary : colors.surfaceElevated,
+                            borderColor: selected ? colors.primary : colors.divider,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: selected ? '#FFFFFF' : colors.text, fontSize: 13, fontWeight: selected ? '700' : '500' }}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={{ gap: 10 }}>
+                <Text style={[styles.groupTitle, { color: colors.textMuted }]}>FORMATO</Text>
+                <View style={styles.chipWrap}>
+                  {formats.map((label) => {
+                    const value = label === 'Todos' ? '' : label === 'Por clasificar' ? 'unknown' : label;
+                    const selected = value === publicationType;
+                    return (
+                      <TouchableOpacity
+                        key={label}
+                        onPress={() => setPublicationType(value)}
+                        style={[
+                          styles.catChip,
+                          {
+                            backgroundColor: selected ? colors.primary : colors.surfaceElevated,
+                            borderColor: selected ? colors.primary : colors.divider,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: selected ? '#FFFFFF' : colors.text, fontSize: 13, fontWeight: selected ? '700' : '500' }}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={{ gap: 10 }}>
+                <Text style={[styles.groupTitle, { color: colors.textMuted }]}>GÉNERO</Text>
+                <View style={styles.chipWrap}>
+                  <TouchableOpacity
+                    onPress={() => setSelectedGenre('')}
+                    style={[
+                      styles.catChip,
+                      {
+                        backgroundColor: !selectedGenre ? colors.primary : colors.surfaceElevated,
+                        borderColor: !selectedGenre ? colors.primary : colors.divider,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: !selectedGenre ? '#FFFFFF' : colors.text, fontSize: 13, fontWeight: !selectedGenre ? '700' : '500' }}>
+                      Todos
+                    </Text>
+                  </TouchableOpacity>
+                  {genreOptions.map((g) => {
+                    const selected = selectedGenre === g;
+                    return (
+                      <TouchableOpacity
+                        key={g}
+                        onPress={() => setSelectedGenre(selected ? '' : g)}
+                        style={[
+                          styles.catChip,
+                          {
+                            backgroundColor: selected ? colors.primary : colors.surfaceElevated,
+                            borderColor: selected ? colors.primary : colors.divider,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: selected ? '#FFFFFF' : colors.text, fontSize: 13, fontWeight: selected ? '700' : '500' }}>
+                          {g}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalFooter, { borderTopColor: colors.divider }]}>
+              <TouchableOpacity
+                onPress={() => {
+                  setActiveFilter('Todos');
+                  setPublicationType('');
+                  setSelectedGenre('');
+                }}
+                style={[styles.footerBtn, { backgroundColor: colors.surfaceElevated }]}
+              >
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: '700' }}>Limpiar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setCategoriesOpen(false)}
+                style={[styles.footerBtn, { backgroundColor: colors.primary, flex: 1 }]}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>Ver resultados</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -396,4 +626,60 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 14 },
   loaderContainer: { minHeight: 220, justifyContent: 'center', alignItems: 'center' },
+  categoriesBtn: {
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 4,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activeTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  modalSheet: {
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '800' },
+  groupTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catChip: {
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    minHeight: 38,
+    borderRadius: 6,
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+  },
+  footerBtn: {
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

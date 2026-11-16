@@ -45,6 +45,7 @@ async function runDriveIngestBatch() {
     await runScript('tools/pixel-drive-verify.mjs', ['--repair']);
     await runScript('tools/pixel-drive-ingest.mjs', ['--trailers', '--limit', '5']);
     await runScript('tools/pixel-drive-ingest.mjs', ['--batch', '--limit', '2']);
+    await runScript('tools/pixel-drive-ingest.mjs', ['--thumbnails', '--limit', '1']);
     await runScript('tools/pixel-drive-manga.mjs', ['--batch', '--limit', '3']);
     await runScript('tools/pixel-drive-hentai.mjs', ['--batch', '--limit', '2']);
     console.log('[CronDrive] ✓ Ciclo automático a Google Drive finalizado.');

@@ -283,6 +283,7 @@ export function useAnimeModal({
           id: String(ep.id),
           number: ep.episode_number,
           title: ep.title || `Episodio ${ep.episode_number}`,
+          image: ep.thumbnail_url || undefined,
           url,
           downloadUrl: ep.video_url || undefined,
           external_servers: ep.external_servers || undefined,

@@ -220,5 +220,37 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
 - **Completar todos los capítulos de un título antes de pasar al siguiente:**
   - En `tools/pixel-drive-ingest.mjs` (`--batch`), `tools/pixel-drive-manga.mjs` (`ingestBatchManga`) y `tools/pixel-drive-hentai.mjs` (`--batch`), la consulta CTE (`target_anime`, `target_manga`, `target_hentai`) fija un único título activo —priorizando cualquier obra que ya tenga capítulos parcialmente en Drive (`synced_count > 0`)— y sube todos sus episodios/capítulos en orden (`episode_number ASC` / `chapter ASC`) hasta terminarla al 100 % antes de pasar a la siguiente.
 
+---
+
+## 9. Presentación, Colores, Categorías en Manga, Cierre Android y Miniaturas de Capítulos
+
+### A. Presentación, Colores y Corrección Android
+- **Eliminación del exceso de degradado blanco (`components/CatalogHero.tsx`, `components/AnimeSeriesModal.tsx`, `components/AnimeSeriesModalStyles.ts`, `components/FeaturedMovie.tsx`):**
+  - El hero mantiene los colores naturales de la ilustración y un sombreado oscuro suave detrás del texto blanco incluso en modo claro, con una transición corta al fondo (`colors.background`) únicamente en el borde inferior (`locations=[0, 0.72, 0.91, 1]` / `[0, 0.45, 0.72, 0.9, 1]`).
+  - `FeaturedMovie.tsx` adapta dinámicamente la altura en escritorio según la proporción natural de la imagen (`Image.getSize`), manteniendo nítidos los banners panorámicos `1900x400` sin estirarlos y dando mayor altura a imágenes ~`1920x800`.
+- **Fondo del detalle en móvil/Android (`components/AnimeSeriesModal.tsx`):**
+  - En pantallas pequeñas (`isSmallScreen`) se omite el banner horizontal y se prioriza el póster vertical con encuadre por anime (`poster_position || '50% 18%'`), manteniendo intacto el diseño de escritorio.
+- **Corrección del destello blanco al cerrar detalle en Android (`components/AnimeSeriesModal.tsx`):**
+  - `<Modal>` ahora usa `transparent` en todas las plataformas (con `animationType="none"` y animación interna de `fadeAnim`/`slideAnim` sobre fondo `colors.background`), evitando que al desvanecerse quede expuesto el fondo blanco del diálogo nativo de Android.
+- **Colores sin verde y simplificación de Manga (`components/Loader.tsx`, `components/LoadingScreen.tsx`, `screens/MangaScreen.tsx`, `server/routes/manga.js`, `server/services/mangaService.js`, `services/mangaApi.ts`):**
+  - Se reemplazó `#83bdb4` en `Loader.tsx` y `LoadingScreen.tsx` por `PIXEL` en rojo (`colors.primary`) y `NO SEKAI` / fichas en blancos/grises según tema.
+  - En `MangaScreen.tsx` se retiraron las filas horizontales de chips y se colocó el botón **Categorías** junto al buscador, abriendo un panel táctil/modal con filtros por **Estado**, **Formato** y **Género** (conectado a `genre` en `mangaService.js` y `manga.js`).
+
+### B. Miniaturas Reales de Capítulos en Drive
+- **`tools/pixel-drive-ingest.mjs` + `server/cron.js` + `server/routes/catalog.js`:**
+  - Tras verificar la subida de `episode.mp4`, `generateAndUploadEpisodeThumbnail()` mide duración con `ffprobe`, elige una sola vez un instante aleatorio entre los minutos `6` y `19` (`360–1140 s`, adaptado si dura menos), extrae 1 solo fotograma JPEG (`480x270`, `-frames:v 1`, sin recodificar el video), sube `Anime/<animeId>/<epNum>/thumb.jpg` y guarda `thumbnail_url` en `anime_episodes`.
+  - `--thumbnails --limit 1` (ejecutado 1 a la vez en `cron.js`) genera miniaturas pendientes de capítulos ya alojados en Drive leyendo vía HTTP range-seek sobre `http://127.0.0.1:8086/...`.
+  - `AnimeSeriesModal.tsx` y `AnimeSeriesModalStyles.ts` muestran la miniatura horizontal `112x63` con etiqueta numérica en la esquina y una alternativa neutra (`colors.surfaceElevated` + icono `film-outline`) cuando aún no hay miniatura en Drive.
+
+### C. Validaciones Reales
+- `node --check` + `npx tsc --noEmit` (0 errores en archivos editados) + `33/33` tests en verde (`trailers`, `security-routes`, `mangaReaderReliability`, `trailerPreview`, `featuredArtwork`, `animeArtwork`).
+- **Consumo en tablet (`arle`) al generar miniaturas (`node tools/pixel-drive-ingest.mjs --thumbnails --limit 1`):**
+  - Ep `#1`: `3.78 s` de `ffmpeg`, `24,003 B` (`HTTP/2 200` en `https://pixelnosekai.com/api/stream/Anime/1/1/thumb.jpg`).
+  - Ep `#496`: `3.19 s` de `ffmpeg` (`5.13 s` CPU usuario total, `18,143 B`, `HTTP/2 200` en `https://pixelnosekai.com/api/stream/Anime/59/11/thumb.jpg`), **1.87 GB RAM disponible** de 3.82 GB.
+- **Inspección visual en navegador (`https://pixelnosekai.com/`, `index-0a032e0441f8ce000fbbafc9623acc6a.js`):**
+  - Hero modo oscuro y claro con colores vivos y transición corta, botón **Categorías** en Manga con Estado/Formato/Género, miniatura real 16:9 en Ep. 1 de Anime #1, y detalle móvil (`390x844`) con póster vertical y cierre limpio sin pantalla blanca.
+- **Pendiente para APK Android:** JDK 21 (`java`/`javac`) no se encuentra instalado en esta laptop; falta instalar OpenJDK 21 para ejecutar `npm run build:android` con `JAVA_HOME` apuntando a JDK 21.
+
+
 
 

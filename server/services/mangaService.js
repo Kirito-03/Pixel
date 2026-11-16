@@ -256,7 +256,7 @@ function ttlMsFromEnv(key, fallbackMinutes) {
 // CACHÉ LISTA MANGAS
 // ----------------------------------------------------------------------
 
-export async function queryMangaCache(pool, { page, limit, status, search, order, publicationType }) {
+export async function queryMangaCache(pool, { page, limit, status, search, order, publicationType, genre }) {
   const l = Math.min(50, Math.max(1, Number(limit || 24) || 24));
   const p = Math.max(1, Number(page || 1) || 1);
   const offset = (p - 1) * l;
@@ -274,6 +274,12 @@ export async function queryMangaCache(pool, { page, limit, status, search, order
   if (q) {
     where.push(`title ILIKE $${i++}`);
     params.push(`%${q}%`);
+  }
+
+  const g = String(genre || '').trim();
+  if (g) {
+    where.push(`EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(tags, '[]'::jsonb)) tag WHERE lower(trim(tag)) = lower($${i++}))`);
+    params.push(g);
   }
 
   if (publicationType) {
@@ -446,8 +452,9 @@ export async function getMangaList(pool, params) {
   const order = String(params?.order || '').trim() || 'latest';
 
   const publicationType = String(params?.publicationType || '').trim();
-  // Type filters query the whole persisted catalog, never repeatedly scrape a remote page.
-  if (publicationType) return { ...(await queryMangaCache(pool, { page, limit, status, search, order, publicationType })), meta: { source: 'db', cache_hit: true } };
+  const genre = String(params?.genre || '').trim();
+  // Type and genre filters query the whole persisted catalog, never repeatedly scrape a remote page.
+  if (publicationType || genre) return { ...(await queryMangaCache(pool, { page, limit, status, search, order, publicationType, genre })), meta: { source: 'db', cache_hit: true } };
 
   const jobKey = `manga:list:${status || 'all'}:${order}:${search}`;
   const ttl = ttlMsFromEnv('MANGA_CACHE_TTL_MINUTES', 360);

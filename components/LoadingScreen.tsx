@@ -6,7 +6,7 @@ import Loader from './Loader';
 export default function LoadingScreen() {
   const { colors } = useTheme();
   return <View style={[styles.container, { backgroundColor: colors.background }]}>
-    <Text style={[styles.brand, { color: colors.text }]}>PIXEL <Text style={{ color: '#83bdb4' }}>NO SEKAI</Text></Text>
+    <Text style={[styles.brand, { color: colors.text }]}><Text style={{ color: colors.primary }}>PIXEL</Text> <Text style={{ color: colors.textSecondary }}>NO SEKAI</Text></Text>
     <Loader />
   </View>;
 }

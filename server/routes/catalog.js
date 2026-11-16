@@ -157,6 +157,7 @@ router.get('/anime/:id/episodes', async (req, res) => {
           episode_number,
           title,
           duration,
+          thumbnail_url,
           status,
           video_url,
           stream_url,

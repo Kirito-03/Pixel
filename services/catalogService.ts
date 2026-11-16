@@ -33,6 +33,7 @@ export interface CatalogEpisode {
   episode_number: number;
   title?: string | null;
   duration?: number | null;
+  thumbnail_url?: string | null;
   status?: string | null;
   video_url?: string | null;
   external_servers?: { server: string; title: string; url: string }[] | null;

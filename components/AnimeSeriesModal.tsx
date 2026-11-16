@@ -352,6 +352,7 @@ export default function AnimeSeriesModal({
           id: String(ep.id),
           number: ep.episode_number,
           title: ep.title || `Episodio ${ep.episode_number}`,
+          image: ep.thumbnail_url || undefined,
           url,
           downloadUrl: ep.video_url || undefined,
           external_servers: ep.external_servers || undefined,
@@ -885,8 +886,8 @@ export default function AnimeSeriesModal({
   return (
     <Modal
       visible={modalVisible}
-      transparent={Platform.OS !== 'android'}
-      animationType="slide"
+      transparent
+      animationType="none"
       statusBarTranslucent
       navigationBarTranslucent
       onRequestClose={playback ? onClosePlayback : handleClose}
@@ -935,26 +936,29 @@ export default function AnimeSeriesModal({
               ) : (
                 <>
                   <AnimeArtwork
-                    backgroundColor={colors.background}
-                    banner={currentContent?.type === 'anime'
-                      ? (detailData as any)?.bannerImage || currentContent?.backdrop_path || undefined
-                      : currentContent?.backdrop_path ? getImageUrl(currentContent.backdrop_path, 'original') : undefined}
+                    backgroundColor="#050505"
+                    banner={isSmallScreen ? undefined : (
+                      currentContent?.type === 'anime'
+                        ? (detailData as any)?.bannerImage || currentContent?.backdrop_path || undefined
+                        : currentContent?.backdrop_path ? getImageUrl(currentContent.backdrop_path, 'original') : undefined
+                    )}
                     poster={currentContent?.type === 'anime'
                       ? (detailData as any)?.coverImage?.extraLarge || (detailData as any)?.coverImage?.large || currentContent?.poster_path || undefined
                       : currentContent?.poster_path ? getImageUrl(currentContent.poster_path, 'original') : undefined}
-                    position={(currentContent as any)?.banner_position}
+                    position={isSmallScreen
+                      ? ((currentContent as any)?.poster_position || '50% 18%')
+                      : (currentContent as any)?.banner_position}
                   />
-                  {/* Gradiente multi-stop — más agresivo en la mitad inferior para legibilidad */}
+                  {/* Sombreado oscuro suave detrás del texto incluso en modo claro; transición corta al fondo inferior */}
                   <LinearGradient
-                    colors={theme === 'light' ? ['rgba(255,255,255,0)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0.97)', '#fff', '#fff'] : [
-                      'rgba(0,0,0,0.0)',
-                      'rgba(0,0,0,0.10)',
-                      'rgba(0,0,0,0.32)',
-                      'rgba(0,0,0,0.62)',
-                      'rgba(0,0,0,0.86)',
-                      'rgba(0,0,0,1.0)',
+                    colors={[
+                      'rgba(0,0,0,0.22)',
+                      'rgba(0,0,0,0.12)',
+                      'rgba(0,0,0,0.52)',
+                      'rgba(0,0,0,0.78)',
+                      colors.background,
                     ]}
-                    locations={[0, 0.18, 0.42, 0.62, 0.82, 1]}
+                    locations={[0, 0.45, 0.72, 0.9, 1]}
                     style={StyleSheet.absoluteFill}
                   />
                 </>
@@ -1252,18 +1256,23 @@ export default function AnimeSeriesModal({
                                     onMouseLeave: (e: any) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; },
                                   } : {})}
                                 >
-                                  {/* Número o thumb */}
-                                  {episode.image ? (
-                                    <Image
-                                      source={{ uri: episode.image }}
-                                      style={epStyles.thumb}
-                                      resizeMode="cover"
-                                    />
-                                  ) : (
-                                    <View style={epStyles.numBadge}>
-                                      <Text style={epStyles.numText}>{episode.number}</Text>
+                                  {/* Miniatura horizontal real o alternativa neutra con etiqueta pequeña */}
+                                  <View style={[epStyles.thumbWrap, { backgroundColor: colors.surfaceElevated }]}>
+                                    {episode.image ? (
+                                      <Image
+                                        source={{ uri: episode.image }}
+                                        style={epStyles.thumb}
+                                        resizeMode="cover"
+                                      />
+                                    ) : (
+                                      <View style={epStyles.thumbPlaceholder}>
+                                        <Ionicons name="film-outline" size={20} color={colors.textMuted} />
+                                      </View>
+                                    )}
+                                    <View style={epStyles.thumbBadge}>
+                                      <Text style={epStyles.thumbBadgeText}>{episode.number}</Text>
                                     </View>
-                                  )}
+                                  </View>
 
                                   {/* Info */}
                                   <View style={epStyles.info}>
