@@ -46,7 +46,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
 
   const backgroundColor = backgroundOpacity.interpolate({
     inputRange: [0, 1],
-    outputRange: [theme === 'dark' ? 'rgba(5, 5, 5, 0.88)' : 'rgba(0, 0, 0, 0)', theme === 'dark' ? 'rgba(5, 5, 5, 0.96)' : 'rgba(255, 255, 255, 0.92)'],
+    outputRange: ['rgba(0, 0, 0, 0)', theme === 'dark' ? 'rgba(5, 5, 5, 0.96)' : 'rgba(255, 255, 255, 0.92)'],
   });
 
   const handleCategorySelect = (categoryId: string, categoryName: string) => {

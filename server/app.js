@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { authenticateToken, authenticateAdmin } from './middleware/auth.js';
 import { requireOwnUser, requireProfileOwner } from './middleware/ownership.js';
 import rateLimit from 'express-rate-limit';
+import { profilePageRedirect } from './middleware/profilePage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -209,6 +210,7 @@ app.use('/proxy', proxyRoutes);
 app.use('/api/proxy', proxyRoutes);
 
 // Nuevos routers extraídos
+app.get('/profiles', profilePageRedirect);
 app.use('/profiles', profilesRoutes);
 app.use('/downloads', downloadsRoutes);
 app.use('/upload', uploadsRoutes);

@@ -47,3 +47,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-15-player-release-timeline-sync]]: causa real de la pantalla gris (VideoPlayer liberado), barra para elegir minuto y búsquedas sincronizadas por perfil autorizadas por el usuario.
 
 - [[2026-11-15-emision-busqueda-imagenes]]: Emisión y Buscar con controles neutros, diseño adaptable, encuadre de Inicio y APK1.0.11/12; pruebas reales y límites de imágenes fuente.
+
+- [[2026-11-15-inicio-perfiles-y-lectura]]: hero/menu transparente, tipos de lectura, descripción plegable, organización de Perfil, carga propia y selección explícita tras iniciar sesión.
