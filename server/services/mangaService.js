@@ -388,6 +388,22 @@ async function resolveFallbackMangaCover(title) {
     // ignore fallback failure
   }
 
+  // Plan B-3: Jikan / MyAnimeList public API
+  try {
+    const res = await fetch(
+      `https://api.jikan.moe/v4/manga?q=${encodeURIComponent(cleanTitle)}&limit=1`,
+      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(4000) }
+    );
+    if (res.ok) {
+      const json = await res.json();
+      const item = json?.data?.[0];
+      const img = item?.images?.jpg?.large_image_url || item?.images?.jpg?.image_url || null;
+      if (img) return img;
+    }
+  } catch {
+    // ignore fallback failure
+  }
+
   return null;
 }
 

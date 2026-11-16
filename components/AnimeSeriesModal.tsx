@@ -1,4 +1,4 @@
-import { briefSynopsis } from '../utils/briefSynopsis';
+import { briefSynopsis, cleanSynopsisText } from '../utils/briefSynopsis';
 import MovieRow from './MovieRow';
 import TrailerPreview from './TrailerPreview';
   import React, { useState, useEffect, useRef } from 'react';
@@ -849,20 +849,7 @@ export default function AnimeSeriesModal({
   useEffect(() => setExpandedSynopsis(false), [currentContent?.id]);
   const fullSynopsis = String((detailData as any)?.description || currentContent?.overview || '');
 
-  const cleanDescription = (description: string): string => {
-    if (!description) return '';
-
-    return description
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim();
-  };
+  const cleanDescription = (description: string): string => cleanSynopsisText(description);
 
   const formatRuntime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -898,8 +885,9 @@ export default function AnimeSeriesModal({
             ? (detailData as any)?.bannerImage || currentContent?.backdrop_path
             : currentContent?.backdrop_path
         );
-        const lightPortrait = theme === 'light' && !hasLandscapeBanner;
-        const heroBg = theme === 'light' ? colors.background : '#050505';
+        const isLight = theme === 'light';
+        const lightPortrait = isLight;
+        const heroBg = isLight ? colors.background : '#050505';
         return (
       <Animated.View style={[styles.container, { opacity: fadeAnim, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
         <StatusBar style={theme === 'light' ? 'dark' : 'light'} translucent />
@@ -958,16 +946,25 @@ export default function AnimeSeriesModal({
                       ? ((currentContent as any)?.poster_position || '50% 18%')
                       : (currentContent as any)?.banner_position}
                   />
-                  {/* Sombreado oscuro suave detrás del texto cuando hay banner o modo oscuro; en modo claro con póster mantiene fondo claro */}
+                  {/* En modo claro sin degradado negro: transición suave al fondo claro; en modo oscuro conserva sombreado cinematográfico */}
+                  {isLight && hasLandscapeBanner && (
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.82)', 'rgba(255,255,255,0.38)', 'transparent']}
+                      start={{ x: 0, y: 0.5 }}
+                      end={{ x: 1, y: 0.5 }}
+                      locations={[0, 0.52, 0.85]}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  )}
                   <LinearGradient
-                    colors={lightPortrait ? ['transparent', 'transparent', colors.background] : [
+                    colors={isLight ? ['transparent', 'rgba(255,255,255,0.18)', 'rgba(255,255,255,0.58)', colors.background] : [
                       'rgba(0,0,0,0.22)',
                       'rgba(0,0,0,0.12)',
                       'rgba(0,0,0,0.52)',
                       'rgba(0,0,0,0.78)',
                       colors.background,
                     ]}
-                    locations={lightPortrait ? [0, 0.9, 1] : [0, 0.45, 0.72, 0.9, 1]}
+                    locations={isLight ? [0, 0.58, 0.86, 1] : [0, 0.45, 0.72, 0.9, 1]}
                     style={StyleSheet.absoluteFill}
                   />
                 </>

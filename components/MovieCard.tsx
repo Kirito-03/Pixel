@@ -291,13 +291,14 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
               onError={handleImageError}
             />
             <LinearGradient
-              colors={['transparent', theme === 'dark' ? 'rgba(20,20,20,0.85)' : 'rgba(255,255,255,0.85)']}
+              colors={['transparent', theme === 'dark' ? 'rgba(20,20,20,0.85)' : 'rgba(255,255,255,0.42)']}
+              locations={[0.6, 1]}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
             {/* El título superpuesto en la imagen (al no tener logo) */}
             <View style={styles.popupTitleOverlay}>
-               <Text style={[styles.popupTitleText, { color: theme === 'dark' ? '#fff' : '#000', textShadowColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>{getTitle()}</Text>
+               <Text style={[styles.popupTitleText, { color: theme === 'dark' ? '#fff' : '#111', textShadowColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]} numberOfLines={2}>{getTitle()}</Text>
             </View>
           </>}</View>
           {previewId && !previewClosed && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cerrar vista previa" onPress={() => setPreviewClosed(true)} style={{ padding: 8 }}><Text style={{ color: colors.text }}>Cerrar tráiler</Text></TouchableOpacity>}
