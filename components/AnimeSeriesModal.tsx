@@ -127,6 +127,15 @@ export default function AnimeSeriesModal({
   const continueTarget = latestAiringEpisode(streamingInfo?.seasons || [], (detailData as any)?.status || streamingInfo?.status);
   const loadingContinue = false;
   const [refreshing, setRefreshing] = useState(false);
+  useEffect(()=>{
+    if(!visible||!currentContent||currentContent.type!=='anime')return;
+    return catalogService.subscribeAnime(currentContent.id,part=>{
+      if(!requestScope.current.visible||requestScope.current.id!==currentContent.id)return;
+      if(part==='anime')void loadContentDetails();
+      else if(part==='episodes')void loadStreamingInfo();
+      else if(part==='related')void loadRelatedContent();
+    });
+  },[visible,currentContent?.id]);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -248,7 +257,7 @@ export default function AnimeSeriesModal({
 
 
 
-  const loadContentDetails = async () => {
+  const loadContentDetails = async (force = false) => {
     if (!currentContent) return;
 
     const request = ++requestScope.current.details;
@@ -262,7 +271,7 @@ export default function AnimeSeriesModal({
       } else if (currentContent.type === 'tv') {
         details = await getTVShowDetails(currentContent.id);
       } else if ((currentContent.type as string) === 'anime') {
-        const anime = await catalogService.getAnimeById(currentContent.id);
+        const anime = await catalogService.getAnimeById(currentContent.id, force);
         details = {
           id: anime.id,
           title: {
@@ -334,7 +343,7 @@ export default function AnimeSeriesModal({
     }
   };
 
-  const loadStreamingInfo = async () => {
+  const loadStreamingInfo = async (force = false) => {
     if (!currentContent || currentContent.type !== 'anime') return;
     const request = ++requestScope.current.streams;
     const id = currentContent.id;
@@ -342,8 +351,8 @@ export default function AnimeSeriesModal({
     setLoadingStreaming(true);
     try {
       const [anime, episodes] = await Promise.all([
-        catalogService.getAnimeById(currentContent.id),
-        catalogService.getAnimeEpisodes(currentContent.id),
+        catalogService.getAnimeById(currentContent.id, force),
+        catalogService.getAnimeEpisodes(currentContent.id, force),
       ]);
 
       if (!active()) return;
@@ -415,8 +424,9 @@ export default function AnimeSeriesModal({
     try {
       await Promise.all([
         // recargar detalles básicos y similares si aplica
-        loadContentDetails(),
-        loadStreamingInfo(),
+        loadContentDetails(true),
+        loadStreamingInfo(true),
+        loadRelatedContent(true),
       ]);
     } catch (e) {
       // noop, ya hay logs dentro
@@ -425,7 +435,7 @@ export default function AnimeSeriesModal({
     }
   };
 
-  const loadRelatedContent = async () => {
+  const loadRelatedContent = async (force = false) => {
     if (!currentContent) return;
     const request = ++relatedGeneration.current, animeId = currentContent.id;
 
@@ -436,10 +446,10 @@ export default function AnimeSeriesModal({
 
       if (currentContent.type === 'anime') {
         try {
-          const current = await catalogService.getAnimeById(currentContent.id);
+          const current = await catalogService.getAnimeById(currentContent.id, force);
           const [genrePool, franchisePool] = await Promise.all([
-            catalogService.getAnimeList({ genre: current.genres?.[0] || undefined, limit: 40 }),
-            current.franchise_key ? catalogService.getAnimeList({ franchise: current.franchise_key, limit: 40 }) : seriesSearchTerm(current.title).length >= 6 ? catalogService.getAnimeList({ search: seriesSearchTerm(current.title), limit: 40 }) : Promise.resolve({ data: [] }),
+            catalogService.getRelatedAnime(currentContent.id, force),
+            current.franchise_key ? catalogService.getAnimeList({ franchise: current.franchise_key, limit: 40 }, force) : seriesSearchTerm(current.title).length >= 6 ? catalogService.getAnimeList({ search: seriesSearchTerm(current.title), limit: 40 }, force) : Promise.resolve({ data: [] }),
           ]);
           similar = relatedAnime(current, franchisePool.data || [], genrePool.data || []);
         } catch (error) {
@@ -492,11 +502,11 @@ export default function AnimeSeriesModal({
         mapped = unique.map((show: any) => tmdbToContentItem(show as any, 'tv'));
       }
 
-      if (request === relatedGeneration.current && relatedScope.current === animeId) setRelatedContent(mapped.slice(0, 15));
+      if (requestScope.current.visible && request === relatedGeneration.current && relatedScope.current === animeId) setRelatedContent(mapped.slice(0, 15));
     } catch (error) {
-      if (request === relatedGeneration.current && relatedScope.current === animeId) setRelatedContent([]);
+      if (requestScope.current.visible && request === relatedGeneration.current && relatedScope.current === animeId) setRelatedContent([]);
     } finally {
-      if (request === relatedGeneration.current && relatedScope.current === animeId) setLoadingRelated(false);
+      if (requestScope.current.visible && request === relatedGeneration.current && relatedScope.current === animeId) setLoadingRelated(false);
     }
   };
 

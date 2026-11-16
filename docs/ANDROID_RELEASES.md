@@ -67,3 +67,6 @@ Actualización 1.0.17 / código 18: detalle con contraste sobre imágenes en amb
 
 
 Actualización1.0.18/código19: categorías de H en diálogo desplazable y selección con confirmación; filtros de lecturas equivalentes a estados del origen; catálogo completo con páginas de50 y cuadrícula adaptable; miniaturas de Drive con caché acotada y precarga; bloqueo de controles Android con pulsación larga para desbloquear. Incluye la altura estable del hero de Inicio. APK123591510bytes; SHA256 `36586eabff819f8315757afd58139da3792ae5d7ce273b9b5cd53cb7a52b17fc`.147 tests y11 de seguridad pasan. Sin dispositivo ADB: instalación y gesto físico pendientes. Ver docs/brain/2026-11-16-filtros-paginacion-bloqueo.md.
+
+
+Actualización1.0.19/código20: Similares deduplicado por identidad AniList/fecha, recomendaciones sobre catálogo completo, caché pública persistente acotada con revalidación y refresco sin ocultar Inicio; carga diferida web y menos tarjetas iniciales Android. APK123599350bytes; SHA256 `555bc8fe9d6d325f639cc48e3a636258f5eaf0030bf20dd5b5638f673cc362d8`.159 tests y11 de seguridad pasan. Ver docs/brain/2026-11-16-similares-y-red-lenta.md para límites de red y validaciones. No instalada físicamente.

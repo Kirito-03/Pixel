@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 const source=fs.readFileSync(new URL('../components/AnimeSeriesModal.tsx',import.meta.url),'utf8').replace(/\r\n/g,'\n');
 function fixture(name) {
- const a=source.indexOf(`  const ${name} = async () => {`), b=source.indexOf('\n  };',a)+6;
+ const a=source.indexOf(`  const ${name} = async (`), b=source.indexOf('\n  };',a)+6;
  const requestScope={current:{id:1,visible:true,details:0,streams:0}}, pending=[],writes=[];
  const context={requestScope,currentContent:{id:1,type:'anime'},console:{error(){}},
  catalogService:{getAnimeById:()=>new Promise((resolve,reject)=>pending.push({resolve,reject})),getAnimeEpisodes:async()=>[]},

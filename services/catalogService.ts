@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {createPublicCatalogCache} from './publicCatalogCache';
 import { isPublicCatalogItem } from '../utils/publicCatalog';
 import axios from 'axios';
 import { getCurrentBaseURL } from './databaseService';
@@ -54,7 +56,12 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+const publicCache=createPublicCatalogCache(AsyncStorage);
+const cacheKey=(path:string)=>`${getBaseURL()}:${path}`;
+
 export const catalogService = {
+  subscribeHome(listener:()=>void){return publicCache.subscribe(key=>{if(key===cacheKey('home'))listener();});},
+  subscribeAnime(id:number,listener:(part:string)=>void){return publicCache.subscribe(key=>{for(const part of ['anime','episodes','related'])if(key===cacheKey(`${part}:${id}`))listener(part);});},
   async getAnimeList(params: {
     page?: number;
     limit?: number;
@@ -62,8 +69,9 @@ export const catalogService = {
     search?: string;
     franchise?: string;
     genre?: string;
-  }) {
-    const { data } = await http.get('/api/catalog/anime', { params });
+  }, force = false) {
+    const load=async()=>{const r=await http.get('/api/catalog/anime',{params});return r.data;};
+    const data=params.search?await load():await publicCache.read(cacheKey('list:'+JSON.stringify(params)),load,{force});
     return { ...data, data: (data?.data || []).filter(isPublicCatalogItem) } as { data: CatalogAnime[]; pagination: any };
   },
 
@@ -72,18 +80,25 @@ export const catalogService = {
     return (data?.data || []).filter(isPublicCatalogItem) as CatalogAnime[];
   },
 
-  async getAnimeById(id: number) {
-    const { data } = await http.get(`/api/catalog/anime/${id}`);
+  async getAnimeById(id: number, force = false) {
+    const data=await publicCache.read(cacheKey(`anime:${id}`),async()=>{const r=await http.get(`/api/catalog/anime/${id}`);if(!isPublicCatalogItem(r.data))throw new Error('Contenido no disponible');return r.data;},{force});
     if (!isPublicCatalogItem(data)) throw new Error('Contenido no disponible en el catálogo general.');
     return data as CatalogAnime;
   },
 
-  async getAnimeEpisodes(id: number) {
-    const { data } = await http.get(`/api/catalog/anime/${id}/episodes`);
+  async getAnimeEpisodes(id: number, force = false) {
+    const data=await publicCache.read(cacheKey(`episodes:${id}`),async()=>{const r=await http.get(`/api/catalog/anime/${id}/episodes`);return r.data;},{force,ttl:60000});
     return (data?.episodes || []) as CatalogEpisode[];
   },
 
-  async getHomeSections() {
+  async getRelatedAnime(id: number, force = false) {
+    const data=await publicCache.read(cacheKey(`related:${id}`),async()=>{const r=await http.get(`/api/catalog/anime/${id}/related`);return r.data;},{force});
+    return {data:(data?.data||[]).filter(isPublicCatalogItem)} as {data:CatalogAnime[]};
+  },
+  async getHomeSections(force = false) {
+    return publicCache.read(cacheKey('home'),()=>this.fetchHomeSections(),{force});
+  },
+  async fetchHomeSections() {
     const limit = 48;
     // Lista de géneros con catálogo abundante para rotar en cada recarga
     const rotatingGenres = ['Action', 'Comedy', 'Fantasy', 'Romance', 'Drama', 'Adventure', 'Sci-Fi', 'Slice of Life', 'Supernatural'];

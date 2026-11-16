@@ -126,17 +126,25 @@ export default function HomeScreen({ navigation }: Props) {
         return shuffled.slice(0, 28);
     };
 
+    const homeMounted=useRef(true),homeLoaded=useRef(false),homeGeneration=useRef(0);
     useEffect(() => {
-        loadContent();
+        homeMounted.current=true;
+        const unsubscribe=catalogService.subscribeHome(()=>{if(homeMounted.current)void loadContent();});
+        void loadContent();
+        return()=>{homeMounted.current=false;homeGeneration.current++;unsubscribe();};
     }, []);
 
     const [refreshingSection, setRefreshingSection] = useState(false);
-    const refreshSection = async () => { setRefreshingSection(true); try { await loadContent(); } finally { setRefreshingSection(false); } };
-    const loadContent = async () => {
+    const refreshSection = async () => { setRefreshingSection(true); try { await loadContent(true); } finally { setRefreshingSection(false); } };
+    const loadContent = async (force = false) => {
+        const generation=++homeGeneration.current;
+        const active=()=>homeMounted.current&&generation===homeGeneration.current;
         try {
-            setLoading(true);
+            if(!homeLoaded.current)setLoading(true);
             setLoadError(false);
-            const sections = await catalogService.getHomeSections();
+            const sections = await catalogService.getHomeSections(force);
+            if(!active())return;
+            homeLoaded.current=true;
 
             const newContentSections: { [key: string]: ContentItem[] } = {
                 airing: sections.airing.map(mapCatalogAnimeToContentItem),
@@ -176,11 +184,10 @@ export default function HomeScreen({ navigation }: Props) {
             }
             setContentSections(newContentSections);
         } catch (error) {
-            setLoadError(true);
-            console.error('Critical error loading content:', error);
-            Alert.alert('Error', 'No se pudo cargar el contenido. Por favor, intente de nuevo más tarde.');
+            if(!active())return;
+            if(!homeLoaded.current){setLoadError(true);Alert.alert('Error', 'No se pudo cargar el contenido. Por favor, intente de nuevo más tarde.');}
         } finally {
-            setLoading(false);
+            if(active())setLoading(false);
         }
     };
 
@@ -448,7 +455,7 @@ export default function HomeScreen({ navigation }: Props) {
                         <View style={styles.emptyState}>
                             <Text style={[styles.emptyTitle, { color: colors.text }]}>{loadError ? "No pudimos cargar el catálogo" : "Aún no hay anime disponible"}</Text>
                             <Text style={[styles.emptySubtitle, { color: colors.textMuted || 'rgba(255,255,255,0.5)' }]}>{loadError ? "Comprueba tu conexión o vuelve a intentarlo en unos momentos." : "Agrega contenido desde el panel de administrador."}</Text>
-                            {loadError && <Pressable accessibilityRole="button" onPress={loadContent}><Text style={{ color: colors.primary, marginTop: 16 }}>Reintentar</Text></Pressable>}
+                            {loadError && <Pressable accessibilityRole="button" onPress={() => loadContent(true)}><Text style={{ color: colors.primary, marginTop: 16 }}>Reintentar</Text></Pressable>}
                         </View>
                     )}
                 </View>

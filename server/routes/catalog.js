@@ -1,3 +1,4 @@
+import {getRelatedAnime} from '../services/relatedAnime.js';
 import { withSpanishSynopses } from '../services/spanishSynopsisService.js';
 import express from 'express';
 import pool from '../db.js';
@@ -144,6 +145,11 @@ router.get('/anime/:id', async (req, res) => {
   } catch (e) {
     res.status(500).json({ message: 'Error obteniendo anime', error: e.message });
   }
+});
+
+router.get('/anime/:id/related',async(req,res)=>{
+ const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<=0)return res.status(400).json({message:'ID inválido'});
+ try{res.json({data:await getRelatedAnime(pool,id)});}catch{res.status(500).json({message:'No se pudo cargar anime similar'});}
 });
 
 router.get('/anime/:id/episodes', async (req, res) => {

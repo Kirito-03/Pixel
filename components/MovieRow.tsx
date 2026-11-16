@@ -130,6 +130,9 @@ export default function MovieRow({ title, movies, onMoviePress, accentColor, sho
           <FlatList
             ref={flatListRef}
             data={movies}
+            initialNumToRender={Math.ceil(width / TOTAL_CARD_WIDTH) + 1}
+            maxToRenderPerBatch={4}
+            windowSize={5}
             horizontal
             onLayout={event => setViewportWidth(event.nativeEvent.layout.width)}
             onContentSizeChange={w => setContentWidth(w)}

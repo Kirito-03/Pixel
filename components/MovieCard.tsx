@@ -1,3 +1,4 @@
+import CatalogPoster from './CatalogPoster';
 import { resolveAnimeTrailer } from '../services/animePresentation';
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
@@ -245,12 +246,7 @@ export default function MovieCard({ movie, onPress, isFirst = false, isLast = fa
         onPress={() => { closeHover(); onPress(); }}
         activeOpacity={0.9}
       >
-        <Image
-          source={{ uri: getImageSource() }}
-          style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
-          resizeMode="cover"
-          onError={handleImageError}
-        />
+        <CatalogPoster uri={getImageSource()} width={CARD_WIDTH} height={CARD_HEIGHT} onError={handleImageError}/>
 
         {/* Badge EN EMISIÓN — solo para animes en emisión */}
         {isAiring() && (

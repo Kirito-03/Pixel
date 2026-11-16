@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 const exports = {};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../services/animePresentation.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports});
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../services/animePresentation.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports,URL});
 test('Drive trailers take priority with an independent YouTube fallback, even without a YouTube ID',()=>{
  const source=exports.resolveAnimeTrailer({id:1,trailer_site:'GDrive',trailer_id:'73y6CAqPomE'});
  assert.equal(source.id,'https://pixelnosekai.com/api/stream/Anime/1/trailer.mp4');
@@ -38,4 +38,19 @@ test('numbered and Roman sequel titles in the real catalog join their series wit
  assert.equal(exports.seriesSearchTerm('Area 88'),'Area 88');
  const rows=exports.relatedAnime({id:1,title:'Boku no Hero Academia 6'},[{id:3,title:'Boku no Hero Academia FINAL SEASON',release_date:'2025'},{id:2,title:'Boku no Hero Academia 7',release_date:'2024'}],[{id:5,title:'Other anime'}]);
  assert.equal(rows.map(row=>row.id).join(','),'2,3,5');
+});
+test('duplicate catalog records with different titles but the same AniList work are shown once',()=>{
+ const poster='https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx404-3gafSRLXJDp6.jpg';
+ const rows=exports.relatedAnime({id:1,title:'Unrelated'},[],[
+  {id:935,title:'Bastard!! Ankoku no Hakaishin Part 2 (ONA)',poster_url:poster},
+  {id:920,title:'BASTARD!!: Ankoku no Hakaishin',poster_url:poster.replace('/large/','/medium/')+'?v=2'},
+  {id:757,title:'BASTARD!!: Ankoku no Hakaishin - Jigoku no Chinkonka-hen',poster_url:poster.replace('bx404-','bx159926-')},
+ ]);
+ assert.equal(rows.map(row=>row.id).join(','),'935,757');
+ const own=exports.relatedAnime({id:935,title:'Bastard Part 2',poster_url:poster},[],[{id:920,title:'Other name',poster_url:poster}]);assert.equal(own.length,0);
+});
+test('explicit seasons released on different dates remain distinct even if imported artwork was reused',()=>{
+ const poster='https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx404-shared.jpg';
+ const rows=exports.relatedAnime({id:1,title:'Different work'},[{id:2,title:'Long Chronicle Season 1',poster_url:poster,release_date:'2024-01-01'},{id:3,title:'Long Chronicle Season 2',poster_url:poster,release_date:'2025-01-01'}],[{id:2,title:'Long Chronicle Season 1',poster_url:poster,release_date:'2024-01-01'},{id:3,title:'Long Chronicle Season 2',poster_url:poster,release_date:'2025-01-01'}]);
+ assert.equal(rows.map(r=>r.id).join(','),'2,3');
 });
