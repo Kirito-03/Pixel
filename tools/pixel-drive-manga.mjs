@@ -7,7 +7,7 @@
  *   node tools/pixel-drive-manga.mjs --manga-id "slug" --limit 5
  */
 
-import { existsSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -107,6 +107,34 @@ async function downloadImage(url, destPath) {
   ]);
 }
 
+/** Sync manga cover image first (lightweight & fast) */
+async function syncMangaCover(mangaId) {
+  const coverRemote = `${RCLONE_REMOTE}/${mangaId}/cover.jpg`;
+  if (getRemoteFileSize(coverRemote) > 500) return true;
+  try {
+    const { rows } = await pool.query('SELECT cover_url, title FROM manga_cache WHERE manga_id = $1 LIMIT 1', [mangaId]);
+    const coverUrl = rows[0]?.cover_url;
+    if (!coverUrl || !/^https?:\/\//i.test(coverUrl)) return false;
+    console.log(`[MangaIngest] Subiendo portada de manga "${mangaId}"...`);
+    const tmpCover = join(INGEST_DIR, `tmp_cover_${mangaId}.jpg`);
+    try {
+      await downloadImage(coverUrl, tmpCover);
+      if (existsSync(tmpCover) && statSync(tmpCover).size > 500) {
+        await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpCover, coverRemote]);
+        if (getRemoteFileSize(coverRemote) > 500) {
+          console.log(`[MangaIngest] ✓ Portada de manga subida: ${coverRemote}`);
+          return true;
+        }
+      }
+    } finally {
+      if (existsSync(tmpCover)) unlinkSync(tmpCover);
+    }
+  } catch (e) {
+    console.warn(`[MangaIngest] No se pudo subir portada de ${mangaId}:`, e.message);
+  }
+  return false;
+}
+
 /** Ingest a single chapter into Google Drive */
 export async function ingestChapter(chapterUrl) {
   const cleanUrl = String(chapterUrl || '').trim();
@@ -114,6 +142,8 @@ export async function ingestChapter(chapterUrl) {
 
   console.log(`\n[MangaIngest] ─────────────────────────────────────────────`);
   console.log(`[MangaIngest] Procesando Manhwa: ${mangaId} | Capítulo: ${chapterSlug}`);
+
+  await syncMangaCover(mangaId);
 
   // 1. Obtener lista de páginas desde BD (manga_page_cache)
   const { rows } = await pool.query(
@@ -263,17 +293,32 @@ export async function ingestManga(mangaId, limit = 50) {
   }
 }
 
-/** Ingest pending chapters across the catalog into Google Drive */
+/** Ingest pending chapters across the catalog into Google Drive (completes one manga before moving to the next) */
 export async function ingestBatchManga(limit = 3) {
-  console.log(`[MangaIngest] Buscando hasta ${limit} capítulos pendientes para Google Drive...`);
+  console.log(`[MangaIngest] Buscando hasta ${limit} capítulos del manga en curso para completar antes de pasar al siguiente...`);
   const { rows } = await pool.query(
     `
-      SELECT mc.external_url AS chapter_url
+      WITH target_manga AS (
+        SELECT
+          mc.manga_id,
+          COUNT(*) FILTER (WHERE mp.pages::text LIKE '%/api/stream/Manga/%') AS synced_count
+        FROM manga_chapters_cache mc
+        LEFT JOIN manga_page_cache mp ON mp.chapter_url = mc.external_url
+        WHERE mc.external_url IS NOT NULL
+        GROUP BY mc.manga_id
+        HAVING COUNT(*) FILTER (WHERE mp.pages IS NULL OR mp.pages::text NOT LIKE '%/api/stream/Manga/%') > 0
+        ORDER BY
+          (COUNT(*) FILTER (WHERE mp.pages::text LIKE '%/api/stream/Manga/%') > 0) DESC,
+          mc.manga_id ASC
+        LIMIT 1
+      )
+      SELECT mc.manga_id, mc.chapter, mc.external_url AS chapter_url
       FROM manga_chapters_cache mc
+      JOIN target_manga tm ON tm.manga_id = mc.manga_id
       LEFT JOIN manga_page_cache mp ON mp.chapter_url = mc.external_url
       WHERE mc.external_url IS NOT NULL
         AND (mp.pages IS NULL OR mp.pages::text NOT LIKE '%/api/stream/Manga/%')
-      ORDER BY mc.cached_at DESC NULLS LAST, NULLIF(regexp_replace(mc.chapter, '[^0-9.]', '', 'g'), '')::numeric ASC NULLS LAST
+      ORDER BY NULLIF(regexp_replace(mc.chapter, '[^0-9.]', '', 'g'), '')::numeric ASC NULLS LAST, mc.chapter ASC
       LIMIT $1
     `,
     [limit]
@@ -284,7 +329,7 @@ export async function ingestBatchManga(limit = 3) {
     return;
   }
 
-  console.log(`[MangaIngest] Procesando lote de ${rows.length} capítulos...`);
+  console.log(`[MangaIngest] Completando Manga "${rows[0].manga_id}" (${rows.length} capítulos en este lote)...`);
   for (const row of rows) {
     await ingestChapter(row.chapter_url);
   }

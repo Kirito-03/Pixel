@@ -39,13 +39,13 @@ async function runDriveIngestBatch() {
     return;
   }
   isDriveIngestRunning = true;
-  console.log('[CronDrive] Iniciando verificación e ingesta controlada a Google Drive (Anime + Trailers + Hentai + Manga)...');
+  console.log('[CronDrive] Iniciando verificación e ingesta controlada a Google Drive (Imágenes/Trailers primero -> Anime -> Manga -> Hentai)...');
   try {
     await runScript('tools/pixel-drive-verify.mjs', ['--repair']);
-    await runScript('tools/pixel-drive-ingest.mjs', ['--batch', '--limit', '1']);
-    await runScript('tools/pixel-drive-ingest.mjs', ['--trailers', '--limit', '2']);
-    await runScript('tools/pixel-drive-hentai.mjs', ['--batch', '--limit', '1']);
-    await runScript('tools/pixel-drive-manga.mjs', ['--batch', '--limit', '1']);
+    await runScript('tools/pixel-drive-ingest.mjs', ['--trailers', '--limit', '5']);
+    await runScript('tools/pixel-drive-ingest.mjs', ['--batch', '--limit', '2']);
+    await runScript('tools/pixel-drive-manga.mjs', ['--batch', '--limit', '3']);
+    await runScript('tools/pixel-drive-hentai.mjs', ['--batch', '--limit', '2']);
     console.log('[CronDrive] ✓ Ciclo automático a Google Drive finalizado.');
   } catch (e) {
     console.error('[CronDrive] Error en lote automático:', e.message);

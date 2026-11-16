@@ -38,6 +38,8 @@ export default function MangaDetailScreen() {
   const [localSavingList, setSavingList] = useState(false);
   const savingList = localSavingList || listLoading || isUpdatingMyList(id, 'manga');
   const [listError, setListError] = useState('');
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  useEffect(() => setDescriptionExpanded(false), [id]);
   const [manga, setManga] = useState<Manga | null>(null);
   const [chapters, setChapters] = useState<MangaChapter[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
@@ -270,7 +272,10 @@ export default function MangaDetailScreen() {
                   </View>
                 )}
 
-                <Text style={[styles.excerpt, { maxWidth: 720 }]}>{manga.description || fallbackDescription(manga.title)}</Text>
+                <Text numberOfLines={descriptionExpanded ? undefined : 4} style={[styles.excerpt, { maxWidth: 720 }]}>{manga.description || fallbackDescription(manga.title)}</Text>
+                {(manga.description || '').length > 200 && <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: descriptionExpanded }} accessibilityLabel={descriptionExpanded ? 'Contraer descripción' : 'Expandir descripción'} onPress={() => setDescriptionExpanded(value => !value)} style={{ alignSelf: 'flex-start', paddingVertical: 12, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ color: '#ddd', fontSize: 13, fontWeight: '600' }}>{descriptionExpanded ? 'Ver menos' : 'Ver más'}</Text><Ionicons name={descriptionExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#ddd" />
+                </TouchableOpacity>}
 
                 <View style={styles.actions}>
                   <TouchableOpacity

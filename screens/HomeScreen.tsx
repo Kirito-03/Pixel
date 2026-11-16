@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Dimensions, Aler
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { HomeStackParamList, MovieDetail, ContentItem, AnimeDetail } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
+import Loader from '../components/Loader';
 import Header from '../components/Header';
 import FeaturedCarousel from '../components/FeaturedCarousel';
 import { prioritizeFeaturedArtwork } from '../utils/featuredArtwork';
@@ -246,8 +247,8 @@ export default function HomeScreen({ navigation }: Props) {
 
     if (loading) {
         return (
-            <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
+            <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <Loader />
             </View>
         );
     }

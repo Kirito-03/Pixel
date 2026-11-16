@@ -118,10 +118,34 @@ function resolveVideoUrl(videoServers) {
   return null;
 }
 
+/** Sync hentai cover image first (lightweight & fast) */
+async function syncHentaiCover(hentaiId, posterUrl) {
+  if (!posterUrl || !/^https?:\/\//i.test(posterUrl)) return false;
+  const posterRemote = `${RCLONE_REMOTE}/Hentai/${hentaiId}/poster.jpg`;
+  if (getRemoteFileSize(posterRemote) > 500) return true;
+  console.log(`[HentaiIngest] Subiendo portada de Hentai #${hentaiId}...`);
+  const tmpPoster = join(INGEST_DIR, `tmp_h_poster_${hentaiId}.jpg`);
+  try {
+    await runCommand('curl', ['-sS', '-L', '--max-time', '45', posterUrl, '-o', tmpPoster]);
+    if (existsSync(tmpPoster) && statSync(tmpPoster).size > 500) {
+      await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpPoster, posterRemote]);
+      if (getRemoteFileSize(posterRemote) > 500) {
+        console.log(`[HentaiIngest] ✓ Portada de Hentai subida: ${posterRemote}`);
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn(`[HentaiIngest] Error subiendo portada de Hentai #${hentaiId}:`, e.message);
+  } finally {
+    if (existsSync(tmpPoster)) unlinkSync(tmpPoster);
+  }
+  return false;
+}
+
 /** Ingest a single hentai episode */
 export async function ingestHentaiEpisode(episodeId) {
   const { rows } = await pool.query(
-    `SELECT he.id, he.hentai_id, he.episode_number, he.video_servers, hc.slug, hc.title
+    `SELECT he.id, he.hentai_id, he.episode_number, he.video_servers, hc.slug, hc.title, hc.poster_url
      FROM hentai_episodes he
      JOIN hentai_content hc ON hc.id = he.hentai_id
      WHERE he.id = $1`,
@@ -141,6 +165,8 @@ export async function ingestHentaiEpisode(episodeId) {
 
   console.log(`\n[HentaiIngest] ─────────────────────────────────────────────`);
   console.log(`[HentaiIngest] Procesando: ${ep.title} (ID: ${hentaiId}) | Episodio: ${epNum}`);
+
+  await syncHentaiCover(hentaiId, ep.poster_url);
 
   // 1. Verificar si ya existe en Drive
   if (remoteFileExists(driveRemoteTarget)) {
@@ -289,16 +315,39 @@ async function main() {
   } else if (args.includes('--batch')) {
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 5;
     const { rows } = await pool.query(
-      `SELECT he.id
+      `WITH target_hentai AS (
+         SELECT
+           he.hentai_id,
+           COUNT(*) FILTER (WHERE he.video_servers::text LIKE '%/api/stream/%') AS synced_count
+         FROM hentai_episodes he
+         JOIN hentai_content hc ON hc.id = he.hentai_id
+         WHERE he.is_active = true
+           AND hc.is_active = true
+         GROUP BY he.hentai_id
+         HAVING COUNT(*) FILTER (
+           WHERE he.video_servers @> '[{"server":"MP4Upload"}]'::jsonb
+             AND NOT (he.video_servers::text LIKE '%/api/stream/%')
+         ) > 0
+         ORDER BY
+           (COUNT(*) FILTER (WHERE he.video_servers::text LIKE '%/api/stream/%') > 0) DESC,
+           he.hentai_id ASC
+         LIMIT 1
+       )
+       SELECT he.id, he.hentai_id, he.episode_number
        FROM hentai_episodes he
+       JOIN target_hentai th ON th.hentai_id = he.hentai_id
        WHERE he.is_active = true
          AND he.video_servers @> '[{"server":"MP4Upload"}]'::jsonb
          AND NOT (he.video_servers::text LIKE '%/api/stream/%')
-       ORDER BY he.hentai_id ASC, he.episode_number ASC
+       ORDER BY he.episode_number ASC
        LIMIT $1`,
       [limit]
     );
-    console.log(`[HentaiIngest] Procesando lote de ${rows.length} episodios...`);
+    if (rows.length > 0) {
+      console.log(`[HentaiIngest] Completando Hentai #${rows[0].hentai_id} (${rows.length} episodios en este lote)...`);
+    } else {
+      console.log(`[HentaiIngest] No hay episodios Hentai pendientes con MP4Upload.`);
+    }
     for (const r of rows) {
       await ingestHentaiEpisode(r.id);
     }

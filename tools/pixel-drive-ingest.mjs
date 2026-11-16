@@ -398,20 +398,43 @@ async function main() {
     }
   } else if (args.includes('--batch')) {
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 5;
-    console.log(`[DriveIngest] Buscando los próximos ${limit} episodios pendientes con MP4Upload...`);
+    console.log(`[DriveIngest] Buscando próximos hasta ${limit} episodios del anime en curso para completar antes de pasar al siguiente...`);
     const { rows } = await pool.query(
       `
+        WITH target_anime AS (
+          SELECT
+            e.anime_id,
+            COUNT(*) FILTER (WHERE e.stream_url LIKE '%/api/stream/%' OR e.storage_type = 'gdrive') AS synced_count
+          FROM anime_episodes e
+          JOIN anime_content ac ON ac.id = e.anime_id
+          WHERE e.is_active = true
+            AND ac.is_active = true
+          GROUP BY e.anime_id
+          HAVING COUNT(*) FILTER (
+            WHERE e.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
+              AND (e.stream_url IS NULL OR e.stream_url NOT LIKE '%/api/stream/%')
+          ) > 0
+          ORDER BY
+            (COUNT(*) FILTER (WHERE e.stream_url LIKE '%/api/stream/%' OR e.storage_type = 'gdrive') > 0) DESC,
+            e.anime_id ASC
+          LIMIT 1
+        )
         SELECT e.id, e.anime_id, e.episode_number
         FROM anime_episodes e
+        JOIN target_anime ta ON ta.anime_id = e.anime_id
         WHERE e.is_active = true
           AND e.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
           AND (e.stream_url IS NULL OR NOT e.stream_url LIKE '%/api/stream/%')
-        ORDER BY e.anime_id ASC, e.episode_number ASC
+        ORDER BY e.episode_number ASC
         LIMIT $1
       `,
       [limit]
     );
-    console.log(`[DriveIngest] Procesando lote de ${rows.length} episodios...`);
+    if (rows.length > 0) {
+      console.log(`[DriveIngest] Completando Anime #${rows[0].anime_id} (${rows.length} episodios en este lote)...`);
+    } else {
+      console.log(`[DriveIngest] No hay episodios pendientes con MP4Upload.`);
+    }
     for (const row of rows) {
       await ingestEpisode(row.id);
     }

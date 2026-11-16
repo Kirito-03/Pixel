@@ -66,6 +66,7 @@ export const useProfileManagement = () => {
   };
 
   const createProfile = async (name: string, imageUri: string) => {
+    if (!userId) throw new Error('Inicia sesión antes de crear un perfil.');
     if (!name.trim() || !imageUri) {
       throw new Error('El nombre y la imagen son requeridos.');
     }

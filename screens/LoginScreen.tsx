@@ -126,7 +126,7 @@ export default function LoginScreen({ navigation }: any) {
         {(emailLoading || googleLoading) && (
           <View style={StyleSheet.absoluteFillObject}>
             <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-              <Loader />
+              <Loader onDark />
             </View>
           </View>
         )}
@@ -336,7 +336,7 @@ export default function LoginScreen({ navigation }: any) {
       {/* Full-screen Loader Overlay */}
       {(emailLoading || googleLoading) && (
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }]}>
-          <Loader />
+          <Loader onDark />
         </View>
       )}
 
@@ -373,21 +373,7 @@ export default function LoginScreen({ navigation }: any) {
             <Text style={mobileStyles.heroWhite}>SEKAI</Text>
           </View>
 
-          {/* Stats on the right side */}
-          <View style={mobileStyles.statsContainer}>
-            <View style={mobileStyles.statRowBox}>
-               <View style={mobileStyles.statIcon}><Ionicons name="play" size={10} color="#E50914"/></View>
-               <Text style={mobileStyles.statVal}>10K+</Text>
-            </View>
-            <View style={mobileStyles.statRowBox}>
-               <View style={mobileStyles.statIcon}><Ionicons name="star" size={10} color="#E50914"/></View>
-               <Text style={mobileStyles.statVal}>4.9</Text>
-            </View>
-            <View style={mobileStyles.statRowBox}>
-               <View style={mobileStyles.statIcon}><Ionicons name="flash" size={10} color="#E50914"/></View>
-               <Text style={mobileStyles.statVal}>HD</Text>
-            </View>
-          </View>
+
         </View>
 
         {/* ═══ BOTTOM FORM SECTION (White) ═══ */}

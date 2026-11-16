@@ -397,13 +397,13 @@ router.post('/drive/sync', async (req, res) => {
             label = `Hentai Ep #${epId}`;
             commands = [{ script: 'tools/pixel-drive-hentai.mjs', args: ['--episode-id', String(epId)] }];
         } else if (type === 'batch') {
-            label = 'Lote Mixto (Verificar + Anime + Trailers + Hentai + Manga)';
+            label = 'Lote Mixto (Verificar + Imágenes/Trailers + Anime + Manga + Hentai)';
             commands = [
                 { script: 'tools/pixel-drive-verify.mjs', args: ['--repair'] },
-                { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '1'] },
-                { script: 'tools/pixel-drive-ingest.mjs', args: ['--trailers', '--limit', '2'] },
-                { script: 'tools/pixel-drive-hentai.mjs', args: ['--batch', '--limit', '1'] },
-                { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '1'] },
+                { script: 'tools/pixel-drive-ingest.mjs', args: ['--trailers', '--limit', '5'] },
+                { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '2'] },
+                { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '3'] },
+                { script: 'tools/pixel-drive-hentai.mjs', args: ['--batch', '--limit', '2'] },
             ];
         } else {
             return res.status(400).json({ message: 'Tipo de sincronización inválido' });

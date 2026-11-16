@@ -5,8 +5,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Storage } from '../services/storage';
-import * as SplashScreen from 'expo-splash-screen';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -383,72 +381,10 @@ const linking: LinkingOptions<LinkRoutes> = {
 export default function AppNavigator() {
   const { colors, theme } = useTheme();
   const { user, isLoading } = useAuth();
-  const { currentProfile, loadCurrentProfile } = useProfile();
+  const { currentProfile } = useProfile();
   const { isAdmin } = useAdmin();
-  const [initialRoute, setInitialRoute] = React.useState<string | null>(null);
-  const [isReady, setIsReady] = React.useState(false);
-  const [initialState, setInitialState] = React.useState();
-
-  // Load navigation state on mount
-  useEffect(() => {
-    // Hemos deshabilitado la restauración del estado de navegación
-    // porque estados guardados con estructuras antiguas causan pantalla negra.
-    setIsReady(true);
-  }, [isReady]);
-
-  useEffect(() => {
-    const determineInitialRoute = async () => {
-      // Must wait for Auth AND Persistence to be ready
-      if (isLoading || !isReady) {
-        return;
-      }
-
-      // 1. If we have a restored state, prioritize it!
-      if (initialState) {
-        // If user is logged out but state is for internal screens, React Nav might handle it
-        // by resetting to restricted screens, or we should verify user.
-        // For now, assuming if user exists, state is valid.
-        // BUT due to layout changes (moving screens to tabs), old state might crash.
-        // So we will just ignore it and do standard routing if user exists.
-        if (user) {
-          console.log('AppNavigator: Ignoring restored state to prevent routing errors with old layouts');
-          // We intentionally do NOT set RESTORED_STATE here to force standard routing below
-        } else {
-            // If no user, we ignore state and force Login
-        }
-      }
-
-      if (!user) {
-        // Delay mínimo para mostrar animación de carga
-        setTimeout(() => setInitialRoute('Ingreso'), 2000);
-        return;
-      }
-
-      // Si hay usuario, verificar si hay perfil guardado
-      const loadedProfile = await loadCurrentProfile();
-
-      // OPTIMIZACIÓN: Si ya tenemos usuario, no necesitamos un delay largo
-      if (loadedProfile) {
-        // Si hay perfil guardado, ir directamente a Principal
-        setInitialRoute('Principal');
-      } else {
-        // Si no hay perfil, ir a selección de perfil
-        setInitialRoute('SeleccionPerfil');
-      }
-
-      // Ocultar la pantalla de carga (Splash Screen) nativa explícitamente
-      try {
-        await SplashScreen.hideAsync();
-      } catch (e) {}
-    };
-
-    determineInitialRoute();
-  }, [user, isLoading, isReady, initialState]);
-
-  // Mostrar loading mientras se determina la ruta inicial
-  if (isLoading || !isReady || initialRoute === null) {
-    return <LoadingScreen />;
-  }
+  if (isLoading) return <LoadingScreen />;
+  const initialRoute = !user ? 'Ingreso' : currentProfile ? 'Principal' : 'SeleccionPerfil';
 
   return (
     <NavigationContainer
@@ -456,13 +392,14 @@ export default function AppNavigator() {
       theme={{ ...(theme === 'dark' ? DarkTheme : DefaultTheme), colors: { ...(theme === 'dark' ? DarkTheme.colors : DefaultTheme.colors), background: colors.background, card: colors.card, text: colors.text, primary: colors.primary, border: colors.divider } }}
     >
       <RootStack.Navigator
+        key={`${user?.uid || 'signed-out'}:${currentProfile?.id || 'choose-profile'}`}
         screenOptions={{
           headerShown: false,
           animation: 'fade',
           presentation: 'card',
           gestureEnabled: false,
         }}
-        initialRouteName={initialRoute === 'RESTORED_STATE' ? undefined : initialRoute}
+        initialRouteName={initialRoute}
       >
         {!user ? (
           <>
@@ -472,18 +409,18 @@ export default function AppNavigator() {
           </>
         ) : (
           <>
-            <RootStack.Screen
+            {!currentProfile && <RootStack.Screen
               name="SeleccionPerfil"
               component={ProfileSelectionScreen as any}
-            />
-            <RootStack.Screen name="Principal" component={MainTabs} />
-            {Platform.OS !== 'web' && (
+            />}
+            {currentProfile && <RootStack.Screen name="Principal" component={MainTabs} />}
+            {currentProfile && Platform.OS !== 'web' && (
               <RootStack.Screen name="Perfil" component={ProfileScreen} />
             )}
             <RootStack.Screen name="Apariencia" component={AppearanceScreen} />
             <RootStack.Screen name="Descargas" component={DownloadsScreen as any} />
             <RootStack.Screen name="LegalScreen" component={LegalScreen} />
-            {isAdmin && <RootStack.Screen name="Admin" component={AdminNavigator} />}
+            {currentProfile && isAdmin && <RootStack.Screen name="Admin" component={AdminNavigator} />}
           </>
         )}
       </RootStack.Navigator>

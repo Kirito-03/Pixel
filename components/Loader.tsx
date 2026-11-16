@@ -1,87 +1,40 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  withDelay,
-  Easing,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
-export default function Loader() {
-  const dot1 = useSharedValue(0);
-  const dot2 = useSharedValue(0);
-  const dot3 = useSharedValue(0);
-
-  const animateDot = (dot: Animated.SharedValue<number>, delay: number) => {
-    dot.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
-          withTiming(0, { duration: 400, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1, // infinite repeat
-        true // reverse
-      )
-    );
-  };
-
+export default function Loader({ onDark = false, label = 'Preparando tu espacio…' }: { onDark?: boolean; label?: string }) {
+  const { colors } = useTheme();
+  const tiles = useRef(Array.from({ length: 9 }, () => new Animated.Value(0.25))).current;
+  const [reducedMotion, setReducedMotion] = useState(true);
   useEffect(() => {
-    animateDot(dot1, 0);
-    animateDot(dot2, 200);
-    animateDot(dot3, 400);
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active) setReducedMotion(value); }).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducedMotion);
+    return () => { active = false; subscription.remove(); };
   }, []);
-
-  const getStyle = (dot: Animated.SharedValue<number>) => {
-    return useAnimatedStyle(() => ({
-      transform: [{ translateY: dot.value * -10 }],
-      opacity: 0.3 + (dot.value * 0.7),
-    }));
-  };
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.dotsContainer}>
-        <Animated.View style={[styles.dot, getStyle(dot1)]} />
-        <Animated.View style={[styles.dot, getStyle(dot2)]} />
-        <Animated.View style={[styles.dot, getStyle(dot3)]} />
-      </View>
-      <Text style={styles.text}>CARGANDO DATOS</Text>
+  useEffect(() => {
+    if (reducedMotion) { tiles.forEach(tile => tile.setValue(0.65)); return; }
+    const animation = Animated.loop(Animated.sequence([
+      Animated.stagger(65, tiles.map(tile => Animated.sequence([
+        Animated.timing(tile, { toValue: 1, duration: 240, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(tile, { toValue: 0.25, duration: 420, useNativeDriver: true }),
+      ]))),
+      Animated.delay(180),
+    ]));
+    animation.start();
+    return () => animation.stop();
+  }, [reducedMotion, tiles]);
+  const ink = onDark ? '#edf4f2' : colors.text;
+  return <View accessibilityRole="progressbar" accessibilityLabel={label} accessibilityState={{ busy: true }} style={styles.container}>
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.matrix}>
+      {tiles.map((tile, index) => <Animated.View key={index} style={[styles.tile, { backgroundColor: index === 4 ? '#83bdb4' : ink, opacity: tile, transform: [{ scale: tile.interpolate({ inputRange: [0.25, 1], outputRange: [0.82, 1] }) }] }]} />)}
     </View>
-  );
+    <Text style={[styles.label, { color: onDark ? '#b7c4c1' : colors.textMuted }]}>{label}</Text>
+  </View>;
 }
-
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 16,
-    height: 24, // Para que el salto no desplace los textos
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#E50914',
-    shadowColor: '#E50914',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-  },
-  text: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 2,
-    opacity: 0.6,
-  },
+  container: { alignItems: 'center', gap: 22, padding: 20 },
+  matrix: { width: 54, height: 54, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tile: { width: 14, height: 14, borderRadius: 2 },
+  label: { fontSize: 13, lineHeight: 20, letterSpacing: 0.25, textAlign: 'center' },
 });

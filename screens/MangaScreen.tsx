@@ -193,11 +193,9 @@ export default function MangaScreen() {
               },
             ]}
           >
-            <View style={styles.titleRow}>
+            <View style={[styles.titleRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 6 }]}>
               <Text style={[styles.title, { color: colors.text }]}>Manga y más</Text>
-              <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.badgeText}>MANHWA · MANHUA · MANGA</Text>
-              </View>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>Manga, manhwa y manhua para descubrir</Text>
             </View>
 
             <View
@@ -303,6 +301,7 @@ export default function MangaScreen() {
                       item={{
                         id: p.id,
                         title: p.title,
+                        publicationType: readingFormat(p),
                         image: p.cover_url || '',
                         status: p.status,
                         chapters: p.chapter_count || p.latest_chapter || 0,

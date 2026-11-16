@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
 import { Storage } from '../services/storage';
 
 export interface Profile {
@@ -25,16 +26,14 @@ interface ProfileProviderProps {
 }
 
 export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) => {
-  const [currentProfile, setCurrentProfileState] = useState<Profile | null>(() => {
-    try { return Storage.getObject<Profile>('currentProfile') || null; } catch { return null; }
-  });
-  const [adultContentEnabled, setAdultContentEnabledState] = useState<boolean>(() => {
-    try {
-      const profile = Storage.getObject<Profile>('currentProfile');
-      const saved = profile ? Storage.getString(`adultContentEnabled:${profile.id}`) : undefined;
-      return saved !== undefined && JSON.parse(saved) === true;
-    } catch { return false; }
-  });
+  const { user } = useAuth();
+  const [currentProfile, setCurrentProfileState] = useState<Profile | null>(null);
+  const [adultContentEnabled, setAdultContentEnabledState] = useState(false);
+  useEffect(() => {
+    setCurrentProfileState(null);
+    setAdultContentEnabledState(false);
+    Storage.delete('currentProfile');
+  }, [user?.uid]);
 
   const setCurrentProfile = async (profile: Profile | null) => {
     console.log('ProfileContext: Setting current profile:', profile?.id, profile?.name);
@@ -111,9 +110,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
 
   };
 
-  useEffect(() => {
-    loadCurrentProfile();
-  }, []);
+
 
 
   const value: ProfileContextType = {

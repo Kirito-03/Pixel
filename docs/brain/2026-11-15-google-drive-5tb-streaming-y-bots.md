@@ -211,4 +211,14 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
 - `node --check` sobre los 12 archivos JS modificados: exit `0`.
 - `node --test server/tests/security-routes.test.cjs server/tests/uploads-security.test.mjs server/tests/trailers.test.mjs server/tests/legacyAnimeMetadata.test.mjs`: `24/24` tests en verde (incluyendo bloqueo SSRF en `/transcode/hls`).
 
+---
+
+## 8. Prioridad a Imágenes/Tráilers y Completado Serie por Serie antes de Avanzar
+- **Imágenes y tráilers primero (`server/cron.js`, `server/routes/admin.js`, `tools/pixel-drive-*.mjs`):**
+  - El ciclo automático y el botón `⚡ Subir Lote` ahora ejecutan primero `pixel-drive-ingest.mjs --trailers --limit 5` (subiendo `poster.jpg`, `banner.jpg` y `trailer.mp4`, que son livianos y rápidos) antes de pasar a los videos completos.
+  - En `pixel-drive-manga.mjs` (`syncMangaCover`) y `pixel-drive-hentai.mjs` (`syncHentaiCover`) también se sube primero la portada (`cover.jpg` / `poster.jpg`) de cada obra antes de sus capítulos/episodios.
+- **Completar todos los capítulos de un título antes de pasar al siguiente:**
+  - En `tools/pixel-drive-ingest.mjs` (`--batch`), `tools/pixel-drive-manga.mjs` (`ingestBatchManga`) y `tools/pixel-drive-hentai.mjs` (`--batch`), la consulta CTE (`target_anime`, `target_manga`, `target_hentai`) fija un único título activo —priorizando cualquier obra que ya tenga capítulos parcialmente en Drive (`synced_count > 0`)— y sube todos sus episodios/capítulos en orden (`episode_number ASC` / `chapter ASC`) hasta terminarla al 100 % antes de pasar a la siguiente.
+
+
 

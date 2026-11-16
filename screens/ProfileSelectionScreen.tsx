@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   Alert,
   Platform,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useProfile, Profile } from '../contexts/ProfileContext';
@@ -25,11 +27,15 @@ interface ProfileSelectionScreenProps {
 }
 
 const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigation }) => {
+  const { width } = useWindowDimensions();
+  const compact = width < 600;
+  const insets = useSafeAreaInsets();
   const { logout } = useAuth();
   const { setCurrentProfile } = useProfile();
-  const { profiles, loading, createProfile, deleteProfile, getCorrectedAvatarUrl } = useProfileManagement();
+  const { profiles, loading, error, loadProfiles, createProfile, deleteProfile, getCorrectedAvatarUrl } = useProfileManagement();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  useEffect(() => { if (!loading && !error && profiles.length === 0) setShowCreateModal(true); }, [loading, error, profiles.length]);
   const [newProfileName, setNewProfileName] = useState('');
   const [creating, setCreating] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -115,10 +121,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
 
   const handleSelectProfile = async (profile: Profile) => {
     await setCurrentProfile(profile);
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Principal', params: { selectedProfile: profile } }],
-    });
+    // The root navigator opens content only after an explicit profile selection.
   };
 
   if (loading) {
@@ -128,7 +131,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
           <AnimatedLeftPanel fullScreenMode={true} />
         </View>
         <View style={styles.loadingContainer}>
-          <Loader />
+          <Loader onDark />
         </View>
       </View>
     );
@@ -143,15 +146,16 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
 
       <View style={styles.mainContentContainer}>
         {/* Top Header */}
-        <View style={styles.topBar}>
-          <View style={styles.topLogo}>
+        <View style={[styles.topBar, { paddingHorizontal: compact ? 20 : 40, paddingTop: insets.top + (compact ? 16 : 32), gap: 16, flexWrap: 'wrap' }]}>
+          <View style={[styles.topLogo, { flexShrink: 1 }]}>
             <View style={styles.logoIconBox}>
               <Ionicons name="play" size={11} color="#fff" />
             </View>
-            <Text style={styles.logoText}>PIXEL NO SEKAI</Text>
+            <Text numberOfLines={1} style={[styles.logoText, { fontSize: compact ? 12 : 14, letterSpacing: compact ? 0.8 : 1.5, flexShrink: 1 }]}>PIXEL NO SEKAI</Text>
           </View>
           <Pressable
-            style={[styles.logoutButton, logoutHovered && styles.logoutButtonHover]}
+            accessibilityRole="button" accessibilityLabel="Cerrar sesión"
+            style={[styles.logoutButton, { minHeight: 44, paddingHorizontal: compact ? 8 : 16, flexShrink: 0 }, logoutHovered && styles.logoutButtonHover]}
             onPress={async () => {
               await logout();
               // El navegador condicional redirige automáticamente cuando user=null
@@ -161,7 +165,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
             onHoverOut={() => setLogoutHovered(false)}
           >
             <Ionicons name="log-out-outline" size={16} color={logoutHovered ? "#fff" : "rgba(255,255,255,0.5)"} />
-            <Text style={[styles.logoutText, logoutHovered && styles.logoutTextHover]}>CERRAR SESIÓN</Text>
+            <Text style={[styles.logoutText, logoutHovered && styles.logoutTextHover]}>{compact ? 'Salir' : 'CERRAR SESIÓN'}</Text>
           </Pressable>
         </View>
 
@@ -177,6 +181,8 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
             <Text style={styles.titleRed}>VIENDO?</Text>
           </View>
 
+          {!!error && <View style={{ padding: 20, maxWidth: 420, gap: 12 }}><Text style={{ color: '#ddd', textAlign: 'center' }}>No se pudieron cargar tus perfiles.</Text><TouchableOpacity accessibilityRole="button" onPress={loadProfiles} style={{ padding: 14, backgroundColor: '#202b29' }}><Text style={{ color: '#fff', textAlign: 'center' }}>Reintentar</Text></TouchableOpacity></View>}
+          {!error && profiles.length === 0 && <Text style={{ color: '#bbb', textAlign: 'center', paddingHorizontal: 24, marginBottom: 24 }}>Crea tu primer perfil para empezar.</Text>}
           {/* Profiles Grid */}
           <View style={styles.profilesContainer}>
             {profiles.map((profile, index) => (

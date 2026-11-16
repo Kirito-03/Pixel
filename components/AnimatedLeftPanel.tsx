@@ -120,24 +120,7 @@ export default function AnimatedLeftPanel({ fullScreenMode = false }: { fullScre
         <Text style={styles.heroWhite}>PIXEL</Text>
         <Text style={styles.heroRed}>NO</Text>
         <Text style={styles.heroWhite}>SEKAI</Text>
-        <View style={styles.statsRow}>
-          {[
-            { icon: 'film-outline', val: '10K+', label: 'Títulos' },
-            { icon: 'star-outline', val: '4.9', label: 'Rating' },
-            { icon: 'sparkles-outline', val: 'HD', label: 'Calidad' },
-          ].map((s, i) => (
-            <React.Fragment key={s.label}>
-              {i > 0 && <View style={styles.statDivider} />}
-              <View style={styles.statItem}>
-                <View style={styles.statIcon}>
-                  <Ionicons name={s.icon as any} size={13} color="#E50914" />
-                </View>
-                <Text style={styles.statVal}>{s.val}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
+
       </View>
         </>
       )}

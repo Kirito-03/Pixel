@@ -100,16 +100,16 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
   const headerOffset = isSmallScreen ? 0 : (isWeb ? 72 : 64);
   const heroHeight = isSmallScreen
     ? Math.min(680, Math.max(500, height * 0.75))
-    : Math.min(610, Math.max(585, Math.round(height * 0.78)));
+    : Math.min(820, Math.max(620, Math.round(height * 0.82)));
 
   return (
     <View onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)} style={[styles.container, { width: Platform.OS === 'ios' ? width : '100%', height: heroHeight }]}>
-      <AnimeArtwork alignTop topOffset={headerOffset} banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "50% 0%"} />
+      <AnimeArtwork alignTop banner={bannerUri} poster={posterUri} position={isSmallScreen ? undefined : "50% 0%"} />
 
       {/* Top vignette para navbar */}
       <LinearGradient
         colors={heroTopColors as any}
-        style={[StyleSheet.absoluteFillObject, { top: headerOffset, height: '28%' }]}
+        style={[StyleSheet.absoluteFillObject, { top: 0, height: '28%' }]}
         pointerEvents="none"
       />
 
@@ -117,7 +117,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
       <LinearGradient
         colors={heroBottomColors as any}
         locations={[0, 0.3, 0.7, 1]}
-        style={[StyleSheet.absoluteFillObject, { top: headerOffset }]}
+        style={[StyleSheet.absoluteFillObject, { top: 0 }]}
         pointerEvents="none"
       />
 
@@ -128,7 +128,7 @@ export default function FeaturedMovie({ movie, onWatch, onMoreInfo, onAddList }:
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           locations={[0, 0.4, 0.8]}
-          style={[StyleSheet.absoluteFillObject, { top: headerOffset }]}
+          style={[StyleSheet.absoluteFillObject, { top: 0 }]}
           pointerEvents="none"
         />
       )}
