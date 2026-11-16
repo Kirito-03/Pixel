@@ -1,6 +1,6 @@
 import { runSpanishSynopsisBatch } from './services/spanishSynopsisService.js';
 import cron from 'node-cron';
-import { spawn } from 'child_process';
+import { createDriveStages, runDriveStages, tryAcquireDriveJob, spawnDriveScript } from '../tools/lib/drive-job-runner.mjs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { syncAiringAnimes, updateOngoingAnimes, syncNextCatalogPage, fixMissingImages } from './services/smartBotService.js';
@@ -12,47 +12,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
 
-let isDriveIngestRunning = false;
-
-function runScript(scriptRelPath, args = []) {
-  return new Promise((resolve) => {
-    const scriptPath = join(projectRoot, scriptRelPath);
-    const child = spawn(process.execPath, [scriptPath, ...args], {
-      cwd: projectRoot,
-      stdio: 'inherit',
-    });
-    child.on('error', (err) => {
-      console.error(`[CronDrive] Error iniciando ${scriptRelPath}:`, err.message);
-      resolve();
-    });
-    child.on('close', (code) => {
-      if (code !== 0) {
-        console.warn(`[CronDrive] ${scriptRelPath} finalizó con código ${code}`);
-      }
-      resolve();
-    });
-  });
-}
-
-async function runDriveIngestBatch() {
-  if (isDriveIngestRunning) {
-    console.log('[CronDrive] Ya hay una ingesta a Google Drive en curso, omitiendo ciclo.');
+export async function runDriveIngestBatch() {
+  const lease = tryAcquireDriveJob('Sincronización automática de Drive');
+  if (!lease) {
+    console.log('[CronDrive] Ya hay una ingesta manual o automática en curso, omitiendo ciclo.');
     return;
   }
-  isDriveIngestRunning = true;
-  console.log('[CronDrive] Iniciando verificación e ingesta controlada a Google Drive (Imágenes/Trailers primero -> Anime -> Manga -> Hentai)...');
+  const commands = [
+    { script: 'tools/pixel-drive-verify.mjs', args: ['--repair'], lane: 'preflight', label: 'Verificación de Drive' },
+    { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '2'], lane: 'video', label: 'Episodios de anime' },
+    { script: 'tools/pixel-drive-hentai.mjs', args: ['--batch', '--limit', '2'], lane: 'video', label: 'Episodios de H' },
+    { script: 'tools/pixel-drive-ingest.mjs', args: ['--trailers', '--limit', '5'], lane: 'video', label: 'Portadas y trailers' },
+    { script: 'tools/pixel-drive-ingest.mjs', args: ['--thumbnails', '--limit', '1'], lane: 'video', label: 'Miniaturas pendientes' },
+    { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '3'], lane: 'manga', label: 'Capítulos de manga' },
+  ];
+  console.log('[CronDrive] Iniciando verificación; manga avanzará en paralelo con la cola de videos.');
   try {
-    await runScript('tools/pixel-drive-verify.mjs', ['--repair']);
-    await runScript('tools/pixel-drive-ingest.mjs', ['--trailers', '--limit', '5']);
-    await runScript('tools/pixel-drive-ingest.mjs', ['--batch', '--limit', '2']);
-    await runScript('tools/pixel-drive-ingest.mjs', ['--thumbnails', '--limit', '1']);
-    await runScript('tools/pixel-drive-manga.mjs', ['--batch', '--limit', '3']);
-    await runScript('tools/pixel-drive-hentai.mjs', ['--batch', '--limit', '2']);
+    await runDriveStages(commands, {
+      stages: createDriveStages(commands),
+      signal: lease.controller.signal,
+      run: (command, options) => spawnDriveScript(projectRoot, command, options),
+      onStage: (stage) => console.log(`[CronDrive] ${stage.label}: ${stage.status}`),
+    });
     console.log('[CronDrive] ✓ Ciclo automático a Google Drive finalizado.');
-  } catch (e) {
-    console.error('[CronDrive] Error en lote automático:', e.message);
+  } catch (error) {
+    console.error('[CronDrive] Error en lote automático:', error.message);
   } finally {
-    isDriveIngestRunning = false;
+    lease.release();
   }
 }
 
@@ -144,7 +130,7 @@ export function startBotSchedulers() {
     }
   });
 
-  // Tarea 9: Verificación e Ingesta Controlada a Google Drive (Cada 45 minutos, secuencial sin saturar CPU/red)
+  // Tarea 9: Verificación e Ingesta Controlada a Google Drive (Cada 45 minutos; manga paralelo, videos secuenciales)
   cron.schedule('*/45 * * * *', async () => {
     try {
       await runDriveIngestBatch();

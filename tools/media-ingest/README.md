@@ -15,8 +15,9 @@ Herramienta CLI portable escrita únicamente con la **biblioteca estándar de Py
   - No registra URLs con query strings ni secretos en logs o salidas JSON.
 - **No borra originales**: los archivos de entrada nunca se eliminan ni se sobrescriben.
 - **No inicia servicios ni modifica la BD de Pixel**: `queue-run` ejecuta un worker secuencial bajo demanda y bloqueado con `fcntl.flock`; no instala daemons ni toca servidor/frontend/BD principal.
-- **Remux sin reducción prometida**: en `--mode auto` o `--mode remux`, si `ffprobe` confirma vídeo `h264` (`yuv420p`) y audio `aac` (o sin audio), se copia a MP4 (`-c copy +faststart`) sin re-codificar ni prometer reducción de tamaño o resolución.
-- **MediaCodec solo experimental explícito**: `--mode mediacodec` verifica explícitamente `h264_mediacodec` en `ffmpeg -encoders` antes de ejecutarse; **nunca** se selecciona de forma automática en `--mode auto`. En tablet real solo se comprobó una muestra sintética `lavfi` 720p 24fps de `3s` (`1.09s`, código `0`); no extrapolar a capítulos largos.
+- **Solo AV1**: un vídeo AV1 existente se copia a MP4 con `-c copy +faststart`; conserva vídeo y audio sin recodificar. Los demás códecs se convierten una sola vez a AV1, sin reducir resolución, profundidad de píxel o fps. La conversión no es matemáticamente sin pérdida.
+- **Reanudación verificada**: se conserva el original. Las salidas preparadas solo se reutilizan cuando coinciden su SHA256 y un manifiesto AV1; los manifiestos H.264 antiguos no se aceptan para nuevas subidas automáticas. No se modifican archivos ya publicados.
+- **MediaCodec H.264 deshabilitado**: los modos válidos son `auto`, `remux` y `encode`; nunca hay fallback automático a H.264.
 - **No prometer streaming ilimitado**: almacenamiento amplio en Drive no equivale a ancho de banda ni cuotas de API/túnel ilimitadas.
 
 ## Requisitos
@@ -27,10 +28,9 @@ Herramienta CLI portable escrita únicamente con la **biblioteca estándar de Py
 
 ## Modos (`--mode`)
 
-- `encode` (por defecto en CLI simple): `libx264`, escala máxima `1280x720` sin upscaling y dimensiones pares, `-crf 26`, `-preset veryfast`, `-threads 2`, `-filter_threads 1`, `-pix_fmt yuv420p`, `aac 96k`, `-movflags +faststart`, prioridad baja POSIX (`os.nice(10)`, desactivable con `--no-low-priority`).
-- `auto` (por defecto en `queue-add`): ejecuta `ffprobe` local (`-protocol_whitelist file,pipe`); usa `remux` si el flujo es `h264` (`yuv420p`) + `aac`, o `encode` en caso contrario.
-- `remux`: fuerza copia directa (`-map 0:v:0 -map 0:a? -c copy +faststart`) tras verificar compatibilidad con `ffprobe`; falla si el archivo no es compatible.
-- `mediacodec`: experimental explícito (`h264_mediacodec` 720p); falla si `ffmpeg -encoders` no expone `h264_mediacodec`.
+- `encode` (por defecto en CLI simple) y `auto`: inspeccionan con `ffprobe`; si ya es AV1, copian vídeo y audio. Para otros códecs usan `libsvtav1`, CRF25, preset8, `lp=2`, threads2, prioridad baja. Si SVT no está disponible, se admite `libaom-av1` CRF25/cpu-used6; si no hay codificador AV1, falla conservando el original. No se aplican filtros de escala ni cambio de fps. El audio se copia; si no cabe en MP4, se produce un error explícito sin degradarlo.
+- `remux`: fuerza copia AV1 (`-c copy +faststart`) después de verificar el códec; rechaza vídeos de otro códec.
+- Antes de marcar `encoded` se comprueban AV1, dimensiones, píxeles, fps, duración y audio contra el original. La calidad visual y la velocidad real de una conversión requieren una muestra del material; no se promete pérdida cero ni tiempo fijo. La principal aceleración consiste en conservar AV1 existente y reanudar subidas preparadas.
 
 ## Uso CLI simple (compatible)
 
@@ -97,7 +97,7 @@ python3 tools/media-ingest queue-run \
 Comportamiento ante interrupción y reintentos:
 - Si otro `queue-run` mantiene el bloqueo `flock`, falla inmediatamente con código de salida `3`.
 - Al iniciar `queue-run`, cualquier trabajo que quedó en `running` tras un corte se recupera de forma segura:
-  - Si el manifiesto y el `sha256` del MP4 de salida ya coinciden como `encoded`/`uploading`/`verifying`, reanuda la subida sin re-codificar (o marca `encoded` si no hay `--remote`).
+  - Si el manifiesto AV1 y el `sha256` del MP4 de salida ya coinciden como `encoded`/`uploading`/`verifying`, reanuda la subida sin re-codificar (o marca `encoded` si no hay `--remote`).
   - Si el encode quedó incompleto, limpia únicamente el artefacto parcial de salida/manifiesto (nunca el archivo original) y reencola si `attempts <= max_retries`, o marca `failed` si agotó reintentos.
 
 ## Pruebas unitarias (sin red, con binarios simulados)

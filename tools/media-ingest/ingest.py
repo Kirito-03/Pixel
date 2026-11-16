@@ -1,4 +1,4 @@
-"""Core media ingest pipeline: local H.264 720p encode and verified rclone upload."""
+"""Core media ingest pipeline: preserve AV1 or encode once without resizing; verified private upload."""
 
 from __future__ import annotations
 
@@ -42,6 +42,8 @@ class ProbeResult:
     format_name: str | None
     is_remux_compatible: bool
     remux_reason: str
+    duration: float | None = None
+    fps: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize probe summary for manifests and dry-run/queue output."""
@@ -54,6 +56,8 @@ class ProbeResult:
             "format_name": self.format_name,
             "is_remux_compatible": self.is_remux_compatible,
             "remux_reason": self.remux_reason,
+            "duration": self.duration,
+            "fps": self.fps,
         }
 
 
@@ -102,9 +106,9 @@ def build_ffprobe_command(
         "-protocol_whitelist",
         "file,pipe",
         "-show_entries",
-        "stream=codec_type,codec_name,width,height,pix_fmt",
+        "stream=codec_type,codec_name,width,height,pix_fmt,duration,avg_frame_rate",
         "-show_entries",
-        "format=format_name",
+        "format=format_name,duration",
         "-of",
         "json",
         str(input_path),
@@ -117,8 +121,10 @@ def build_ffmpeg_command(
     ffmpeg_bin: str = "ffmpeg",
     *,
     mode: str = "encode",
+    encoder: str = "libsvtav1",
+    pixel_format: str | None = None,
 ) -> list[str]:
-    """Build argument list for encode (720p CRF26 veryfast), remux, or experimental mediacodec."""
+    """Build AV1 encode or lossless AV1 stream-copy arguments; never resize or change fps."""
     base = [
         ffmpeg_bin,
         "-hide_banner",
@@ -147,61 +153,16 @@ def build_ffmpeg_command(
             str(output_path),
         ]
 
-    scale_filter = (
-        "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
-        "pad=ceil(iw/2)*2:ceil(ih/2)*2"
-    )
     if mode == "mediacodec":
-        return [
-            *base,
-            "-threads",
-            "2",
-            "-filter_threads",
-            "1",
-            "-vf",
-            scale_filter,
-            "-c:v",
-            "h264_mediacodec",
-            "-b:v",
-            "1800k",
-            "-maxrate",
-            "2500k",
-            "-bufsize",
-            "3600k",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "96k",
-            "-movflags",
-            "+faststart",
-            str(output_path),
-        ]
-
+        raise IngestError("MediaCodec H.264 is disabled: this pipeline only produces AV1.")
     return [
-        *base,
-        "-threads",
-        "2",
-        "-filter_threads",
-        "1",
-        "-vf",
-        scale_filter,
-        "-c:v",
-        "libx264",
-        "-crf",
-        "26",
-        "-preset",
-        "veryfast",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "96k",
-        "-movflags",
-        "+faststart",
-        str(output_path),
+        *base, "-threads", "2", "-filter_threads", "1",
+        "-map", "0:v:0", "-map", "0:a?", "-c:v", encoder,
+        "-crf", "25", "-b:v", "0", "-fps_mode", "passthrough",
+        *(["-preset", "8", "-svtav1-params", "lp=2"] if encoder == "libsvtav1"
+          else ["-cpu-used", "6", "-row-mt", "1"]),
+        *(["-pix_fmt", pixel_format] if pixel_format else []),
+        "-c:a", "copy", "-movflags", "+faststart", str(output_path),
     ]
 
 
@@ -324,21 +285,15 @@ def probe_media(
     fmt = payload.get("format")
     format_name = fmt.get("format_name") if isinstance(fmt, dict) else None
 
-    if video_codec != "h264":
-        compatible = False
-        reason = f"video codec '{video_codec}' is not h264"
-    elif video_pix_fmt != "yuv420p":
-        compatible = False
-        reason = f"video pix_fmt '{video_pix_fmt}' is not yuv420p"
-    elif any(ac != "aac" for ac in audio_codecs):
-        compatible = False
-        reason = f"audio codecs {list(audio_codecs)} are not all aac"
-    elif len(audio_streams) != len(audio_codecs):
-        compatible = False
-        reason = "audio stream missing codec_name"
-    else:
-        compatible = True
-        reason = "h264 (yuv420p) + aac compatible for MP4 remux"
+    compatible = video_codec == "av1" and len(audio_streams) == len(audio_codecs)
+    reason = "AV1 video with copied audio" if compatible else f"video codec '{video_codec}' is not AV1 or an audio codec is unknown"
+    duration_raw = primary_video.get("duration") or (fmt.get("duration") if isinstance(fmt, dict) else None)
+    try:
+        duration = float(duration_raw) if duration_raw is not None else None
+        num, den = str(primary_video.get("avg_frame_rate", "0/1")).split("/")
+        fps = float(num) / float(den) if float(den) else None
+    except (ValueError, TypeError, ZeroDivisionError):
+        duration, fps = None, None
 
     return ProbeResult(
         video_codec=str(video_codec) if video_codec is not None else None,
@@ -349,22 +304,32 @@ def probe_media(
         format_name=str(format_name) if format_name is not None else None,
         is_remux_compatible=compatible,
         remux_reason=reason,
+        duration=duration, fps=fps,
     )
 
 
-def verify_mediacodec_available(
-    ffmpeg_bin: str = "ffmpeg",
-    timeout: int = 30,
-    *,
-    low_priority: bool = True,
-) -> None:
-    """Explicitly verify h264_mediacodec encoder availability before experimental use."""
-    cmd = [ffmpeg_bin, "-hide_banner", "-encoders"]
-    completed = _run_subprocess(cmd, timeout, "ffmpeg -encoders", low_priority=low_priority)
-    if "h264_mediacodec" not in (completed.stdout or ""):
-        raise IngestError(
-            "Experimental MediaCodec mode requested, but 'h264_mediacodec' encoder is not available in this ffmpeg build."
-        )
+def select_av1_encoder(ffmpeg_bin: str, *, low_priority: bool = True) -> str:
+    """Fail closed when AV1 encoding is unavailable; never fall back to H.264."""
+    result = _run_subprocess([ffmpeg_bin, "-hide_banner", "-encoders"], 30, "ffmpeg -encoders", low_priority=low_priority)
+    for codec in ("libsvtav1", "libaom-av1"):
+        if codec in (result.stdout or ""):
+            return codec
+    raise IngestError("No AV1 encoder available (libsvtav1/libaom-av1); source is preserved.")
+
+
+def validate_av1_output(source: ProbeResult, output: ProbeResult) -> None:
+    if output.video_codec != "av1":
+        raise IngestError("Prepared output is not AV1.")
+    if (source.width, source.height) != (output.width, output.height):
+        raise IngestError("Prepared output changed the original resolution.")
+    if source.video_pix_fmt != output.video_pix_fmt:
+        raise IngestError("Prepared output changed the original pixel format/depth.")
+    if source.duration and (not output.duration or abs(source.duration - output.duration) > max(0.5, source.duration * 0.001)):
+        raise IngestError("Prepared output has an incomplete or different duration.")
+    if source.fps and (not output.fps or abs(source.fps-output.fps) / source.fps > 0.001):
+        raise IngestError("Prepared output changed the original frame rate.")
+    if source.audio_codecs != output.audio_codecs:
+        raise IngestError("Prepared output changed the original audio streams.")
 
 
 def validate_and_build_config(
@@ -505,13 +470,8 @@ def upload_and_verify_output(
 
 def _resolve_mode_for_run(cfg: IngestConfig) -> tuple[str, ProbeResult | None]:
     """Resolve effective processing mode (auto/remux/encode/mediacodec) via local checks."""
-    if cfg.mode == "encode":
-        return "encode", None
     if cfg.mode == "mediacodec":
-        verify_mediacodec_available(
-            cfg.ffmpeg_bin, timeout=min(cfg.ffprobe_timeout, 60), low_priority=cfg.low_priority
-        )
-        return "mediacodec", None
+        raise IngestError("MediaCodec H.264 is disabled: only AV1 is allowed.")
 
     probe = probe_media(
         cfg.input_path,
@@ -522,7 +482,7 @@ def _resolve_mode_for_run(cfg: IngestConfig) -> tuple[str, ProbeResult | None]:
     if cfg.mode == "remux":
         if not probe.is_remux_compatible:
             raise IngestError(
-                f"Remux mode rejected because input is not H.264 (yuv420p) + AAC compatible: {probe.remux_reason}"
+                f"Remux mode rejected because input is not AV1 compatible: {probe.remux_reason}"
             )
         return "remux", probe
 
@@ -558,11 +518,15 @@ def run_ingest(cfg: IngestConfig) -> dict[str, Any]:
         manifest.probe = probe.to_dict() if probe is not None else None
         manifest.profile = profile_for_mode(applied_mode, low_priority=cfg.low_priority)
 
+        encoder = "copy" if applied_mode == "remux" else select_av1_encoder(cfg.ffmpeg_bin, low_priority=cfg.low_priority)
+        if applied_mode != "remux":
+            manifest.profile["encoder"] = encoder
         manifest.transition("encoding")
         manifest.save_atomic(cfg.manifest_path)
 
         ffmpeg_cmd = build_ffmpeg_command(
-            cfg.input_path, cfg.output_path, cfg.ffmpeg_bin, mode=applied_mode
+            cfg.input_path, cfg.output_path, cfg.ffmpeg_bin, mode=applied_mode,
+            encoder=encoder, pixel_format=probe.video_pix_fmt if probe else None
         )
         _run_subprocess(
             ffmpeg_cmd, cfg.ffmpeg_timeout, "ffmpeg", low_priority=cfg.low_priority
@@ -575,6 +539,9 @@ def run_ingest(cfg: IngestConfig) -> dict[str, Any]:
         if cfg.output_path.stat().st_size <= 0:
             raise IngestError("ffmpeg produced an empty output file.")
 
+        output_probe = probe_media(cfg.output_path, cfg.ffprobe_bin, cfg.ffprobe_timeout, low_priority=cfg.low_priority)
+        validate_av1_output(probe, output_probe)
+        manifest.profile["output_video_codec"] = "av1"
         output_sha256, output_size = compute_sha256(cfg.output_path)
         manifest.output_sha256 = output_sha256
         manifest.output_size_bytes = output_size

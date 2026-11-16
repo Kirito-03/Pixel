@@ -337,6 +337,8 @@ def _load_valid_encoded_manifest(
         return None
     if not isinstance(data, dict):
         return None
+    if (data.get("profile") or {}).get("output_video_codec") != "av1":
+        return None
     output_info = data.get("output")
     if not isinstance(output_info, dict):
         return None

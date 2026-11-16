@@ -9,6 +9,8 @@
  */
 
 import { existsSync, mkdirSync, unlinkSync, statSync } from 'node:fs';
+import { prepareAv1Video, probeVideo } from './lib/drive-video.mjs';
+import { withVideoLock, ensureVideoDownload, verifyDriveUpload, cleanVideoCheckpoint } from './lib/drive-transfer.mjs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -203,8 +205,12 @@ function resolveVideoUrl(externalServers) {
   return null;
 }
 
-/** Process a single episode: download, optimize (720p or remux), upload to Drive, update DB */
+/** Process one episode: resume, preserve AV1 or encode once, verify Drive, then commit DB. */
 export async function ingestEpisode(episodeId) {
+  return withVideoLock(join(homedir(), 'server/data/pixel-ingest'), () => ingestEpisodeUnlocked(episodeId));
+}
+
+async function ingestEpisodeUnlocked(episodeId) {
   const { rows } = await pool.query(
     'SELECT id, anime_id, episode_number, title, external_servers, stream_url, thumbnail_url FROM anime_episodes WHERE id = $1',
     [episodeId]
@@ -230,69 +236,24 @@ export async function ingestEpisode(episodeId) {
     return true;
   }
 
-  // 2. Resolve source
-  const resolved = resolveVideoUrl(ep.external_servers);
-  if (!resolved) {
-    console.log(`[DriveIngest] No se encontró servidor compatible (MP4Upload/YourUpload/mp4) para Ep ${episodeId}.`);
-    return false;
-  }
-
-  console.log(`[DriveIngest] Descargando Ep ${episodeId} desde ${resolved.serverName}...`);
   const tmpDownload = join(INGEST_DIR, `raw_${episodeId}.mp4`);
   const tmpProcessed = join(INGEST_DIR, `opt_${episodeId}.mp4`);
-
+  let committed = false;
   try {
-    // Download via curl with referer
-    const curlArgs = ['-sS', '-L', '--max-time', '1800'];
-    if (resolved.referer) {
-      curlArgs.push('-e', resolved.referer);
-    }
-    curlArgs.push(resolved.directUrl, '-o', tmpDownload);
-    await runCommand('curl', curlArgs);
-
-    const stats = statSync(tmpDownload);
-    const sizeMb = stats.size / (1024 * 1024);
-    console.log(`[DriveIngest] Descargado (${sizeMb.toFixed(1)} MB). Procesando...`);
-
-    // 3. Optimization strategy
-    // If <= 140MB, simply apply faststart (5-10s)
-    // If > 140MB, encode to 720p CRF 26 with tune animation
-    if (sizeMb <= 140) {
-      console.log(`[DriveIngest] Peso adecuado (<= 140 MB). Aplicando faststart directo (copia rápida)...`);
-      await runCommand(FFMPEG_BIN, [
-        '-y', '-i', tmpDownload,
-        '-c', 'copy',
-        '-movflags', '+faststart',
-        tmpProcessed,
-      ]);
-    } else {
-      console.log(`[DriveIngest] Comprimiendo a 720p Ultra-Liviano (CRF 26 + tune animation, 2 hilos)...`);
-      await runCommand(FFMPEG_BIN, [
-        '-y', '-i', tmpDownload,
-        '-threads', '2',
-        '-vf', 'scale=1280:-2',
-        '-c:v', 'libx264',
-        '-crf', '26',
-        '-preset', 'veryfast',
-        '-tune', 'animation',
-        '-c:a', 'aac',
-        '-b:a', '96k',
-        '-movflags', '+faststart',
-        tmpProcessed,
-      ]);
-    }
-
-    const optStats = statSync(tmpProcessed);
-    const optSizeMb = optStats.size / (1024 * 1024);
-    console.log(`[DriveIngest] Archivo optimizado: ${optSizeMb.toFixed(1)} MB. Subiendo a Google Drive...`);
-
-    // 4. Upload to Drive (throttled) and verify integrity
+    await ensureVideoDownload({
+      filePath: tmpDownload,
+      sourceKey: JSON.stringify({ kind: 'anime', episodeId, servers: (ep.external_servers || []).filter((s) => s.server !== 'Pixel VIP (Drive)') }),
+      resolve: () => resolveVideoUrl(ep.external_servers),
+      run: runCommand,
+      probe: (path) => probeVideo(path, FFPROBE_BIN),
+      // Only an operator-confirmed complete legacy download may be adopted once.
+      adoptLegacy: process.env.PIXEL_ADOPT_LEGACY_DOWNLOADS === '1',
+    });
+    const prepared = await prepareAv1Video({ inputPath: tmpDownload, outputPath: tmpProcessed, ffmpegBin: FFMPEG_BIN, ffprobeBin: FFPROBE_BIN });
+    console.log(`[DriveIngest] AV1 preparado (${(prepared.bytes / 1048576).toFixed(1)} MB, ${prepared.mode}). Subiendo a Drive...`);
     await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpProcessed, driveRemoteTarget]);
-    const verifiedSize = getRemoteFileSize(driveRemoteTarget);
-    if (verifiedSize < Math.floor(optStats.size * 0.95) || verifiedSize <= 102400) {
-      throw new Error(`Verificación de integridad falló en Drive (${verifiedSize} / ${optStats.size} bytes)`);
-    }
-    console.log(`[DriveIngest] ✓ Subido y verificado en Drive (${verifiedSize} bytes): ${driveRemoteTarget}`);
+    const verifiedSize = await verifyDriveUpload(tmpProcessed, driveRemoteTarget, RCLONE_BIN);
+    console.log(`[DriveIngest] ✓ Tamaño y MD5 verificados en Drive (${verifiedSize} bytes).`);
 
     // 5. Update Database
     await updateDatabaseRecord(episodeId, publicStreamUrl, verifiedSize);
@@ -303,13 +264,14 @@ export async function ingestEpisode(episodeId) {
         console.warn(`[DriveIngest] No se pudo generar miniatura para Ep ${episodeId}:`, e.message);
       });
     }
+    committed = true;
     return true;
   } catch (err) {
     console.error(`[DriveIngest] Fallo en episodio ${episodeId}:`, err.message);
     return false;
   } finally {
-    if (existsSync(tmpDownload)) unlinkSync(tmpDownload);
-    if (existsSync(tmpProcessed)) unlinkSync(tmpProcessed);
+    if (committed) await cleanVideoCheckpoint(tmpDownload, tmpProcessed);
+    else console.log('[DriveResume] Descarga y AV1 preparado conservados para reintentar este episodio.');
   }
 }
 
@@ -502,7 +464,7 @@ async function main() {
   } else if (args.includes('--episode-id')) {
     const epId = Number(args[args.indexOf('--episode-id') + 1]);
     if (!epId) throw new Error('ID de episodio inválido');
-    await ingestEpisode(epId);
+    if (!await ingestEpisode(epId)) throw new Error('El episodio queda pendiente para reintentar.');
   } else if (args.includes('--anime-id')) {
     const animeId = Number(args[args.indexOf('--anime-id') + 1]);
     if (!animeId) throw new Error('ID de anime inválido');
@@ -519,9 +481,11 @@ async function main() {
       [animeId, limit]
     );
     console.log(`[DriveIngest] Encontrados ${rows.length} episodios pendientes. Procesando en cola...`);
+    let failed = 0;
     for (const row of rows) {
-      await ingestEpisode(row.id);
+      if (!await ingestEpisode(row.id)) failed++;
     }
+    if (failed) throw new Error(`${failed} episodios quedan pendientes para reintentar.`);
   } else if (args.includes('--batch')) {
     const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 5;
     console.log(`[DriveIngest] Buscando próximos hasta ${limit} episodios del anime en curso para completar antes de pasar al siguiente...`);
@@ -561,9 +525,11 @@ async function main() {
     } else {
       console.log(`[DriveIngest] No hay episodios pendientes con MP4Upload.`);
     }
+    let failed = 0;
     for (const row of rows) {
-      await ingestEpisode(row.id);
+      if (!await ingestEpisode(row.id)) failed++;
     }
+    if (failed) throw new Error(`${failed} episodios quedan pendientes para reintentar.`);
   } else {
     console.log(`
 Uso de pixel-drive-ingest:

@@ -21,7 +21,7 @@ MAX_TIMEOUT_SECONDS = 86400
 MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB
 DEFAULT_SOCKET_TIMEOUT = 30
 DEFAULT_DOWNLOAD_TIMEOUT = 600
-VALID_MODES = ("auto", "remux", "encode", "mediacodec")
+VALID_MODES = ("auto", "remux", "encode")
 VALID_DB_EXTENSIONS = (".db", ".sqlite", ".sqlite3")
 MAX_RETRIES_LIMIT = 20
 

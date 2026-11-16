@@ -15,6 +15,7 @@ PACKAGE_DIR = Path(__file__).resolve().parent.parent
 if str(PACKAGE_DIR) not in sys.path:
     sys.path.insert(0, str(PACKAGE_DIR))
 
+from media_fakes import media_tool_response
 import cli  # noqa: E402
 from ingest import IngestError, run_ingest, validate_and_build_config  # noqa: E402
 from validators import ValidationError, sanitize_text  # noqa: E402
@@ -64,6 +65,9 @@ class MediaIngestTests(unittest.TestCase):
 
         def fake_run(cmd, **kwargs):
             captured_cmds.append((cmd, kwargs))
+            response = media_tool_response(cmd)
+            if response is not None:
+                return response
             Path(cmd[-1]).write_bytes(b"encoded-mp4-bytes")
             return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
@@ -76,15 +80,17 @@ class MediaIngestTests(unittest.TestCase):
         with patch("ingest.subprocess.run", side_effect=fake_run):
             result = run_ingest(cfg)
 
-        self.assertEqual(len(captured_cmds), 1)
-        cmd, kwargs = captured_cmds[0]
+        self.assertEqual(len(captured_cmds), 4)
+        cmd, kwargs = next(item for item in captured_cmds if item[0][0] == "ffmpeg" and "-encoders" not in item[0])
         self.assertIs(kwargs["shell"], False)
-        self.assertIn("libx264", cmd)
-        self.assertIn("26", cmd)
-        self.assertIn("96k", cmd)
+        self.assertIn("libsvtav1", cmd)
+        self.assertIn("25", cmd)
+        self.assertIn("lp=2", cmd)
         self.assertIn("+faststart", cmd)
         self.assertIn("-n", cmd)
-        self.assertTrue(any("min(720,ih)" in part for part in cmd))
+        self.assertNotIn("-vf", cmd)
+        self.assertNotIn("-r", cmd)
+        self.assertEqual(result["profile"]["video_codec"], "av1")
 
         self.assertTrue(self.input_file.exists())
         self.assertEqual(self.input_file.read_bytes(), b"fake-video-content-1234567890")
@@ -104,6 +110,9 @@ class MediaIngestTests(unittest.TestCase):
         def fake_run(cmd, **kwargs):
             self.assertIs(kwargs["shell"], False)
             calls.append(cmd)
+            response = media_tool_response(cmd)
+            if response is not None:
+                return response
             if Path(cmd[0]).name == "ffmpeg":
                 Path(cmd[-1]).write_bytes(b"mp4-ready-bytes")
             return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
@@ -117,9 +126,10 @@ class MediaIngestTests(unittest.TestCase):
         with patch("ingest.subprocess.run", side_effect=fake_run):
             result = run_ingest(cfg)
 
-        self.assertEqual(len(calls), 3)
-        self.assertEqual(calls[1][0:2], ["rclone", "copyto"])
-        self.assertEqual(calls[2][0:3], ["rclone", "check", "--one-way"])
+        remote_calls = [cmd for cmd in calls if cmd[0] == "rclone"]
+        self.assertEqual(len(remote_calls), 2)
+        self.assertEqual(remote_calls[0][0:2], ["rclone", "copyto"])
+        self.assertEqual(remote_calls[1][0:3], ["rclone", "check", "--one-way"])
         self.assertEqual(result["status"], "ready")
         self.assertTrue(result["remote"]["verified"])
         states = [entry["state"] for entry in result["history"]]
@@ -130,6 +140,9 @@ class MediaIngestTests(unittest.TestCase):
 
     def test_rclone_check_failure_does_not_mark_ready(self) -> None:
         def fake_run(cmd, **kwargs):
+            response = media_tool_response(cmd)
+            if response is not None:
+                return response
             if cmd[0] == "ffmpeg":
                 Path(cmd[-1]).write_bytes(b"mp4-bytes")
                 return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
@@ -159,10 +172,13 @@ class MediaIngestTests(unittest.TestCase):
             manifest_path=str(self.manifest_file),
             ffmpeg_timeout=5,
         )
-        with patch(
-            "ingest.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd=["ffmpeg"], timeout=5),
-        ):
+        def timed_out(cmd, **kwargs):
+            response = media_tool_response(cmd)
+            if response is not None:
+                return response
+            raise subprocess.TimeoutExpired(cmd=cmd, timeout=5)
+
+        with patch("ingest.subprocess.run", side_effect=timed_out):
             with self.assertRaises(IngestError) as ctx:
                 run_ingest(cfg)
         self.assertIn("timed out after 5s", str(ctx.exception))

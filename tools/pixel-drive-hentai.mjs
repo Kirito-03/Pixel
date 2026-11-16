@@ -11,6 +11,8 @@
  */
 
 import { existsSync, mkdirSync, unlinkSync, statSync } from 'node:fs';
+import { prepareAv1Video, probeVideo } from './lib/drive-video.mjs';
+import { withVideoLock, ensureVideoDownload, verifyDriveUpload, cleanVideoCheckpoint } from './lib/drive-transfer.mjs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -28,6 +30,7 @@ const RCLONE_REMOTE = 'pixel-drive:PixelNoSekai';
 const RCLONE_BIN = existsSync('/data/data/com.termux/files/usr/bin/rclone') ? '/data/data/com.termux/files/usr/bin/rclone' : 'rclone';
 const BASE_STREAM_URL = 'https://pixelnosekai.com/api/stream';
 const FFMPEG_BIN = process.env.PIXEL_FFMPEG_BIN || 'ffmpeg';
+const FFPROBE_BIN = process.env.PIXEL_FFPROBE_BIN || 'ffprobe';
 
 function findYtDlp() {
   const candidates = [
@@ -108,7 +111,7 @@ function resolveVideoUrl(videoServers) {
   if (!supported) return null;
 
   try {
-    const directUrl = runCapture(YTDLP_BIN, ['-g', supported.url]);
+    const directUrl = runCapture(YTDLP_BIN, ['--force-ipv4', '--socket-timeout', '20', '--retries', '2', '-g', supported.url]);
     if (directUrl && /^https?:\/\//i.test(directUrl)) {
       return { directUrl, referer: supported.url, serverName: supported.server };
     }
@@ -144,6 +147,10 @@ async function syncHentaiCover(hentaiId, posterUrl) {
 
 /** Ingest a single hentai episode */
 export async function ingestHentaiEpisode(episodeId) {
+  return withVideoLock(join(homedir(), 'server/data/pixel-ingest'), () => ingestHentaiEpisodeUnlocked(episodeId));
+}
+
+async function ingestHentaiEpisodeUnlocked(episodeId) {
   const { rows } = await pool.query(
     `SELECT he.id, he.hentai_id, he.episode_number, he.video_servers, hc.slug, hc.title, hc.poster_url
      FROM hentai_episodes he
@@ -175,75 +182,35 @@ export async function ingestHentaiEpisode(episodeId) {
     return true;
   }
 
-  // 2. Resolver enlace de video
-  const resolved = resolveVideoUrl(ep.video_servers);
-  if (!resolved) {
-    console.warn(`[HentaiIngest] Ep ${episodeId}: no se encontró enlace compatible (MP4Upload).`);
-    return false;
-  }
-
-  console.log(`[HentaiIngest] Descargando desde ${resolved.serverName}...`);
   const tmpDownload = join(INGEST_DIR, `raw_h_${episodeId}.mp4`);
   const tmpProcessed = join(INGEST_DIR, `opt_h_${episodeId}.mp4`);
-
+  let committed = false;
   try {
-    // Descarga con curl
-    const curlArgs = ['-sS', '-L', '--max-time', '1800'];
-    if (resolved.referer) curlArgs.push('-e', resolved.referer);
-    curlArgs.push(resolved.directUrl, '-o', tmpDownload);
-    await runCommand('curl', curlArgs);
-
-    const stats = statSync(tmpDownload);
-    const sizeMb = stats.size / (1024 * 1024);
-    console.log(`[HentaiIngest] Descargado (${sizeMb.toFixed(1)} MB). Procesando compresión...`);
-
-    // 3. Estrategia de compresión
-    if (sizeMb <= 140) {
-      console.log(`[HentaiIngest] Peso ligero (<= 140 MB). Aplicando faststart directo...`);
-      await runCommand(FFMPEG_BIN, [
-        '-y', '-i', tmpDownload,
-        '-c', 'copy',
-        '-movflags', '+faststart',
-        tmpProcessed,
-      ]);
-    } else {
-      console.log(`[HentaiIngest] Comprimiendo a 720p Ultra-Liviano (CRF 26 + faststart, 2 hilos)...`);
-      await runCommand(FFMPEG_BIN, [
-        '-y', '-i', tmpDownload,
-        '-threads', '2',
-        '-vf', 'scale=1280:-2',
-        '-c:v', 'libx264',
-        '-crf', '26',
-        '-preset', 'veryfast',
-        '-tune', 'animation',
-        '-c:a', 'aac',
-        '-b:a', '96k',
-        '-movflags', '+faststart',
-        tmpProcessed,
-      ]);
-    }
-
-    const optStats = statSync(tmpProcessed);
-    const optSizeMb = optStats.size / (1024 * 1024);
-    console.log(`[HentaiIngest] Archivo optimizado: ${optSizeMb.toFixed(1)} MB. Subiendo a Google Drive...`);
-
-    // 4. Subir a Google Drive (limitado) y verificar integridad
+    await ensureVideoDownload({
+      filePath: tmpDownload,
+      sourceKey: JSON.stringify({ kind: 'hentai', episodeId, servers: (ep.video_servers || []).filter((s) => s.server !== 'Pixel VIP (Drive)') }),
+      resolve: () => resolveVideoUrl(ep.video_servers),
+      run: runCommand,
+      probe: (path) => probeVideo(path, FFPROBE_BIN),
+      // Only an operator-confirmed complete legacy download may be adopted once.
+      adoptLegacy: process.env.PIXEL_ADOPT_LEGACY_DOWNLOADS === '1',
+    });
+    const prepared = await prepareAv1Video({ inputPath: tmpDownload, outputPath: tmpProcessed, ffmpegBin: FFMPEG_BIN, ffprobeBin: FFPROBE_BIN });
+    console.log(`[HentaiIngest] AV1 preparado (${(prepared.bytes / 1048576).toFixed(1)} MB, ${prepared.mode}). Subiendo a Drive...`);
     await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpProcessed, driveRemoteTarget]);
-    const verifiedSize = getRemoteFileSize(driveRemoteTarget);
-    if (verifiedSize < Math.floor(optStats.size * 0.95) || verifiedSize <= 102400) {
-      throw new Error(`Verificación de integridad falló en Drive (${verifiedSize} / ${optStats.size} bytes)`);
-    }
-    console.log(`[HentaiIngest] ✓ Subido y verificado en Drive (${verifiedSize} bytes): ${driveRemoteTarget}`);
+    const verifiedSize = await verifyDriveUpload(tmpProcessed, driveRemoteTarget, RCLONE_BIN);
+    console.log(`[HentaiIngest] ✓ Tamaño y MD5 verificados en Drive (${verifiedSize} bytes).`);
 
     // 5. Actualizar Base de Datos
     await updateHentaiDatabase(episodeId, publicStreamUrl);
+    committed = true;
     return true;
   } catch (err) {
     console.error(`[HentaiIngest] Error en episodio ${episodeId}:`, err.message);
     return false;
   } finally {
-    if (existsSync(tmpDownload)) unlinkSync(tmpDownload);
-    if (existsSync(tmpProcessed)) unlinkSync(tmpProcessed);
+    if (committed) await cleanVideoCheckpoint(tmpDownload, tmpProcessed);
+    else console.log('[DriveResume] Descarga y AV1 preparado conservados para reintentar este episodio.');
   }
 }
 
@@ -293,9 +260,11 @@ export async function ingestHentai(hentaiIdOrSlug) {
   }
 
   console.log(`[HentaiIngest] Sincronizando ${rows.length} episodios de "${rows[0].title}"...`);
+  let failed = 0;
   for (const row of rows) {
-    await ingestHentaiEpisode(row.id);
+    if (!await ingestHentaiEpisode(row.id)) failed++;
   }
+  if (failed) throw new Error(`${failed} episodios H quedan pendientes para reintentar.`);
 }
 
 async function main() {
@@ -305,7 +274,7 @@ async function main() {
 
   if (args.includes('--episode-id')) {
     const epId = Number(args[args.indexOf('--episode-id') + 1]);
-    await ingestHentaiEpisode(epId);
+    if (!await ingestHentaiEpisode(epId)) throw new Error('El episodio H queda pendiente para reintentar.');
   } else if (args.includes('--hentai-id')) {
     const hId = Number(args[args.indexOf('--hentai-id') + 1]);
     await ingestHentai(hId);

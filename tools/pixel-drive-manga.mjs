@@ -7,24 +7,31 @@
  *   node tools/pixel-drive-manga.mjs --manga-id "slug" --limit 5
  */
 
-import { existsSync, mkdirSync, rmSync, readdirSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, statSync, unlinkSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const projectRoot = join(homedir(), 'server/cloud/proyectos/Pixel');
-const envFile = existsSync(join(projectRoot, '.env')) ? join(projectRoot, '.env') : '.env';
-if (typeof process.loadEnvFile === 'function' && existsSync(envFile)) {
-  process.loadEnvFile(envFile);
-}
-
 import { spawn, spawnSync } from 'node:child_process';
-const { default: pool } = await import('../server/db.js');
+let pool;
+async function getPool() {
+  if (!pool) {
+    const envFile = existsSync(join(projectRoot, '.env')) ? join(projectRoot, '.env') : '.env';
+    if (typeof process.loadEnvFile === 'function' && existsSync(envFile)) process.loadEnvFile(envFile);
+    ({ default: pool } = await import('../server/db.js'));
+  }
+  return pool;
+}
 
 const INGEST_DIR = join(homedir(), 'server/data/pixel-ingest/manga');
 const RCLONE_REMOTE = 'pixel-drive:PixelNoSekai/Manga';
 const RCLONE_BIN = existsSync('/data/data/com.termux/files/usr/bin/rclone') ? '/data/data/com.termux/files/usr/bin/rclone' : 'rclone';
 const BASE_STREAM_URL = 'https://pixelnosekai.com/api/stream/Manga';
 const RCLONE_THROTTLE = ['--transfers', '2', '--checkers', '2', '--bwlimit', '8M'];
+const PAGE_DOWNLOAD_CONCURRENCY = 2;
+const verifiedCovers = new Set();
 
 function getRemoteFileSize(remoteOrStreamUrl) {
   try {
@@ -57,10 +64,6 @@ function getRemoteFileSize(remoteOrStreamUrl) {
   }
 }
 
-if (!existsSync(INGEST_DIR)) {
-  mkdirSync(INGEST_DIR, { recursive: true, mode: 0o700 });
-}
-
 function runCommand(bin, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { stdio: 'inherit', ...options });
@@ -75,7 +78,9 @@ function runCommand(bin, args, options = {}) {
 function runCapture(bin, args) {
   const res = spawnSync(bin, args, { encoding: 'utf8' });
   if (res.status !== 0) {
-    throw new Error(res.stderr || `Command ${bin} exited with status ${res.status}`);
+    const error = new Error(res.stderr || `Command ${bin} exited with status ${res.status}`);
+    error.exitCode = res.status;
+    throw error;
   }
   return res.stdout.trim();
 }
@@ -96,21 +101,155 @@ function parseMangaChapter(urlStr) {
 
 /** Download a single image using curl with referer */
 async function downloadImage(url, destPath) {
+  const partialPath = `${destPath}.part`;
   await runCommand('curl', [
     '-sS',
     '-L',
-    '--max-time', '30',
+    '--fail', '--retry', '2', '--retry-delay', '2', '--retry-all-errors',
+    '--connect-timeout', '10', '--max-time', '90',
     '-e', 'https://dragontranslation.org/',
     '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     url,
-    '-o', destPath,
+    '-o', partialPath,
   ]);
+  // Keep the original bytes. An HTTP error/HTML response must not become a page.
+  imageFingerprint(partialPath);
+  renameSync(partialPath, destPath);
+}
+
+function imageFingerprint(file) {
+  const bytes = readFileSync(file);
+  const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const gif = /^GIF8[79]a/.test(bytes.subarray(0, 6).toString('ascii'));
+  const webp = bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP';
+  const avif = bytes.subarray(4, 8).toString() === 'ftyp' && /avif|avis/.test(bytes.subarray(8, 32).toString());
+  if (bytes.length < 32 || !(jpeg || png || gif || webp || avif)) throw new Error(`Respuesta de imagen inválida: ${file.split('/').at(-1)}`);
+  return { size: bytes.length, md5: createHash('md5').update(bytes).digest('hex') };
+}
+
+function remoteInventory(remoteDir) {
+  let entries;
+  try {
+    entries = JSON.parse(runCapture(RCLONE_BIN, ['lsjson', '--files-only', '--max-depth', '1', '--hash', remoteDir]));
+  } catch (error) {
+    // rclone 3 means a missing directory; auth/network errors must not look empty.
+    if (error.exitCode === 3) return new Map();
+    throw error;
+  }
+  return new Map(entries.map(entry => [entry.Name, {
+    size: Number(entry.Size), md5: String(entry.Hashes?.MD5 || entry.Hashes?.md5 || '').toLowerCase(),
+  }]));
+}
+
+function matchesRemote(remote, expected) {
+  return !!remote && remote.size === expected.size && (!remote.md5 || remote.md5 === expected.md5);
+}
+
+function saveManifest(path, manifest) {
+  writeFileSync(`${path}.tmp`, JSON.stringify(manifest), { mode: 0o600 });
+  renameSync(`${path}.tmp`, path);
+}
+
+function acquireChapterLock(localDir) {
+  const lock = join(localDir, '.resume.lock');
+  try { mkdirSync(lock); }
+  catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    let active = true;
+    try {
+      const owner = Number(readFileSync(join(lock, 'pid'), 'utf8'));
+      if (Number.isInteger(owner) && owner > 0) {
+        try { process.kill(owner, 0); } catch (check) { if (check.code === 'ESRCH') active = false; }
+      }
+    } catch {
+      // Do not steal a lock while another process is still writing its owner.
+      active = Date.now() - statSync(lock).mtimeMs < 300_000;
+    }
+    if (active) throw new Error('Este capítulo ya se está procesando; el progreso permanece intacto.');
+    rmSync(lock, { recursive: true });
+    mkdirSync(lock);
+  }
+  writeFileSync(join(lock, 'pid'), String(process.pid), { mode: 0o600 });
+  return () => rmSync(lock, { recursive: true, force: true });
+}
+
+/** Resume an interrupted chapter without recompressing or replacing verified pages. */
+export async function syncChapterPages(options) {
+  mkdirSync(options.localDir, { recursive: true, mode: 0o700 });
+  const release = acquireChapterLock(options.localDir);
+  try { return await syncChapterPagesUnlocked(options); }
+  finally { release(); }
+}
+
+async function syncChapterPagesUnlocked({ chapterUrl, originalUrls, localDir, remoteDir,
+  download = downloadImage, listRemote = remoteInventory,
+  upload = (local, remote) => runCommand(RCLONE_BIN, ['copy', ...RCLONE_THROTTLE, '--ignore-existing', '--include', '*.jpg', local, remote]),
+  onProgress = () => {} }) {
+  const manifestPath = join(localDir, '.resume.json');
+  let manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null;
+  if (manifest && (manifest.chapterUrl !== chapterUrl || JSON.stringify(manifest.pages.map(page => page.url)) !== JSON.stringify(originalUrls))) {
+    throw new Error('Cambió el origen del capítulo; conservamos el progreso para evitar mezclar páginas.');
+  }
+  manifest ||= { version: 1, chapterUrl, pages: originalUrls.map((url, index) => ({ url, filename: `${String(index + 1).padStart(3, '0')}.jpg` })) };
+  saveManifest(manifestPath, manifest);
+  let inventory = await listRemote(remoteDir);
+  let cursor = 0, completed = 0, downloaded = 0, failure;
+  // Two downloads at most: hide network latency without saturating the tablet.
+  await Promise.allSettled(Array.from({ length: Math.min(PAGE_DOWNLOAD_CONCURRENCY, originalUrls.length) }, async () => {
+    try {
+      while (!failure && cursor < manifest.pages.length) {
+        const page = manifest.pages[cursor++];
+        const localFile = join(localDir, page.filename);
+        if (!(page.size > 0 && matchesRemote(inventory.get(page.filename), page))) {
+          let local = null;
+          if (existsSync(localFile)) {
+            try { local = imageFingerprint(localFile); } catch { /* Redownload an incomplete local image. */ }
+          }
+          if (!local || (page.md5 && local.md5 !== page.md5)) {
+            await download(page.url, localFile);
+            local = imageFingerprint(localFile);
+            downloaded++;
+          }
+          Object.assign(page, local);
+          const remote = inventory.get(page.filename);
+          if (remote && !matchesRemote(remote, page)) {
+            throw new Error(`La página remota ${page.filename} no coincide con el origen; no se sobrescribió.`);
+          }
+          saveManifest(manifestPath, manifest);
+        }
+        onProgress({ completed: ++completed, total: manifest.pages.length, downloaded });
+      }
+    } catch (error) { failure ||= error; }
+  }));
+  if (failure) throw failure;
+  const pending = manifest.pages.filter(page => !matchesRemote(inventory.get(page.filename), page));
+  if (pending.length) {
+    await upload(localDir, remoteDir);
+    inventory = await listRemote(remoteDir);
+  }
+  const missing = manifest.pages.filter(page => !matchesRemote(inventory.get(page.filename), page));
+  if (missing.length) throw new Error(`Verificación incompleta en Drive: ${missing.length}/${manifest.pages.length} páginas pendientes.`);
+  // Keep the small checkpoint, not a second full manga library on the tablet.
+  // Cleanup stays inside the chapter lock, after every remote page verifies.
+  for (const page of manifest.pages) {
+    for (const suffix of ['', '.part']) {
+      const file = join(localDir, page.filename + suffix);
+      if (existsSync(file)) unlinkSync(file);
+    }
+  }
+  return { pages: manifest.pages, downloaded, uploaded: pending.length };
 }
 
 /** Sync manga cover image first (lightweight & fast) */
 async function syncMangaCover(mangaId) {
+  if (verifiedCovers.has(mangaId)) return true;
+  const pool = await getPool();
   const coverRemote = `${RCLONE_REMOTE}/${mangaId}/cover.jpg`;
-  if (getRemoteFileSize(coverRemote) > 500) return true;
+  if (getRemoteFileSize(coverRemote) > 500) {
+    verifiedCovers.add(mangaId);
+    return true;
+  }
   try {
     const { rows } = await pool.query('SELECT cover_url, title FROM manga_cache WHERE manga_id = $1 LIMIT 1', [mangaId]);
     const coverUrl = rows[0]?.cover_url;
@@ -122,6 +261,7 @@ async function syncMangaCover(mangaId) {
       if (existsSync(tmpCover) && statSync(tmpCover).size > 500) {
         await runCommand(RCLONE_BIN, ['copyto', ...RCLONE_THROTTLE, tmpCover, coverRemote]);
         if (getRemoteFileSize(coverRemote) > 500) {
+          verifiedCovers.add(mangaId);
           console.log(`[MangaIngest] ✓ Portada de manga subida: ${coverRemote}`);
           return true;
         }
@@ -137,8 +277,12 @@ async function syncMangaCover(mangaId) {
 
 /** Ingest a single chapter into Google Drive */
 export async function ingestChapter(chapterUrl) {
+  const pool = await getPool();
   const cleanUrl = String(chapterUrl || '').trim();
   const { mangaId, chapterSlug } = parseMangaChapter(cleanUrl);
+  mkdirSync(INGEST_DIR, { recursive: true, mode: 0o700 });
+  const tmpChapterDir = join(INGEST_DIR, `${mangaId}_${chapterSlug}`);
+  const driveTargetDir = `${RCLONE_REMOTE}/${mangaId}/chapters/${chapterSlug}`;
 
   console.log(`\n[MangaIngest] ─────────────────────────────────────────────`);
   console.log(`[MangaIngest] Procesando Manhwa: ${mangaId} | Capítulo: ${chapterSlug}`);
@@ -167,20 +311,38 @@ export async function ingestChapter(chapterUrl) {
     return false;
   }
 
-  // Comprobar si ya están en Drive y verificar existencia real vía HTTP local
+  // One listing verifies every expected page, including pages in the middle.
   const isAlreadyDrive = rawPages.every((p) => typeof p === 'string' && p.includes('/api/stream/Manga/'));
   if (isAlreadyDrive) {
-    const firstOk = getRemoteFileSize(rawPages[0]) > 500;
-    const lastOk = getRemoteFileSize(rawPages[rawPages.length - 1]) > 500;
-    if (firstOk && lastOk) {
+    let inventory, checkpoint;
+    try {
+      inventory = remoteInventory(driveTargetDir);
+      const manifestPath = join(tmpChapterDir, '.resume.json');
+      if (existsSync(manifestPath)) checkpoint = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    }
+    catch (error) {
+      console.error(`[MangaIngest] No se pudo verificar Drive; conservamos la caché: ${error.message}`);
+      return false;
+    }
+    const allPresent = rawPages.every((page, index) => {
+      const filename = `${String(index + 1).padStart(3, '0')}.jpg`;
+      const expected = checkpoint?.chapterUrl === cleanUrl && checkpoint.pages?.length === rawPages.length ? checkpoint.pages[index] : null;
+      const validFile = expected ? matchesRemote(inventory.get(filename), expected) : !checkpoint && inventory.get(filename)?.size > 32;
+      return page === `${BASE_STREAM_URL}/${mangaId}/chapters/${chapterSlug}/${filename}` && validFile;
+    });
+    if (allPresent) {
       console.log(`[MangaIngest] ✓ El capítulo ya está alojado y verificado en Google Drive.`);
       return true;
     }
-    console.warn(`[MangaIngest] ⚠ Cache Drive incompleto o inaccesible; re-obteniendo desde origen...`);
-    await pool.query('DELETE FROM manga_page_cache WHERE chapter_url = $1', [cleanUrl]);
-    const { getChapterPages } = await import('../server/services/mangaService.js');
-    const refreshed = await getChapterPages(pool, cleanUrl);
-    rawPages = refreshed?.pages || [];
+    console.warn(`[MangaIngest] ⚠ Faltan páginas en Drive; recuperando solo lo pendiente sin borrar la caché...`);
+    if (checkpoint?.chapterUrl === cleanUrl && checkpoint.pages?.every(page => typeof page.url === 'string')) {
+      rawPages = checkpoint.pages.map(page => page.url);
+    } else {
+      const { getChapterPages } = await import('../server/services/mangaService.js');
+      // Null bypasses DB without deleting existing Drive URLs before repair succeeds.
+      const refreshed = await getChapterPages(null, cleanUrl);
+      rawPages = refreshed?.pages || [];
+    }
     if (!rawPages.length || rawPages.some((p) => typeof p === 'string' && p.includes('/api/stream/Manga/'))) {
       console.error(`[MangaIngest] ✖ No se pudo recuperar páginas válidas de origen para ${cleanUrl}`);
       return false;
@@ -189,47 +351,26 @@ export async function ingestChapter(chapterUrl) {
 
   // 2. Extraer URLs absolutas de origen
   const originalUrls = rawPages.map((p) => {
-    if (typeof p !== 'string') return '';
+    if (typeof p !== 'string') throw new Error('La lista de páginas contiene un origen inválido.');
     if (p.includes('/api/proxy/manga-image?url=')) {
       const match = p.match(/[?&]url=([^&]+)/);
       return match ? decodeURIComponent(match[1]) : p;
     }
     return p;
-  }).filter(Boolean);
+  });
+  if (originalUrls.some(url => !/^https?:\/\//i.test(url) || url.includes('/api/stream/'))) {
+    console.error('[MangaIngest] Lista de páginas de origen inválida; no se cambió la caché.');
+    return false;
+  }
 
-  console.log(`[MangaIngest] Descargando ${originalUrls.length} páginas a carpeta local temporal...`);
-  const tmpChapterDir = join(INGEST_DIR, `${mangaId}_${chapterSlug}`);
-  if (existsSync(tmpChapterDir)) rmSync(tmpChapterDir, { recursive: true, force: true });
-  mkdirSync(tmpChapterDir, { recursive: true });
-
-  const driveTargetDir = `${RCLONE_REMOTE}/${mangaId}/chapters/${chapterSlug}`;
-  const newDrivePages = [];
+  console.log(`[MangaIngest] Reanudando ${originalUrls.length} páginas originales (2 descargas simultáneas, sin recomprimir)...`);
 
   try {
-    for (let i = 0; i < originalUrls.length; i++) {
-      const pageNumStr = String(i + 1).padStart(3, '0');
-      const filename = `${pageNumStr}.jpg`;
-      const localFile = join(tmpChapterDir, filename);
-
-      await downloadImage(originalUrls[i], localFile);
-      newDrivePages.push(`${BASE_STREAM_URL}/${mangaId}/chapters/${chapterSlug}/${filename}`);
-      process.stdout.write(`\r[MangaIngest] Descargadas: ${i + 1}/${originalUrls.length} páginas...`);
-    }
-    console.log(`\n[MangaIngest] Subiendo lote de imágenes a Google Drive (${driveTargetDir})...`);
-
-    // 3. Subir carpeta completa con rclone copy (limitado)
-    await runCommand(RCLONE_BIN, ['copy', ...RCLONE_THROTTLE, tmpChapterDir, driveTargetDir]);
-
-    // Verificar primera y última página en Drive antes de actualizar BD
-    const firstPageRemote = `${driveTargetDir}/001.jpg`;
-    const lastPageFilename = `${String(originalUrls.length).padStart(3, '0')}.jpg`;
-    const lastPageRemote = `${driveTargetDir}/${lastPageFilename}`;
-    const firstSize = getRemoteFileSize(firstPageRemote);
-    const lastSize = getRemoteFileSize(lastPageRemote);
-    if (firstSize <= 500 || lastSize <= 500) {
-      throw new Error(`Verificación en Drive falló (primera: ${firstSize} B, última: ${lastSize} B)`);
-    }
-    console.log(`[MangaIngest] ✓ Imágenes verificadas en Google Drive (${originalUrls.length} págs, p1=${firstSize} B).`);
+    const result = await syncChapterPages({ chapterUrl: cleanUrl, originalUrls, localDir: tmpChapterDir, remoteDir: driveTargetDir,
+      onProgress: ({ completed, total, downloaded }) => process.stdout.write(`\r[MangaIngest] Preparadas: ${completed}/${total} páginas (${downloaded} descargadas)...`),
+    });
+    const newDrivePages = result.pages.map(page => `${BASE_STREAM_URL}/${mangaId}/chapters/${chapterSlug}/${page.filename}`);
+    console.log(`\n[MangaIngest] ✓ Todas las páginas verificadas en Drive (${result.pages.length}; ${result.downloaded} descargas, ${result.uploaded} subidas pendientes completadas).`);
 
     // 4. Actualizar manga_page_cache con las URLs de Drive
     await pool.query(
@@ -245,23 +386,23 @@ export async function ingestChapter(chapterUrl) {
     return true;
   } catch (err) {
     console.error(`\n[MangaIngest] Error durante la ingesta:`, err.message);
+    console.log('[MangaIngest] Progreso conservado; el próximo lote retomará las páginas pendientes.');
     return false;
-  } finally {
-    if (existsSync(tmpChapterDir)) {
-      rmSync(tmpChapterDir, { recursive: true, force: true });
-    }
   }
 }
 
 /** Ingest all chapters for a given manga slug */
 export async function ingestManga(mangaId, limit = 50) {
+  const pool = await getPool();
   console.log(`[MangaIngest] Buscando capítulos de manga "${mangaId}" en catálogo...`);
   let { rows } = await pool.query(
     `
-      SELECT external_url AS chapter_url
-      FROM manga_chapters_cache
-      WHERE manga_id = $1 AND external_url IS NOT NULL
-      ORDER BY NULLIF(regexp_replace(chapter, '[^0-9.]', '', 'g'), '')::numeric ASC NULLS LAST
+      SELECT mc.external_url AS chapter_url
+      FROM manga_chapters_cache mc
+      LEFT JOIN manga_page_cache mp ON mp.chapter_url = mc.external_url
+      WHERE mc.manga_id = $1 AND mc.external_url IS NOT NULL
+        AND (mp.pages IS NULL OR mp.pages::text NOT LIKE '%/api/stream/Manga/%')
+      ORDER BY NULLIF(regexp_replace(mc.chapter, '[^0-9.]', '', 'g'), '')::numeric ASC NULLS LAST
       LIMIT $2
     `,
     [mangaId, limit]
@@ -274,10 +415,11 @@ export async function ingestManga(mangaId, limit = 50) {
         SELECT chapter_url
         FROM manga_page_cache
         WHERE chapter_url LIKE $1
+          AND pages::text NOT LIKE '%/api/stream/Manga/%'
         ORDER BY chapter_url ASC
         LIMIT $2
       `,
-      [`%${mangaId}%`, limit]
+      [`%/manga/${mangaId}/%`, limit]
     );
     rows = fallback.rows;
   }
@@ -295,6 +437,7 @@ export async function ingestManga(mangaId, limit = 50) {
 
 /** Ingest pending chapters across the catalog into Google Drive (completes one manga before moving to the next) */
 export async function ingestBatchManga(limit = 3) {
+  const pool = await getPool();
   console.log(`[MangaIngest] Buscando hasta ${limit} capítulos del manga en curso para completar antes de pasar al siguiente...`);
   const { rows } = await pool.query(
     `
@@ -360,10 +503,10 @@ Uso de pixel-drive-manga:
   }
 }
 
-main()
-  .then(() => pool.end())
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()
+  .then(() => pool?.end())
   .catch((e) => {
     console.error('[MangaIngest] Error:', e.message);
-    pool.end();
+    pool?.end();
     process.exit(1);
   });

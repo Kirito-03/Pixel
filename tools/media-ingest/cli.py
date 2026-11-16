@@ -38,8 +38,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="media-ingest",
         description=(
             "Pixel Media Ingest (stdlib): procesa archivo(s) locales autorizados "
-            "hacia MP4 H.264 720p (CRF 26, preset veryfast, threads 2, filter_threads 1, "
-            "AAC 96k, faststart, prioridad baja) o remux H264+AAC compatible, y opcionalmente "
+            "hacia MP4 AV1 (CRF25, preset8, threads2, sin reducir resolución ni fps, "
+            "audio copiado, faststart) o copia AV1 sin recodificar, y opcionalmente "
             "sube y verifica con rclone copyto + rclone check hacia un remote privado. "
             "Subcomandos de cola SQLite: queue-add, queue-list, queue-run. "
             "No borra originales, no descarga URLs, no publica enlaces ni toca la BD de Pixel."
@@ -74,8 +74,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="encode",
         help=(
             "Modo de procesamiento: encode (por defecto en CLI simple), auto (ffprobe local: "
-            "remux si H264+AAC compatible o encode), remux (solo copia H264+AAC sin reducción "
-            "prometida), mediacodec (experimental explícito, nunca automático)."
+            "copia si AV1 o encode AV1), remux (solo copia AV1 sin reducción "
+            "prometida). Las conversiones nuevas son AV1; no se promete pérdida cero."
         ),
     )
     parser.add_argument(

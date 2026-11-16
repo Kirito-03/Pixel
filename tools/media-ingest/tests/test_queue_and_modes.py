@@ -16,6 +16,8 @@ PACKAGE_DIR = Path(__file__).resolve().parent.parent
 if str(PACKAGE_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR := str(PACKAGE_DIR)))
 
+from media_fakes import media_tool_response
+from validators import ValidationError
 import cli  # noqa: E402
 from ingest import (  # noqa: E402
     IngestError,
@@ -52,7 +54,7 @@ class ModeAndQueueTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def test_auto_mode_remuxes_compatible_h264_aac_without_size_promise(self) -> None:
+    def test_auto_mode_remuxes_compatible_av1_aac_without_size_promise(self) -> None:
         calls: list[tuple[list[str], dict]] = []
 
         def fake_run(cmd, **kwargs):
@@ -63,7 +65,7 @@ class ModeAndQueueTests(unittest.TestCase):
                         "streams": [
                             {
                                 "codec_type": "video",
-                                "codec_name": "h264",
+                                "codec_name": "av1",
                                 "pix_fmt": "yuv420p",
                                 "width": 1920,
                                 "height": 1080,
@@ -87,8 +89,8 @@ class ModeAndQueueTests(unittest.TestCase):
         with patch("ingest.subprocess.run", side_effect=fake_run):
             result = run_ingest(cfg)
 
-        self.assertEqual(len(calls), 2)
-        ffmpeg_cmd, ffmpeg_kwargs = calls[1]
+        self.assertEqual(len(calls), 3)
+        ffmpeg_cmd, ffmpeg_kwargs = next(item for item in calls if Path(item[0][0]).name == "ffmpeg")
         self.assertIn("-c", ffmpeg_cmd)
         self.assertIn("copy", ffmpeg_cmd)
         self.assertNotIn("libx264", ffmpeg_cmd)
@@ -121,9 +123,14 @@ class ModeAndQueueTests(unittest.TestCase):
 
             def fake_run(cmd, **kwargs):
                 calls.append(cmd)
+                if "-encoders" in cmd:
+                    return media_tool_response(cmd)
                 if Path(cmd[0]).name == "ffprobe":
+                    probed = [dict(item) for item in streams]
+                    if Path(cmd[-1]) == out:
+                        probed[0]["codec_name"] = "av1"
                     return subprocess.CompletedProcess(
-                        cmd, 0, stdout=json.dumps({"streams": streams}), stderr=""
+                        cmd, 0, stdout=json.dumps({"streams": probed}), stderr=""
                     )
                 Path(cmd[-1]).write_bytes(b"encoded-720p-bytes")
                 return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
@@ -139,12 +146,13 @@ class ModeAndQueueTests(unittest.TestCase):
                 result = run_ingest(cfg)
 
             self.assertEqual(result["mode"]["applied"], "encode")
-            ffmpeg_cmd = calls[1]
-            self.assertIn("libx264", ffmpeg_cmd)
-            self.assertIn("veryfast", ffmpeg_cmd)
+            ffmpeg_cmd = next(cmd for cmd in calls if cmd[0] == "ffmpeg" and "-encoders" not in cmd)
+            self.assertIn("libsvtav1", ffmpeg_cmd)
+            self.assertIn("8", ffmpeg_cmd)
+            self.assertNotIn("-vf", ffmpeg_cmd)
             self.assertIn("2", ffmpeg_cmd)
             self.assertIn("1", ffmpeg_cmd)
-            self.assertEqual(result["profile"]["preset"], "veryfast")
+            self.assertEqual(result["profile"]["preset"], 8)
             self.assertEqual(result["profile"]["threads"], 2)
             self.assertEqual(result["profile"]["filter_threads"], 1)
 
@@ -175,43 +183,12 @@ class ModeAndQueueTests(unittest.TestCase):
                 run_ingest(cfg)
         self.assertFalse(self.output_a.exists())
 
-    def test_experimental_mediacodec_requires_explicit_verification(self) -> None:
-        def fake_no_mc(cmd, **kwargs):
-            return subprocess.CompletedProcess(
-                cmd, 0, stdout=" V..... libx264\n", stderr=""
+    def test_h264_mediacodec_is_rejected_by_av1_only_policy(self) -> None:
+        with self.assertRaises(ValidationError):
+            validate_and_build_config(
+                input_path=str(self.input_a), output_path=str(self.output_a),
+                manifest_path=str(self.manifest_a), mode="mediacodec",
             )
-
-        cfg = validate_and_build_config(
-            input_path=str(self.input_a),
-            output_path=str(self.output_a),
-            manifest_path=str(self.manifest_a),
-            mode="mediacodec",
-        )
-        with patch("ingest.subprocess.run", side_effect=fake_no_mc):
-            with self.assertRaises(IngestError) as ctx:
-                run_ingest(cfg)
-        self.assertIn("h264_mediacodec", str(ctx.exception))
-
-        def fake_with_mc(cmd, **kwargs):
-            if "-encoders" in cmd:
-                return subprocess.CompletedProcess(
-                    cmd, 0, stdout=" V..... h264_mediacodec\n", stderr=""
-                )
-            Path(cmd[-1]).write_bytes(b"mc-mp4-bytes")
-            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
-
-        out2 = self.root / "ep01_mc.mp4"
-        man2 = self.root / "ep01_mc.json"
-        cfg2 = validate_and_build_config(
-            input_path=str(self.input_a),
-            output_path=str(out2),
-            manifest_path=str(man2),
-            mode="mediacodec",
-        )
-        with patch("ingest.subprocess.run", side_effect=fake_with_mc):
-            result = run_ingest(cfg2)
-        self.assertEqual(result["mode"]["applied"], "mediacodec")
-        self.assertTrue(result["profile"]["experimental"])
 
     def test_queue_cli_add_list_and_run_local_and_remote(self) -> None:
         code_add_a = cli.main(
@@ -258,22 +235,10 @@ class ModeAndQueueTests(unittest.TestCase):
         self.assertEqual(listed["counts"]["queued"], 2)
 
         def fake_run(cmd, **kwargs):
-            exe = Path(cmd[0]).name
-            if exe == "ffprobe":
-                return subprocess.CompletedProcess(
-                    cmd,
-                    0,
-                    stdout=json.dumps(
-                        {
-                            "streams": [
-                                {"codec_type": "video", "codec_name": "h264", "pix_fmt": "yuv420p"},
-                                {"codec_type": "audio", "codec_name": "aac"},
-                            ]
-                        }
-                    ),
-                    stderr="",
-                )
-            if exe == "ffmpeg":
+            response = media_tool_response(cmd, source_codec="av1")
+            if response is not None:
+                return response
+            if Path(cmd[0]).name == "ffmpeg":
                 Path(cmd[-1]).write_bytes(b"mp4-output-data")
             return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
@@ -362,6 +327,9 @@ class ModeAndQueueTests(unittest.TestCase):
         conn.close()
 
         def fake_ffmpeg(cmd, **kwargs):
+            response = media_tool_response(cmd)
+            if response is not None:
+                return response
             Path(cmd[-1]).write_bytes(b"clean-recovered-mp4")
             return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
@@ -389,6 +357,7 @@ class ModeAndQueueTests(unittest.TestCase):
             json.dumps(
                 {
                     "schema": "pixel.media_ingest.v1",
+                    "profile": {"video_codec": "av1", "output_video_codec": "av1"},
                     "job_id": job["job_id"],
                     "status": "uploading",
                     "source": {"path": str(self.input_a), "size_bytes": in_size, "sha256": in_sha},

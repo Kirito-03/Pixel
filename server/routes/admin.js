@@ -8,6 +8,7 @@ import { unlink, readdir, stat } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { basename, dirname, join } from 'path';
 import { spawn } from 'child_process';
+import { createDriveStages, runDriveStages, getRunningDriveJob, tryAcquireDriveJob, spawnDriveScript } from '../../tools/lib/drive-job-runner.mjs';
 import { uploadHlsFolderToR2, deleteLocalHlsFolder, deleteR2Prefix } from '../services/r2Service.js';
 import { refreshNews } from '../services/newsService.js';
 
@@ -26,26 +27,9 @@ const projectRoot = join(__dirname, '..', '..');
 
 const activeDriveJobs = [];
 
-function spawnNodeScript(scriptRelPath, args = []) {
-    return new Promise((resolve, reject) => {
-        const scriptPath = join(projectRoot, scriptRelPath);
-        const child = spawn(process.execPath, [scriptPath, ...args], {
-            cwd: projectRoot,
-            stdio: ['ignore', 'pipe', 'pipe'],
-        });
-        let stderrTail = '';
-        child.stderr?.on('data', (chunk) => {
-            stderrTail = (stderrTail + chunk.toString()).slice(-800);
-        });
-        child.on('error', reject);
-        child.on('close', (code) => {
-            if (code === 0) resolve();
-            else reject(new Error(stderrTail || `${scriptRelPath} exited with code ${code}`));
-        });
-    });
-}
-
 function startDriveJob(jobMeta, commands) {
+    const lease = tryAcquireDriveJob(jobMeta.label);
+    if (!lease) throw new Error('Ya hay una sincronización de Drive en curso.');
     const job = {
         id: `drive-${Date.now()}-${Math.round(Math.random() * 1e4)}`,
         ...jobMeta,
@@ -53,21 +37,26 @@ function startDriveJob(jobMeta, commands) {
         startedAt: new Date().toISOString(),
         finishedAt: null,
         error: null,
+        stages: createDriveStages(commands),
     };
     activeDriveJobs.unshift(job);
     if (activeDriveJobs.length > 20) activeDriveJobs.length = 20;
 
+    const { controller } = lease;
     (async () => {
         try {
-            for (const cmd of commands) {
-                await spawnNodeScript(cmd.script, cmd.args);
-            }
+            await runDriveStages(commands, {
+                stages: job.stages,
+                signal: controller.signal,
+                run: (cmd, { signal }) => spawnDriveScript(projectRoot, cmd, { signal }),
+            });
             job.status = 'done';
         } catch (err) {
             job.status = 'error';
             job.error = err?.message || 'Error en sincronización de Drive';
             console.error(`[AdminDriveSync] Job ${job.id} error:`, job.error);
         } finally {
+            lease.release();
             job.finishedAt = new Date().toISOString();
         }
     })();
@@ -347,11 +336,12 @@ router.get('/drive/inventory', async (req, res) => {
 router.post('/drive/sync', async (req, res) => {
     try {
         const runningJob = activeDriveJobs.find((j) => j.status === 'running');
-        if (runningJob) {
+        const runningLease = getRunningDriveJob();
+        if (runningJob || runningLease) {
             return res.status(409).json({
                 ok: false,
-                message: `Ya hay una sincronización de Drive en curso (${runningJob.label}). Espera a que termine.`,
-                job: runningJob,
+                message: `Ya hay una sincronización de Drive en curso (${(runningJob || runningLease).label}). Espera a que termine.`,
+                job: runningJob || runningLease,
             });
         }
 
@@ -397,13 +387,13 @@ router.post('/drive/sync', async (req, res) => {
             label = `Hentai Ep #${epId}`;
             commands = [{ script: 'tools/pixel-drive-hentai.mjs', args: ['--episode-id', String(epId)] }];
         } else if (type === 'batch') {
-            label = 'Lote Mixto (Verificar + Imágenes/Trailers + Anime + Manga + Hentai)';
+            label = 'Lote mixto: manga en paralelo con la cola de videos';
             commands = [
-                { script: 'tools/pixel-drive-verify.mjs', args: ['--repair'] },
-                { script: 'tools/pixel-drive-ingest.mjs', args: ['--trailers', '--limit', '5'] },
-                { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '2'] },
-                { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '3'] },
-                { script: 'tools/pixel-drive-hentai.mjs', args: ['--batch', '--limit', '2'] },
+                { script: 'tools/pixel-drive-verify.mjs', args: ['--repair'], lane: 'preflight', label: 'Verificación de Drive' },
+                { script: 'tools/pixel-drive-ingest.mjs', args: ['--batch', '--limit', '2'], lane: 'video', label: 'Episodios de anime' },
+                { script: 'tools/pixel-drive-manga.mjs', args: ['--batch', '--limit', '3'], lane: 'manga', label: 'Capítulos de manga' },
+                { script: 'tools/pixel-drive-hentai.mjs', args: ['--batch', '--limit', '2'], lane: 'video', label: 'Episodios de H' },
+                { script: 'tools/pixel-drive-ingest.mjs', args: ['--trailers', '--limit', '5'], lane: 'video', label: 'Portadas y trailers' },
             ];
         } else {
             return res.status(400).json({ message: 'Tipo de sincronización inválido' });

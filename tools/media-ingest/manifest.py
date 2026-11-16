@@ -24,43 +24,16 @@ VALID_STATES = (
 )
 
 DEFAULT_PROFILE: dict[str, Any] = {
-    "container": "mp4",
-    "video_codec": "h264",
-    "max_width": 1280,
-    "max_height": 720,
-    "upscale": False,
-    "crf": 26,
-    "preset": "veryfast",
-    "threads": 2,
-    "filter_threads": 1,
-    "low_priority": True,
-    "audio_codec": "aac",
-    "audio_bitrate": "96k",
-    "faststart": True,
+    "container": "mp4", "video_codec": "av1", "encoder": "libsvtav1",
+    "preserve_resolution": True, "preserve_fps": True, "lossless": False,
+    "crf": 25, "preset": 8, "threads": 2, "filter_threads": 1,
+    "low_priority": True, "audio_codec": "copy", "faststart": True,
 }
 
 REMUX_PROFILE: dict[str, Any] = {
-    "container": "mp4",
-    "video_codec": "copy",
-    "audio_codec": "copy",
-    "faststart": True,
-    "size_reduction_promised": False,
-}
-
-MEDIACODEC_EXPERIMENTAL_PROFILE: dict[str, Any] = {
-    "container": "mp4",
-    "video_codec": "h264_mediacodec",
-    "experimental": True,
-    "max_width": 1280,
-    "max_height": 720,
-    "upscale": False,
-    "video_bitrate": "1800k",
-    "threads": 2,
-    "filter_threads": 1,
-    "low_priority": True,
-    "audio_codec": "aac",
-    "audio_bitrate": "96k",
-    "faststart": True,
+    "container": "mp4", "video_codec": "av1", "encoder": "copy",
+    "audio_codec": "copy", "lossless": True, "faststart": True,
+    "preserve_resolution": True, "preserve_fps": True, "size_reduction_promised": False,
 }
 
 
@@ -69,9 +42,7 @@ def profile_for_mode(mode_applied: str, *, low_priority: bool = True) -> dict[st
     if mode_applied == "remux":
         return dict(REMUX_PROFILE)
     if mode_applied == "mediacodec":
-        profile = dict(MEDIACODEC_EXPERIMENTAL_PROFILE)
-        profile["low_priority"] = low_priority
-        return profile
+        raise ValueError("MediaCodec H.264 is disabled by the AV1-only policy.")
     profile = dict(DEFAULT_PROFILE)
     profile["low_priority"] = low_priority
     return profile
