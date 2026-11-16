@@ -32,6 +32,20 @@ const router = express.Router();
  * Respuesta de error:
  *   { ok: false, error }
  */
+function isSafeRemoteUrl(raw) {
+  try {
+    const u = new URL(String(raw || ''));
+    if (!['https:', 'http:'].includes(u.protocol) || u.username || u.password) return false;
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (!h || h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || h === '::1' || h === '0.0.0.0') return false;
+    if (/^127\.|^10\.|^192\.168\.|^169\.254\.|^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+    if (/^(fc|fd|fe80):/i.test(h)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 router.post('/hls', authenticateAdmin, async (req, res) => {
   const src = req.body?.src || req.query?.src || '';
   const episodeId = req.body?.episodeId ?? null;
@@ -42,9 +56,8 @@ router.post('/hls', authenticateAdmin, async (req, res) => {
   }
 
   try {
-    const sourceURL = new URL(src);
-    if (!['https:', 'http:'].includes(sourceURL.protocol) || sourceURL.username || sourceURL.password) {
-      return res.status(400).json({ ok: false, error: 'Fuente HTTP(S) invalida' });
+    if (!isSafeRemoteUrl(src)) {
+      return res.status(400).json({ ok: false, error: 'Fuente HTTP(S) invalida o direccion interna no permitida' });
     }
     const result = await transcodeHls({ src, episodeId });
     return res.json({ ok: true, ...result });

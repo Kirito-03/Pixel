@@ -49,8 +49,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
   }
 });
 
-// Videos: serve M3U file
-router.get('/m3u', (req, res) => {
+// Videos: serve M3U file (solo admin)
+router.get('/m3u', authenticateAdmin, (req, res) => {
   try {
     const m3uPath = join(__dirname, '..', 'videos', 'animes_madre.m3u');
     const content = readFileSync(m3uPath, 'utf-8');

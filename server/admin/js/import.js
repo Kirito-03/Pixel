@@ -2,6 +2,15 @@ function el(id) {
     return document.getElementById(id);
 }
 
+function escapeHtml(text) {
+    return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function showError(message) {
     const box = el('run-error');
     if (!box) return;
@@ -74,10 +83,10 @@ function renderAnimeList(animeList) {
     }
 
     container.innerHTML = animeList.map((it, i) =>
-        `<label class="anime-check-item" data-title="${it.title.replace(/"/g, '&quot;')}" data-index="${i}">
+        `<label class="anime-check-item" data-title="${escapeHtml(it.title)}" data-index="${i}">
             <input type="checkbox" checked />
-            <span class="title">${it.title}</span>
-            <span class="ep-count">${it.count}</span>
+            <span class="title">${escapeHtml(it.title)}</span>
+            <span class="ep-count">${Number(it.count) || 0}</span>
         </label>`
     ).join('');
 
@@ -125,8 +134,8 @@ function renderSamples(samples) {
     container.innerHTML = samples.map(it => {
         const se = it.episode ? `S${String(it.season || 1).padStart(2, '0')}E${String(it.episode).padStart(2, '0')}` : '—';
         return `<div class="sample-card">
-            <div class="s-title">${it.title}</div>
-            <div class="s-meta">${se} · score ${(Number(it.score || 0) * 100).toFixed(0)}%</div>
+            <div class="s-title">${escapeHtml(it.title)}</div>
+            <div class="s-meta">${escapeHtml(se)} · score ${(Number(it.score || 0) * 100).toFixed(0)}%</div>
         </div>`;
     }).join('');
 }

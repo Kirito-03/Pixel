@@ -7,6 +7,21 @@ const router = express.Router();
 
 import pool from '../db.js';
 
+const ADMIN_EMAILS_LIST = () =>
+    (process.env.ADMIN_EMAILS || '')
+        .split(',')
+        .map(e => e.trim().toLowerCase())
+        .filter(Boolean);
+
+function isAllowedMobileRedirect(rawUri) {
+    if (typeof rawUri !== 'string') return false;
+    const trimmed = rawUri.trim();
+    if (!/^(pixelnosekai|exp):\/\/[A-Za-z0-9._~:/?#[\]!$&'()*+,;=%-]+$/.test(trimmed)) {
+        return false;
+    }
+    return !trimmed.includes('@') && !trimmed.includes('//localhost');
+}
+
 // Configurar Google OAuth Strategy
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -78,7 +93,7 @@ router.get('/google/callback',
             if (req.user?.role !== 'admin') {
                 const platform = req.query.platform;
                 const redirectUri = req.query.redirect_uri;
-                if (platform === 'mobile' && redirectUri) {
+                if (platform === 'mobile' && isAllowedMobileRedirect(redirectUri)) {
                     const separator = redirectUri.includes('?') ? '&' : '?';
                     res.redirect(`${redirectUri}${separator}error=unauthorized`);
                 } else {
@@ -102,8 +117,8 @@ router.get('/google/callback',
             const platform = req.query.platform;
             const redirectUri = req.query.redirect_uri;
 
-            if (platform === 'mobile' && redirectUri) {
-                // Deep link para React Native con token en URL
+            if (platform === 'mobile' && isAllowedMobileRedirect(redirectUri)) {
+                // Deep link validado para React Native con token en URL
                 const separator = redirectUri.includes('?') ? '&' : '?';
                 res.redirect(`${redirectUri}${separator}token=${token}`);
             } else {
@@ -124,7 +139,7 @@ router.get('/google/callback',
             const platform = req.query.platform;
             const redirectUri = req.query.redirect_uri;
 
-            if (platform === 'mobile' && redirectUri) {
+            if (platform === 'mobile' && isAllowedMobileRedirect(redirectUri)) {
                 const separator = redirectUri.includes('?') ? '&' : '?';
                 res.redirect(`${redirectUri}${separator}error=token_generation_failed`);
             } else {
@@ -242,7 +257,7 @@ router.post('/admin/firebase-login', async (req, res) => {
  * GET /auth/admin/me
  * Obtiene información del administrador autenticado
  */
-router.get('/admin/me', (req, res) => {
+router.get('/admin/me', async (req, res) => {
     const token = req.cookies?.admin_token || req.headers.authorization?.split(' ')[1];
 
     if (!token) {
@@ -251,12 +266,17 @@ router.get('/admin/me', (req, res) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const normalizedEmail = String(decoded.email || '').trim().toLowerCase();
+        const isAllowedEmail = ADMIN_EMAILS_LIST().includes(normalizedEmail);
+        if (decoded.role !== 'admin' && !isAllowedEmail) {
+            return res.status(403).json({ message: 'Acceso denegado - Permisos insuficientes' });
+        }
         res.json({
             id: decoded.id,
             email: decoded.email,
             name: decoded.name,
             picture: decoded.picture,
-            role: decoded.role
+            role: 'admin'
         });
     } catch (error) {
         return res.status(401).json({ message: 'Token inválido o expirado' });
@@ -284,8 +304,10 @@ router.get('/admin/check', (req, res) => {
     }
 
     try {
-        jwt.verify(token, process.env.JWT_SECRET);
-        res.json({ authenticated: true });
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const normalizedEmail = String(decoded.email || '').trim().toLowerCase();
+        const isAdmin = decoded.role === 'admin' || ADMIN_EMAILS_LIST().includes(normalizedEmail);
+        res.json({ authenticated: Boolean(isAdmin) });
     } catch (error) {
         res.json({ authenticated: false });
     }

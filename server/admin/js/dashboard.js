@@ -87,6 +87,14 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function sanitizeUrl(url) {
+    const str = String(url || '').trim();
+    if (/^(https?:\/\/|\/)/i.test(str)) {
+        return escapeHtml(str).replace(/"/g, '&quot;');
+    }
+    return '';
+}
+
 function showError(message) {
     alert(message); // TODO: Replace with better notification system
 }
@@ -160,8 +168,8 @@ async function loadDriveInventory() {
                     <td>${escapeHtml(item.epInfo)}</td>
                     <td><small style="color: #aaa;">${item.size}</small></td>
                     <td>
-                        ${item.url ? `
-                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; text-decoration: none;">
+                        ${sanitizeUrl(item.url) ? `
+                            <a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; text-decoration: none;">
                                 Ver Stream
                             </a>
                         ` : '—'}

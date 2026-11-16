@@ -4,6 +4,7 @@ import { syncHentaiSingle } from '../services/hentaiBotService.js';
 import pool from '../db.js';
 
 const router = express.Router();
+const inFlightHentaiSyncs = new Map();
 
 // GET /api/nsfw/latest
 router.get('/latest', async (req, res) => {
@@ -78,10 +79,17 @@ router.get('/details/:slug', async (req, res) => {
             ORDER BY episode_number DESC
         `, [hentai.id]);
 
-        // Si no hay episodios, intentamos buscarlos en vivo (On-Demand)
-        if (episodesResult.rows.length === 0) {
+        // Si no hay episodios, intentamos buscarlos en vivo (On-Demand) con deduplicación en memoria
+        if (episodesResult.rows.length === 0 && /^[a-z0-9-]+$/i.test(slug)) {
             console.log(`[API] 0 episodios para ${slug}, disparando búsqueda On-Demand...`);
-            const synced = await syncHentaiSingle(pool, slug);
+            let syncPromise = inFlightHentaiSyncs.get(slug);
+            if (!syncPromise) {
+                syncPromise = syncHentaiSingle(pool, slug).finally(() => {
+                    inFlightHentaiSyncs.delete(slug);
+                });
+                inFlightHentaiSyncs.set(slug, syncPromise);
+            }
+            const synced = await syncPromise;
             if (synced) {
                 // Re-consultar la base de datos tras la sincronización
                 const refreshedResult = await pool.query(`

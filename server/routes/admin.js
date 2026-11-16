@@ -1004,11 +1004,7 @@ router.post('/episodes/:id/upload-video', episodeVideoUpload.single('video'), as
             return res.status(404).json({ message: 'Episodio no encontrado' });
         }
 
-        const clientBaseURL = req.headers['x-client-baseurl'];
-        const base =
-            typeof clientBaseURL === 'string' && clientBaseURL.trim()
-                ? clientBaseURL.trim()
-                : `${req.protocol}://${req.get('host')}`;
+        const base = process.env.PUBLIC_BASE_URL || 'https://pixelnosekai.com';
         const videoUrl = `${base}/uploads/episodes/${req.file.filename}`;
 
         const updated = await pool.query(
@@ -1281,7 +1277,7 @@ router.post('/import/m3u/upload', importM3uUpload.single('file'), async (req, re
     }
 });
 
-router.post('/import/m3u/text', async (req, res) => {
+router.post('/import/m3u/text', express.json({ limit: '50mb' }), async (req, res) => {
     try {
         await ensureImportsDir();
         const content = String(req.body?.content || '');

@@ -65,6 +65,7 @@ export async function transcodeHls({ src, episodeId }) {
       '-loglevel',
       'error',
       '-y',
+      ...(/^https?:\/\//i.test(src) ? ['-protocol_whitelist', 'http,https,tls,tcp'] : []),
       '-i',
       src,
       ...(isMp4

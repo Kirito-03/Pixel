@@ -223,6 +223,20 @@ async function scanFolder(folderPath, onFile, { maxItems, maxDepth = 6 }) {
   return seen
 }
 
+function isSafeExternalHttpUrl(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || ''))
+    if (!['https:', 'http:'].includes(u.protocol) || u.username || u.password) return false
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+    if (!h || h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || h === '::1' || h === '0.0.0.0') return false
+    if (/^127\.|^10\.|^192\.168\.|^169\.254\.|^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false
+    if (/^(fc|fd|fe80):/i.test(h)) return false
+    return true
+  } catch {
+    return false
+  }
+}
+
 function resolveAllowedPath(inputPath, allowedRoots) {
   const abs = resolve(inputPath).toLowerCase()
   for (const root of allowedRoots) {
@@ -602,12 +616,14 @@ export async function importAnimeFromSources({
       }
 
       if (src?.type === 'url') {
-        let fetchUrl = src.url;
-        if (fetchUrl.includes('10.0.2.2')) {
-          fetchUrl = fetchUrl.replace('10.0.2.2', '127.0.0.1');
+        const fetchUrl = String(src.url || '').trim()
+        if (!isSafeExternalHttpUrl(fetchUrl)) {
+          debugLog('Blocked unsafe URL:', fetchUrl)
+          stats.errors += 1
+          continue
         }
         debugLog('Fetching URL:', fetchUrl)
-        const r = await axios.get(fetchUrl, { responseType: 'stream', timeout: 30_000 })
+        const r = await axios.get(fetchUrl, { responseType: 'stream', timeout: 30_000, maxRedirects: 2 })
         debugLog('Fetched URL, processing readable')
         await processM3uReadable(r.data, (item) => onEntry({ ...item }), { maxItems, signal: options.signal })
       }

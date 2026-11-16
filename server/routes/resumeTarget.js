@@ -26,19 +26,6 @@ router.get('/:animeId', async (req, res) => {
   if (!Number.isFinite(animeId) || animeId <= 0) return res.status(400).json({ message: 'animeId inválido' });
 
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS pns_watch_progress (
-        id SERIAL PRIMARY KEY,
-        profile_id BIGINT NOT NULL,
-        anime_id INTEGER NOT NULL,
-        episode_id INTEGER NOT NULL,
-        current_seconds INTEGER NOT NULL DEFAULT 0,
-        duration_seconds INTEGER NOT NULL DEFAULT 0,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_pns_watch_progress_profile_anime ON pns_watch_progress(profile_id, anime_id);`);
-
     const progress = await pool.query(
       `
       SELECT

@@ -94,8 +94,8 @@ app.use(cors({
   exposedHeaders: ['Content-Type']
 }));
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Cookie parser para JWT
 app.use(cookieParser());
@@ -122,8 +122,9 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // ── Archivos estáticos ─────────────────────────────────────────
-app.use('/videos', express.static(join(__dirname, 'videos')));
-app.use('/uploads', express.static(join(__dirname, 'uploads')));
+app.use('/uploads/avatars', express.static(join(__dirname, 'uploads', 'avatars')));
+app.use('/uploads/episodes', authenticateAdmin, express.static(join(__dirname, 'uploads', 'episodes')));
+app.use('/uploads/imports', authenticateAdmin, express.static(join(__dirname, 'uploads', 'imports')));
 app.use('/hls', express.static(join(__dirname, 'hls')));
 
 // Admin panel
@@ -157,17 +158,19 @@ app.get('/health', async (req, res) => {
     status.db.ok = true;
   } catch (e) {
     status.db.ok = false;
-    status.db.error = e.message;
+    if (process.env.NODE_ENV !== 'production') {
+      status.db.error = e.message;
+    }
   }
   res.status(200).json(status);
 });
 
-app.get('/health/db', async (req, res) => {
+app.get('/health/db', authenticateAdmin, async (req, res) => {
   try {
     const result = await pool.query('SELECT 1 as ok');
     res.json({ ok: true, rows: result.rows });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(500).json({ ok: false, error: process.env.NODE_ENV === 'production' ? 'Database error' : e.message });
   }
 });
 
@@ -318,8 +321,8 @@ app.get('/users/:id', authenticateToken, requireOwnUser(r => r.params.id), async
   }
 });
 
-// ── Videos: serve M3U file ─────────────────────────────────────
-app.get('/videos/animes_madre.m3u', (req, res) => {
+// ── Videos: serve M3U file (solo admin) ────────────────────────
+app.get('/videos/animes_madre.m3u', authenticateAdmin, (req, res) => {
   try {
     const m3uPath = join(__dirname, 'videos', 'animes_madre.m3u');
     const content = readFileSync(m3uPath, 'utf-8');

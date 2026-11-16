@@ -34,21 +34,6 @@ router.post('/', async (req, res) => {
   const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.floor(durationRaw) : 0;
 
   try {
-    console.log('[Progress][POST][REQ]', { headers: req.headers, body: req.body });
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS pns_watch_progress (
-        id SERIAL PRIMARY KEY,
-        profile_id BIGINT NOT NULL,
-        anime_id INTEGER NOT NULL,
-        episode_id INTEGER NOT NULL,
-        current_seconds INTEGER NOT NULL DEFAULT 0,
-        duration_seconds INTEGER NOT NULL DEFAULT 0,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_pns_watch_progress_profile_anime ON pns_watch_progress(profile_id, anime_id);`);
-
     const { rows } = await pool.query(
       `
       INSERT INTO pns_watch_progress (profile_id, anime_id, episode_id, current_seconds, duration_seconds, updated_at)
@@ -64,12 +49,10 @@ router.post('/', async (req, res) => {
       [perfilId, animeId, episodeId, Math.floor(currentTime), duration]
     );
 
-    console.log('[Progress][POST][OK]', rows?.[0]);
     return res.status(200).json({ ok: true, progress: rows[0] });
   } catch (e) {
-    console.error('[Progress][POST][ERR]', e);
-    console.error('[Progress][POST][ERR][BODY]', req.body);
-    return res.status(500).json({ message: 'Error al guardar progreso', error: e?.message || String(e) });
+    console.error('[Progress][POST][ERR]', e?.message);
+    return res.status(500).json({ message: 'Error al guardar progreso' });
   }
 });
 

@@ -187,3 +187,28 @@ Adicionalmente, se crearon e integraron los bots de ingesta automática y audito
   - `node tools/pixel-drive-verify.mjs --repair` finalizó en `0` con `Anime Episodios: 1/1`, `Anime Trailers: 3/3`, `Manga Capítulos: 1/1` y `Hentai Episodios: 1/1` íntegros (`0` rotos).
 - **Nota:** Después de validar `build:web`, se aplicaron únicamente cambios de servidor (`hentaiBotService.js`, `smartBotService.js`, `mangaPageCache.js`) desplegados directamente en `arle` y reiniciados con `pm2 restart pixel-backend --update-env` (el bundle web no cambió respecto a `index-50668512b64368e412c928e70726bfee.js`).
 
+---
+
+## 7. Auditoría de Ciberseguridad y Corrección de Vulnerabilidades
+
+### A. Hallazgos Corregidos
+1. **[ALTA-1] Open Redirect en OAuth Callback y Validación de Rol en `/auth/admin/me` y `/auth/admin/check` (`server/routes/auth.js`):**
+   - `isAllowedMobileRedirect` restringe `redirect_uri` exclusivamente a esquemas `pixelnosekai://` o `exp://` sin `@` ni `//localhost`.
+   - `/auth/admin/me` y `/auth/admin/check` ahora exigen `decoded.role === 'admin'` o email incluido en `ADMIN_EMAILS`.
+2. **[ALTA-2] Restricción de `/uploads/imports`, `/uploads/episodes` y `.m3u` (`server/app.js`, `server/routes/content.js`):**
+   - Se limitó `express.static` público únicamente a `/uploads/avatars`; `/uploads/imports`, `/uploads/episodes`, `/videos/animes_madre.m3u`, `/content/m3u` y `/health/db` requieren `authenticateAdmin`.
+3. **[ALTA-3] Protección Anti-SSRF en Transcodificación e Importación M3U (`server/routes/transcode.js`, `server/services/transcodeHlsService.js`, `server/services/animeImportService.js`):**
+   - Bloqueo de `localhost`, `.local`, `.internal`, loopback (`127.0.0.0/8`, `::1`, `0.0.0.0`), link-local (`169.254.0.0/16`, `fe80:`) y redes privadas (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`), además de `-protocol_whitelist http,https,tls,tcp` en `ffmpeg` para fuentes remotas.
+4. **[MEDIA-2] Prevención de DOM XSS en Admin clásico (`server/admin/js/import.js`, `server/admin/js/dashboard.js`):**
+   - Se escapa `it.title` y `se` con `escapeHtml()` en `import.js` y se valida `item.url` con `sanitizeUrl()` (`https://`, `http://` o `/`) en `dashboard.js`.
+5. **[MEDIA-3] y [BAJA-1,2,3] Endurecimiento de Límites, Logs y Consultas (`server/app.js`, `server/routes/admin.js`, `server/routes/nsfw.js`, `server/routes/progress.js`, `server/routes/resumeTarget.js`):**
+   - Límite global de `express.json`/`express.urlencoded` reducido de `50mb` a `2mb` (conservando `50mb` solo en `/api/admin/import/m3u/text`).
+   - Deduplicación en memoria (`inFlightHentaiSyncs`) y filtro `/^[a-z0-9-]+$/i` para scraping on-demand en `/api/nsfw/details/:slug`.
+   - Eliminado el log de `req.headers` (que exponía `Authorization: Bearer <JWT>`) y los `CREATE TABLE`/`CREATE INDEX` por petición en `progress.js` y `resumeTarget.js`.
+   - URL base fija (`process.env.PUBLIC_BASE_URL || 'https://pixelnosekai.com'`) en `POST /api/admin/episodes/:id/upload-video`.
+
+### B. Validaciones Reales
+- `node --check` sobre los 12 archivos JS modificados: exit `0`.
+- `node --test server/tests/security-routes.test.cjs server/tests/uploads-security.test.mjs server/tests/trailers.test.mjs server/tests/legacyAnimeMetadata.test.mjs`: `24/24` tests en verde (incluyendo bloqueo SSRF en `/transcode/hls`).
+
+

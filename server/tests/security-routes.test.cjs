@@ -53,10 +53,15 @@ test('forgot password never returns a token or accesses database',async()=>{
  const res=response();await routes['POST /forgot-password'][0]({body:{email:'person@example.com'}},res);
  assert.equal(res.statusCode,503);assert.equal(res.data.token,undefined);
 });
-test('transcoding requires the existing admin middleware before executing handler',()=>{
+test('transcoding requires the existing admin middleware before executing handler and blocks internal SSRF URLs',async()=>{
  const authenticateAdmin=()=>{};
- const routes=load('transcode.js',{authenticateAdmin,crypto:{},transcodeHls:()=>{throw Error('must not execute')}});
+ let executed=0;
+ const routes=load('transcode.js',{authenticateAdmin,crypto:{createHash:()=>({update:()=>({digest:()=>'id'})})},transcodeHls:async()=>{executed++;return {id:'id',stream_url:'https://r2.example/index.m3u8'}}});
  assert.equal(routes['POST /hls'][0],authenticateAdmin);assert.equal(routes['POST /hls'].length,2);
+ for (const src of ['http://127.0.0.1:8086/Anime/5/trailer.mp4','http://localhost:3001/health','http://169.254.169.254/latest/meta-data','http://192.168.1.1/video.mp4']) {
+  const res=response();await routes['POST /hls'][1]({body:{src}},res);assert.equal(res.statusCode,400);
+ }
+ assert.equal(executed,0);
 });
 test('reset password hashes before writing to database',async()=>{
  const calls=[];let hashArgs;
