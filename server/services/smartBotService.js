@@ -97,6 +97,54 @@ export async function updateOngoingAnimes() {
   return { jobId, status: 'started' };
 }
 
+async function syncFinishedStatusIfComplete(animeId, fallbackTitle = '') {
+  const { rows } = await pool.query(
+    `SELECT ac.id, ac.title, ac.title_english, ac.status, ac.total_episodes,
+            COUNT(ae.id) FILTER (WHERE ae.is_active = true)::int AS ep_count,
+            COALESCE(MAX(ae.episode_number) FILTER (WHERE ae.is_active = true), 0)::int AS max_ep
+     FROM anime_content ac
+     LEFT JOIN anime_episodes ae ON ae.anime_id = ac.id
+     WHERE ac.id = $1
+     GROUP BY ac.id`,
+    [animeId]
+  );
+  if (!rows.length) return false;
+  const anime = rows[0];
+  if (!['Releasing', 'Ongoing'].includes(anime.status)) return false;
+
+  let totalEpisodes = Number(anime.total_episodes) || 0;
+  let remoteFinished = false;
+
+  try {
+    const meta = await searchAniListMetadata(anime.title_english || anime.title || fallbackTitle);
+    if (meta) {
+      if (!totalEpisodes && Number(meta.total_episodes) > 0) {
+        totalEpisodes = Number(meta.total_episodes);
+      }
+      if (String(meta.status || '').toLowerCase() === 'finished') {
+        remoteFinished = true;
+      }
+    }
+  } catch {
+    // ignore metadata lookup failure
+  }
+
+  const reachedTotal = totalEpisodes > 0 && (anime.ep_count >= totalEpisodes || anime.max_ep >= totalEpisodes);
+  if (reachedTotal || (remoteFinished && (totalEpisodes === 0 || anime.ep_count >= totalEpisodes))) {
+    await pool.query(
+      `UPDATE anime_content
+       SET status = 'Finished',
+           total_episodes = COALESCE(total_episodes, NULLIF($2, 0)),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [animeId, totalEpisodes]
+    );
+    console.log(`[SmartBot] ✓ Anime #${animeId} ("${anime.title}") finalizado (${anime.ep_count}/${totalEpisodes || anime.max_ep} eps) -> status = 'Finished'.`);
+    return true;
+  }
+  return false;
+}
+
 async function runUpdateOngoingJob(job) {
   try {
     const res = await pool.query(`SELECT id, title, title_english FROM anime_content WHERE status IN ('Releasing', 'Ongoing')`);
@@ -123,6 +171,7 @@ async function runUpdateOngoingJob(job) {
       } catch (err) {
         job.errors.push(`Error en ${anime.title}: ${err.message}`);
       }
+      await syncFinishedStatusIfComplete(anime.id, anime.title);
     }
 
     job.status = 'done';
@@ -827,6 +876,8 @@ async function runScrapeJob(job, animeId, options) {
         inserted++;
       }
     }
+
+    await syncFinishedStatusIfComplete(animeId, anime.title);
 
     job.status = 'done';
     job.result = {
