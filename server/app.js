@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { readFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import session from 'express-session';
@@ -137,6 +137,12 @@ try {
   console.log('Admin panel directory already exists or error:', error.message);
 }
 app.use('/admin', express.static(adminDir));
+const webAdminSpaPaths = ['/admin/login', '/admin/dashboard', '/admin/import', '/admin/anime', '/admin/anime/form', '/admin/episodes', '/admin/bot'];
+app.get(webAdminSpaPaths, (_req, res, next) => {
+  const spaEntry = join(__dirname, '..', 'dist', 'index.html');
+  if (!existsSync(spaEntry)) return next();
+  return res.sendFile(spaEntry);
+});
 
 // ── Middleware de logging (dev) ────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {

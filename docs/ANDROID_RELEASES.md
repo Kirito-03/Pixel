@@ -70,3 +70,6 @@ Actualización1.0.18/código19: categorías de H en diálogo desplazable y selec
 
 
 Actualización1.0.19/código20: Similares deduplicado por identidad AniList/fecha, recomendaciones sobre catálogo completo, caché pública persistente acotada con revalidación y refresco sin ocultar Inicio; carga diferida web y menos tarjetas iniciales Android. APK123599350bytes; SHA256 `555bc8fe9d6d325f639cc48e3a636258f5eaf0030bf20dd5b5638f673cc362d8`.159 tests y11 de seguridad pasan. Ver docs/brain/2026-11-16-similares-y-red-lenta.md para límites de red y validaciones. No instalada físicamente.
+
+
+Actualización 1.0.21 / código 22: título del lector de manga visible solo al inicio y oculto al bajar, botón flotante lateral "↑ Inicio" que acompaña al deslizar (Web y Android) más botón al final del capítulo, y corrección de acceso directo / recarga en `/admin/dashboard` web. APK 123601858 bytes; SHA256 `6710575d86b4e9c37b0795632e14bf46d54f29264994e722b8c6aef1d6055fb8`. Firma, manifiesto público y descarga HTTP 200 verificados; sin dispositivo ADB conectado para instalación física. Ver docs/brain/2026-11-16-manga-reader-admin-apk.md.
