@@ -44,3 +44,11 @@ APK publicada tras verificar SHA256 y tamaño remoto antes de sustituir latest.j
 
 Descarga: https://pixelnosekai.com/api/app-release/android/download?build=25
 Unidad Reze montada de nuevo el 2026-11-17. MCP pixel_brain comprobado con lectura y escritura; esta nota y su enlace del índice se sincronizan con la bóveda externa Pixel. Las notas anteriores que indicaban sincronización manga/H pendiente describen versiones previas a 1.0.24.
+
+
+## Comprobación adicional tras continuar — 2026-11-17
+
+- La API pública sigue ofreciendo APK 1.0.24/código25 con SHA256 esperado.
+- En Preferencias web del perfil kirito, el panel muestra 0 lecturas/títulos H respaldados y detecta 3 lecturas antiguas de esta laptop sin importar. Esto no demuestra pérdida de datos del teléfono: todavía falta importar desde la APK del celular al perfil correcto y comprobar la recepción en web.
+- ADB no detecta dispositivos conectados; no se instaló ni se modificó ninguna APK en un dispositivo durante esta comprobación.
+- Se solicitó al usuario el estado del panel de respaldo en el teléfono. No se asignaron automáticamente las lecturas antiguas de la laptop a ningún perfil.
