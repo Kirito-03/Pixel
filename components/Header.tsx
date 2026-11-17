@@ -150,7 +150,7 @@ export default function Header({ black = false, activeSection = 'Inicio', onProf
         <View style={[StyleSheet.absoluteFill, { backgroundColor: theme === 'dark' ? 'rgba(5, 5, 5, 0.96)' : 'rgba(255, 255, 255, 0.92)' }]} />
         // <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
       )}
-      <SafeAreaView>
+      <SafeAreaView edges={['top', 'left', 'right']}>
         <View style={dynamicStyles.header}>
           {/* Logo: PIXEL NO SEKAI */}
           <Animated.View style={{ transform: [{ scale: logoScale }] }}>

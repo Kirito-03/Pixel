@@ -6,7 +6,7 @@ import Loader from '../components/Loader';
 import { readingFormat } from '../utils/readingFormat';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -44,6 +44,8 @@ export default function MangaDetailScreen() {
   const id = String(route?.params?.id || '').trim();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 768;
+  const insets = useSafeAreaInsets();
+  const headerHeight = (isSmallScreen ? 56 : 64) + insets.top;
 
   const [loading, setLoading] = useState(true);
   const [localSavingList, setSavingList] = useState(false);
@@ -226,8 +228,8 @@ export default function MangaDetailScreen() {
               />
             </View>
 
-            <SafeAreaView edges={['top', 'left', 'right']}>
-              <View style={styles.topBar}>
+            <SafeAreaView edges={['left', 'right']}>
+              <View style={[styles.topBar, Platform.OS !== 'web' && { paddingTop: headerHeight + 24 }]}>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a lecturas" onPress={() => navigation.canGoBack() ? navigation.goBack() : navigateByLabel('Manga')} style={styles.backBtn} activeOpacity={0.9}>
                   <Ionicons name="arrow-back" size={20} color="#fff" />
                   <Text style={styles.backText}>Volver</Text>
@@ -401,7 +403,8 @@ const baseStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 10,
+    minHeight: 44,
     borderRadius: 2,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',

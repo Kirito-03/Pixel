@@ -21,14 +21,14 @@ function runtime(file, mocks = {}) {
     StyleSheet: { create: value => value, absoluteFill: {}, absoluteFillObject: {} }, useWindowDimensions: () => ({ width: 390, height: 844 }),
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     AccessibilityInfo: { isReduceMotionEnabled: async () => false, addEventListener: () => ({ remove() {} }) },
-    Animated: { Value: function Value() {}, View: 'Animated.View', timing: () => ({ start: cb => cb?.({ finished: true }) }) },
+    Animated: { Value: function Value() { this.interpolate = value => value; }, View: 'Animated.View', timing: () => ({ start: cb => cb?.({ finished: true }), stop() {} }) },
   };
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true } }).outputText, {
     exports, console, Promise, AbortController, requestAnimationFrame: fn => fn(),
     setTimeout: fn => { timeouts.set(++clock, fn); return clock; }, clearTimeout: id => timeouts.delete(id),
     setInterval: fn => { intervals.set(++clock, fn); return clock; }, clearInterval: id => intervals.delete(id),
-    require(name) { if (name === '../hooks/usePlaybackLock') return playbackLockModule(react); if (name === './PlaybackLock') return { default:'PlaybackLock',__esModule:true }; if (name === 'react') return react; if (name === 'react-native') return native; if (name.endsWith('/ThemeContext')) return { useTheme: () => ({ theme: 'dark', colors: { text: '#fff', textSecondary: '#aaa', textMuted: '#999', background: '#000', card: '#141414', primary: '#e50914' } }) };  return mocks[name] || {}; },
+    require(name) { if (name === '@react-navigation/native' && mocks[name]) return { ...mocks[name], useFocusEffect: fn => react.useEffect(fn, [fn]) }; if (name === '../utils/readerChrome') { const result = {}; vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../utils/readerChrome.ts', import.meta.url),'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: result }); return result; } if (name === '../hooks/usePlaybackLock') return playbackLockModule(react); if (name === './PlaybackLock') return { default:'PlaybackLock',__esModule:true }; if (name === 'react') return react; if (name === 'react-native') return native; if (name.endsWith('/ThemeContext')) return { useTheme: () => ({ theme: 'dark', colors: { text: '#fff', textSecondary: '#aaa', textMuted: '#999', background: '#000', card: '#141414', primary: '#e50914' } }) };  return mocks[name] || {}; },
   });
   return { exports, intervals, timeouts,
     render(props) { cursor = 0; const tree = exports.default(props); for (const { i, fn } of pending.splice(0)) { cleanups.get(i)?.(); cleanups.set(i, fn()); } return tree; },
@@ -88,23 +88,38 @@ test('manga carousel keeps advancing after using an arrow or a dot on Android', 
 test('reader footer opens the actual next chapter and disappears on the last one', async () => {
   const chapters = [{ id: 'three', chapter: '3' }, { id: 'two', chapter: '2' }, { id: 'one', chapter: '1' }];
   const route = { params: { id: 'manga', chapterId: 'two', chapters } }, navigated = [];
+  const visibility = [], reading = [];
+  const chrome = { setReading: value => reading.push(value), setBottomVisible: value => visibility.push(value) };
   const f = runtime('screens/MangaReaderScreen.tsx', {
     '@react-navigation/native': { useIsFocused: () => true, useNavigation: () => ({ setParams: value => navigated.push(value) }), useRoute: () => route },
     '../hooks/useTabNavigation': { useTabNavigation: () => ({ navigateByLabel() {} }) },
     '../services/mangaApi': { mangaApi: { getById: async () => ({title:'Fixture'}), chapters: async () => ({ chapters }), chapterPages: async () => ({ pages: ['https://example.test/page.jpg'] }) } },
+    '../contexts/ReaderChromeContext': { useReaderChrome: () => chrome },
     '../utils/mangaProgress': { saveMangaProgress() {} },
-    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0 }) },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 24 }) },
     '../utils/mangaChapterNavigation': { getMangaReaderContext: () => undefined, mangaChapterKey: chapter => 'cap-' + chapter.chapter },
     '../utils/readerRetry': { loadReaderPages: async ({request}) => (await request()).pages, readerRetryDelay: () => 3000 },
     '../components/NativeMangaPages': { default: 'NativeMangaPages', __esModule: true },
   });
   f.render(); await tick(); let tree = f.render();
   let reader = type(tree, 'NativeMangaPages');
+  const reserved = reader.props.topSpace;
+  reader.props.onScroll(180); tree = f.render();
+  assert.equal(type(tree, 'NativeMangaPages').props.topSpace, reserved);
+  assert.equal(type(tree, 'Animated.View').props.pointerEvents, 'none');
+  assert.equal(visibility.at(-1), false);
+  reader = type(tree, 'NativeMangaPages'); reader.props.onScroll(120); tree = f.render();
+  assert.equal(visibility.at(-1), true);
+  assert.equal(type(tree, 'Animated.View').props.pointerEvents, 'none');
+  reader = type(tree, 'NativeMangaPages'); reader.props.onScroll(20); tree = f.render();
+  assert.equal(type(tree, 'Animated.View').props.pointerEvents, 'auto');
   reader.props.onNext(); assert.equal(navigated[0].chapterKey, 'cap-3'); assert.equal(navigated[0].chapterId, undefined);
   route.params.chapterId = 'three'; f.render(); await tick(); tree = f.render();
   reader = type(tree, 'NativeMangaPages');
   assert.equal(reader.props.next, null);
   f.unmount();
+  assert.equal(reading.at(-1), false);
+  assert.equal(visibility.at(-1), true);
 });
 
 test('closing a player during an in-flight landscape request still restores portrait afterwards', async () => {

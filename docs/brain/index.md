@@ -62,3 +62,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-16-similares-y-red-lenta]]: identidad de portadas, ranking por afinidad y caché pública persistente con revalidación; APK1.0.19/código20.
 
 - [[2026-11-16-android-manga-1-0-22]] — Android: navegación, botones, ancho del lector y APK.
+
+- [[2026-11-16-lector-manga-transicion-1-0-23]] — Controles del lector Android con transición suave, menú inferior por dirección y separación de Volver.

@@ -1,9 +1,11 @@
+import { createReaderChromeController } from '../utils/readerChrome';
+import { useReaderChrome } from '../contexts/ReaderChromeContext';
 import Loader from '../components/Loader';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, ActivityIndicator, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import Header from '../components/Header';
 import ReaderImage from '../components/ReaderImage';
 import NativeMangaPages from '../components/NativeMangaPages';
@@ -26,6 +28,21 @@ export default function MangaReaderScreen() {
   const { navigateByLabel } = useTabNavigation();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { setReading, setBottomVisible } = useReaderChrome();
+  const chromeController = useRef(createReaderChromeController());
+  const topProgress = useRef(new Animated.Value(1)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const headerHeight = (width < 768 ? 56 : 64) + insets.top;
+  useFocusEffect(React.useCallback(() => {
+    if (Platform.OS === 'web') return;
+    setReading(true); setBottomVisible(true);
+    return () => { setReading(false); setBottomVisible(true); };
+  }, [setReading, setBottomVisible]));
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub.remove();
+  }, []);
   const params = (route.params || {}) as RouteParams;
   const mangaId = String(params.mangaId || params.id || '').trim();
   const legacyChapterId = safeDecode(String(params.chapterId || ''));
@@ -90,6 +107,7 @@ export default function MangaReaderScreen() {
   }, [mangaId, preferredLanguage, retryKey, active, paused]);
   useEffect(() => {
     loadedChapter.current = '';
+    chromeController.current = createReaderChromeController(); setBottomVisible(true);
     setPages([]); setVisibleCount(STEP); setActivePage(1); setAtTop(true); setShowFloatingTop(false); setPaused(false); setRetryAttempt(0); setMessage('');
     offsets.current = {};
     listRef.current?.scrollToOffset?.({ offset: 0, animated: false });
@@ -142,8 +160,19 @@ export default function MangaReaderScreen() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+  useEffect(() => {
+    const animation = Animated.timing(topProgress, { toValue: atTop || !pages.length ? 1 : 0,
+      duration: reduceMotion ? 0 : 240, useNativeDriver: Platform.OS !== 'web' });
+    animation.start();
+    return () => animation.stop();
+  }, [atTop, !!pages.length, reduceMotion, topProgress]);
+  const handleNativeScroll = (y: number) => {
+    const chrome = chromeController.current(y);
+    setAtTop(chrome.topVisible);
+    setBottomVisible(chrome.bottomVisible);
+  };
   const titleBar = (
-    <View style={[styles.topBar, { marginTop: Platform.OS === 'web' ? (width < 768 ? 64 : 72) : 56 + insets.top }]}>
+    <View style={[styles.topBar, { marginTop: Platform.OS === 'web' ? (width < 768 ? 64 : 72) : 0 }]}>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()} style={styles.backButton}><Ionicons name="arrow-back" color="#fff" size={22} /></TouchableOpacity>
       <View style={{ flex: 1, minWidth: 0 }}><Text style={styles.title} numberOfLines={1}>{mangaTitle}</Text><Text style={styles.hint}>{chapterLabel}{pages.length ? ` · Página ${activePage} de ${pages.length}` : ''}</Text></View>
     </View>
@@ -171,9 +200,17 @@ export default function MangaReaderScreen() {
   </View>;
 
   return <View style={styles.container}>
-    {(Platform.OS === 'web' || atTop || !pages.length) && <Header black activeSection="Manga" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} />}
+    {Platform.OS === 'web' ? <Header black activeSection="Manga" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} /> :
+      <Animated.View pointerEvents={atTop || !pages.length ? 'auto' : 'none'}
+        accessibilityElementsHidden={!atTop && !!pages.length} importantForAccessibility={!atTop && pages.length ? 'no-hide-descendants' : 'auto'}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000, opacity: topProgress,
+          transform: [{ translateY: topProgress.interpolate({ inputRange: [0, 1], outputRange: [-28, 0] }) }] }}>
+        <Header black activeSection="Manga" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} />
+        <View style={{ paddingTop: headerHeight + 16, backgroundColor: '#080808' }}>{titleBar}</View>
+      </Animated.View>}
+
     {!pages.length ? <ScrollView contentContainerStyle={styles.stateContent}>
-      {titleBar}
+      {Platform.OS === 'web' ? titleBar : <View style={{ height: headerHeight + 100 }} />}
       {chapterNavigation('inicio')}
       <View style={styles.status}>
         {(!paused && active) && <Loader onDark />}
@@ -210,9 +247,8 @@ export default function MangaReaderScreen() {
         </TouchableOpacity>
       )}
     </> : <>
-      {atTop && titleBar}
       <NativeMangaPages key={chapterId} pages={pages} previous={previous ? previous.chapter || '' : null} next={next ? next.chapter || '' : null}
-        active={active} onPrevious={() => openChapter(previous)} onNext={() => openChapter(next)} onPage={setActivePage} onAtTop={setAtTop} />
+        active={active} onPrevious={() => openChapter(previous)} onNext={() => openChapter(next)} onPage={setActivePage} onScroll={handleNativeScroll} topSpace={headerHeight + 100} bottomSpace={60 + insets.bottom} />
     </>}
   </View>;
 }

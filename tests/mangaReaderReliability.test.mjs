@@ -75,3 +75,36 @@ test('native reader retries failed near pages, stops timers in background and pr
  image.onload();assert.equal(page.style.maxWidth,'800px');assert.equal(page.style.width,'100%');assert.ok(classes.has('loaded'));assert.equal(timers.size,0);
  observe([{target:page,isIntersecting:true}]);assert.equal(requests,2);
 });
+
+test('reader chrome keeps a hysteresis band near the top instead of oscillating on small scrolls',()=>{
+ const {createReaderChromeController}=module('utils/readerChrome.ts');
+ const update=createReaderChromeController();
+ for(const y of [0,12,25,23,32,24,40,80,110]) assert.equal(update(y).topVisible,true);
+ assert.equal(update(112).topVisible,false);
+ for(const y of [110,114,109,85,40,25,28,26]) assert.equal(update(y).topVisible,false);
+ assert.equal(update(24).topVisible,true);
+ assert.equal(update(-9).topVisible,true);
+});
+test('bottom reader menu needs deliberate direction changes and returns near the top',()=>{
+ const {createReaderChromeController}=module('utils/readerChrome.ts');
+ const update=createReaderChromeController();
+ update(0);update(80);assert.equal(update(160).bottomVisible,false);
+ for(const y of [159,160,159,160,159,160]) assert.equal(update(y).bottomVisible,false);
+ update(145);assert.equal(update(125).bottomVisible,true);
+ update(150);assert.equal(update(175).bottomVisible,true);
+ assert.equal(update(184).bottomVisible,false);
+ assert.equal(update(15).bottomVisible,true);
+ assert.equal(createReaderChromeController()(0).bottomVisible,true);
+});
+test('native scroll bridge preserves its reserved layout and reports offsets to the hysteresis controller',()=>{
+ let y=0,scroll;const messages=[];
+ const document={querySelectorAll:()=>[],querySelector:()=>null,addEventListener:(name,fn)=>{if(name==='scroll')scroll=fn;}};
+ const scope={window:{ReactNativeWebView:{postMessage:value=>messages.push(JSON.parse(value))},get scrollY(){return y;}},
+   document,URL,Array,Math,Number,innerHeight:800,IntersectionObserver:function(){this.observe=()=>{};},requestAnimationFrame:fn=>fn(),setTimeout,clearTimeout};
+ const markup=html.nativeReaderHtml([],null,null,180,80);
+ assert.match(markup,/padding-top:180px;padding-bottom:80px/);
+ vm.runInNewContext(markup.match(/<script>([\s\S]*)<\/script>/)[1],scope);
+ for(const value of [0,30,112,109,100,24]){y=value;scroll();}
+ assert.deepEqual(messages.filter(m=>m.type==='scroll').map(m=>m.value),[0,30,112,109,100,24]);
+ assert.equal(messages.some(m=>m.type==='atTop'),false);
+});

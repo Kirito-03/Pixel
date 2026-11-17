@@ -1,3 +1,5 @@
+import { ReaderChromeProvider, useReaderChrome } from '../contexts/ReaderChromeContext';
+import ReaderTabBar from '../components/ReaderTabBar';
 import { profileNavigationScreens } from '../utils/profileNavigation';
 import React, { useEffect, Suspense } from 'react';
 import { NavigationContainer, DarkTheme, DefaultTheme, type LinkingOptions, type NavigatorScreenParams } from '@react-navigation/native';
@@ -129,6 +131,11 @@ function MangaNavigator() {
 }
 
 function MainTabs({ route }: { route: any }) {
+  return <ReaderChromeProvider><MainTabsContent route={route} /></ReaderChromeProvider>;
+}
+
+function MainTabsContent({ route }: { route: any }) {
+  const { reading } = useReaderChrome();
   const { colors } = useTheme();
   const { selectedProfile, userId } = route.params || {};
   const { isAdmin } = useAdmin();
@@ -196,9 +203,10 @@ function MainTabs({ route }: { route: any }) {
 
   return (
     <Tab.Navigator
+      tabBar={props => <ReaderTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarStyle: tabBarBaseStyle,
+        tabBarStyle: [tabBarBaseStyle, !isWeb && reading ? { position: 'absolute' } : null],
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
