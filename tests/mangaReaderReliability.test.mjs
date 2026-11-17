@@ -72,6 +72,6 @@ test('native reader retries failed near pages, stops timers in background and pr
  image.onerror();assert.ok(classes.has('failed'));assert.equal(timers.size,1);
  scope.window.pixelReaderActive(false);assert.equal(timers.size,0);
  scope.window.pixelReaderActive(true);assert.equal(requests,2);assert.match(image.current,/_retry=2/);
- image.onload();assert.equal(page.style.maxWidth,'720px');assert.ok(classes.has('loaded'));assert.equal(timers.size,0);
+ image.onload();assert.equal(page.style.maxWidth,'800px');assert.equal(page.style.width,'100%');assert.ok(classes.has('loaded'));assert.equal(timers.size,0);
  observe([{target:page,isIntersecting:true}]);assert.equal(requests,2);
 });

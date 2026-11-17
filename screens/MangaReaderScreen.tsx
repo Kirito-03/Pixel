@@ -171,7 +171,7 @@ export default function MangaReaderScreen() {
   </View>;
 
   return <View style={styles.container}>
-    <Header black activeSection="Manga" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} />
+    {(Platform.OS === 'web' || atTop || !pages.length) && <Header black activeSection="Manga" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} />}
     {!pages.length ? <ScrollView contentContainerStyle={styles.stateContent}>
       {titleBar}
       {chapterNavigation('inicio')}

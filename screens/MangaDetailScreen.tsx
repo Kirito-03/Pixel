@@ -228,7 +228,7 @@ export default function MangaDetailScreen() {
 
             <SafeAreaView edges={['top', 'left', 'right']}>
               <View style={styles.topBar}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.9}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver a lecturas" onPress={() => navigation.canGoBack() ? navigation.goBack() : navigateByLabel('Manga')} style={styles.backBtn} activeOpacity={0.9}>
                   <Ionicons name="arrow-back" size={20} color="#fff" />
                   <Text style={styles.backText}>Volver</Text>
                 </TouchableOpacity>
@@ -301,7 +301,7 @@ export default function MangaDetailScreen() {
                     disabled={!chapters.length}
                   >
                     <Ionicons name="play" size={18} color={colors.background} />
-                    <Text numberOfLines={2} style={[styles.primaryText, { flexShrink: 1, textAlign: 'center' }]}>{primaryButtonLabel}</Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.primaryText, { flexShrink: 1, textAlign: 'center' }]}>{primaryButtonLabel}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -320,7 +320,7 @@ export default function MangaDetailScreen() {
                     }}
                   >
                     {savingList ? <ActivityIndicator size="small" color={colors.text} /> : <Ionicons name={isInMyList(id, 'manga') ? "checkmark" : "add"} size={20} color={colors.text} />}
-                    <Text numberOfLines={2} style={[styles.secondaryText, { flexShrink: 1, textAlign: 'center' }]}>{savingList ? 'Guardando…' : isInMyList(id, 'manga') ? 'En mi lista' : 'Mi lista'}</Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.secondaryText, { flexShrink: 1, textAlign: 'center' }]}>{savingList ? 'Guardando…' : isInMyList(id, 'manga') ? 'En mi lista' : 'Mi lista'}</Text>
                   </TouchableOpacity>
 
                 </View>
@@ -332,11 +332,7 @@ export default function MangaDetailScreen() {
               <View style={styles.chaptersHeader}>
                 <View>
                   <Text style={styles.sectionTitle}>Capítulos</Text>
-                  {readingProgress?.chapterId ? (
-                    <Text style={{ color: '#E50914', fontSize: 12, fontWeight: '700', marginTop: 4 }}>
-                      Último leído: {readingProgress.chapterNumber ? `Cap. ${readingProgress.chapterNumber}` : 'Guardado'}
-                    </Text>
-                  ) : null}
+
                 </View>
 
 
@@ -395,7 +391,7 @@ const baseStyles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingBottom: 60 },
   topBar: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'web' ? 90 : 10,
+    paddingTop: Platform.OS === 'web' ? 90 : 66,
     paddingBottom: 5,
     zIndex: 10,
   },
@@ -548,12 +544,13 @@ const baseStyles = StyleSheet.create({
     maxWidth: 520,
     alignSelf: 'flex-start',
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 12,
     width: '100%',
   },
   primaryBtn: {
     flex: 1,
+    minHeight: 52,
     minWidth: 0,
     flexBasis: 0,
     flexDirection: 'row',
@@ -575,6 +572,7 @@ const baseStyles = StyleSheet.create({
   },
   secondaryBtn: {
     flex: 1,
+    minHeight: 52,
     minWidth: 0,
     flexBasis: 0,
     flexDirection: 'row',

@@ -60,3 +60,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-16-filtros-paginacion-bloqueo]]: categorías desplazables, estados equivalentes, páginas reales, miniaturas con caché y candado Android; APK1.0.18/código19.
 
 - [[2026-11-16-similares-y-red-lenta]]: identidad de portadas, ranking por afinidad y caché pública persistente con revalidación; APK1.0.19/código20.
+
+- [[2026-11-16-android-manga-1-0-22]] — Android: navegación, botones, ancho del lector y APK.
