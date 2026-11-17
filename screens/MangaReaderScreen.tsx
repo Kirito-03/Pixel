@@ -65,6 +65,9 @@ export default function MangaReaderScreen() {
   const [showFloatingTop, setShowFloatingTop] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [progressError, setProgressError] = useState('');
+  const [displayedChapter, setDisplayedChapter] = useState('');
+  const forceChapter = useRef('');
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [paused, setPaused] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -109,6 +112,7 @@ export default function MangaReaderScreen() {
   }, [mangaId, preferredLanguage, retryKey, active, paused]);
   useEffect(() => {
     loadedChapter.current = '';
+    setDisplayedChapter(''); setProgressError('');
     chromeController.current = createReaderChromeController(); setBottomVisible(true);
     setPages([]); setVisibleCount(STEP); setActivePage(1); setAtTop(true); setShowFloatingTop(false); setPaused(false); setRetryAttempt(0); setMessage('');
     offsets.current = {};
@@ -122,7 +126,7 @@ export default function MangaReaderScreen() {
     const controller = new AbortController();
     setLoading(true); setMessage('');
     loadReaderPages({ signal: controller.signal,
-      request: () => mangaApi.chapterPages(chapterId, { signal: controller.signal }),
+      request: () => mangaApi.chapterPages(chapterId, { signal: controller.signal, refresh: forceChapter.current === chapterId }),
       onRetry: attempt => {
         if (controller.signal.aborted) return;
         setLoading(false); setRetryAttempt(attempt);
@@ -131,15 +135,17 @@ export default function MangaReaderScreen() {
     }).then(result => {
       if (controller.signal.aborted || !result) return;
       loadedChapter.current = chapterId;
+      if(forceChapter.current===chapterId)forceChapter.current='';
       setPages(result); setVisibleCount(Math.min(STEP, result.length)); setLoading(false); setMessage('');
     }).catch(() => {
       if (!controller.signal.aborted) { setLoading(false); setMessage('Este capítulo no está disponible. Puedes volver a intentarlo.'); setPaused(true); }
     });
     return () => controller.abort();
   }, [chapterId, retryKey, paused, active, chaptersLoading]);
+  const displayKey=`${mangaId}:${chapterId}:${currentProfile?.id}`;
   useEffect(() => {
-    if (mangaId && chapterId && pages.length) void saveMangaProgress(mangaId, chapterId, current?.chapter, currentProfile?.id).catch(() => {});
-  }, [mangaId, chapterId, current?.chapter, pages.length, currentProfile?.id]);
+    if (mangaId && chapterId && pages.length && displayedChapter === displayKey) void saveMangaProgress(mangaId, chapterId, current?.chapter, currentProfile?.id).catch(() => setProgressError('No se pudo guardar esta lectura. El historial anterior se conserva.'));
+  }, [mangaId, chapterId, current?.chapter, pages.length, displayedChapter, displayKey, currentProfile?.id]);
 
   const openChapter = (target?: MangaChapter) => {
     if (!target || target.id === chapterId) return;
@@ -150,7 +156,7 @@ export default function MangaReaderScreen() {
       navigation.setParams({ id: mangaId, chapterKey: mangaChapterKey(current), chapterId: undefined, mangaId: undefined, mangaTitle: undefined, language: undefined, selectedLanguage: undefined, chapters: undefined, currentIndex: undefined });
     }
   }, [legacyChapterId, current?.id]);
-  const reload = () => { loadedChapter.current = ''; setPaused(false); setRetryKey(value => value + 1); };
+  const reload = () => { forceChapter.current = chapterId; loadedChapter.current = ''; setPaused(false); setRetryKey(value => value + 1); };
   const loadMore = () => setVisibleCount(count => Math.min(count + STEP, pages.length));
   const scrollToTop = () => {
     setAtTop(true);
@@ -202,6 +208,7 @@ export default function MangaReaderScreen() {
   </View>;
 
   return <View style={styles.container}>
+    {!!progressError && <View accessibilityRole="alert" style={{position:'absolute',top:headerHeight+100,left:16,right:16,zIndex:1100,padding:12,backgroundColor:'#252525'}}><Text style={{color:'#fff'}}>{progressError}</Text></View>}
     {Platform.OS === 'web' ? <Header black activeSection="Manga" onNavPress={navigateByLabel} onSearchPress={() => navigateByLabel('Buscar')} onProfilePress={() => navigateByLabel('Perfil')} /> :
       <Animated.View pointerEvents={atTop || !pages.length ? 'auto' : 'none'}
         accessibilityElementsHidden={!atTop && !!pages.length} importantForAccessibility={!atTop && pages.length ? 'no-hide-descendants' : 'auto'}
@@ -234,7 +241,7 @@ export default function MangaReaderScreen() {
         }}>
         {titleBar}
         {chapterNavigation('inicio')}
-        {visiblePages.map((uri, page) => <View key={`${chapterId}-${page}`} onLayout={event => { offsets.current[page] = event.nativeEvent.layout.y; }}><ReaderImage uri={uri} page={page + 1} active={active} /></View>)}
+        {visiblePages.map((uri, page) => <View key={`${chapterId}-${page}`} onLayout={event => { offsets.current[page] = event.nativeEvent.layout.y; }}><ReaderImage uri={uri} page={page + 1} active={active} onReady={() => setDisplayedChapter(displayKey)} /></View>)}
         {footer}
       </ScrollView>
       {showFloatingTop && (
@@ -250,7 +257,7 @@ export default function MangaReaderScreen() {
       )}
     </> : <>
       <NativeMangaPages key={chapterId} pages={pages} previous={previous ? previous.chapter || '' : null} next={next ? next.chapter || '' : null}
-        active={active} onPrevious={() => openChapter(previous)} onNext={() => openChapter(next)} onPage={setActivePage} onScroll={handleNativeScroll} topSpace={headerHeight + 100} bottomSpace={60 + insets.bottom} />
+        active={active} onReady={() => setDisplayedChapter(displayKey)} onPrevious={() => openChapter(previous)} onNext={() => openChapter(next)} onPage={setActivePage} onScroll={handleNativeScroll} topSpace={headerHeight + 100} bottomSpace={60 + insets.bottom} />
     </>}
   </View>;
 }

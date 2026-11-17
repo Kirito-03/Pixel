@@ -2,7 +2,7 @@ import { withProgressDeadline } from './progressDeadline';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDocFromServer, onSnapshot, runTransaction } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { ContentProgress, ProgressScope, createContentProgressEngine, newerProgress, progressKey, validContentProgress } from './contentProgressEngine';
+import { ContentProgress, ProgressScope, createContentProgressEngine, mergeContentProgress, progressKey, validContentProgress } from './contentProgressEngine';
 export type { ContentProgress, ProgressScope, ProgressSnapshot } from './contentProgressEngine';
 export function currentProgressScope(profileId: number): ProgressScope {
   const uid=auth.currentUser?.uid;
@@ -27,8 +27,8 @@ export const contentProgressSync=createContentProgressEngine({ storage: AsyncSto
         for (const row of changes) {
           if (!validContentProgress(row)) throw Error('Avance inválido.');
           const key=progressKey(row.kind,row.id), previous=existing[key];
-          confirmed[key]=newerProgress(row,validContentProgress(previous)?previous:undefined)?row:previous;
-          if (confirmed[key]===row) updates[key]=row;
+          confirmed[key]=mergeContentProgress(row,validContentProgress(previous)?previous:undefined);
+          if (JSON.stringify(confirmed[key])!==JSON.stringify(previous)) updates[key]=confirmed[key];
         }
         assertScope(scope);
         if (Object.keys(updates).length) tx.set(account,{content_progress_v1:{[String(scope.profileId)]:updates}},{merge:true});
@@ -41,8 +41,7 @@ export function watchContentProgress(scope: ProgressScope, onError: () => void, 
   return onSnapshot(ref(scope),{includeMetadataChanges:true},snapshot => {
     if (auth.currentUser?.uid!==scope.uid) return;
     const confirmed=!snapshot.metadata.fromCache&&!snapshot.metadata.hasPendingWrites;
-    if(confirmed)onConfirmed();
-    void contentProgressSync.acceptRemote(scope,rows(snapshot.data(),scope),confirmed).catch(onError);
+    void contentProgressSync.acceptRemote(scope,rows(snapshot.data(),scope),confirmed).then(()=>{if(confirmed&&auth.currentUser?.uid===scope.uid)onConfirmed();}).catch(onError);
   },onError);
 }
 async function legacyClaims(): Promise<Record<string,unknown>> {

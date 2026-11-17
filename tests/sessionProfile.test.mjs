@@ -68,3 +68,11 @@ test('a fresh Firebase sign-in clears the old selection before exposing the acco
  assert.equal(state.profileSession,1);assert.equal(storage.getObject('pixel.selectedProfile:owner').profileId,15);
  h.unmount();
 });
+
+test('clearing a profile prevents a slow previous selection from reopening it later',async()=>{
+ const pending=deferred(),auth={user:{uid:'owner'},isLoading:false,profileSession:1},storage=memory();
+ const h=load('contexts/ProfileContext.tsx',{'../services/storage':{Storage:storage},'./AuthContext':{useAuth:()=>auth},'../services/db/profileService':{profileService:{getProfile:()=>pending.promise}},'../services/profileSelection':{restoreProfileSelection}});
+ h.render('ProfileProvider');await tick();let state=h.render('ProfileProvider');
+ const selecting=state.setCurrentProfile({id:12,name:'Fixture'});await state.clearCurrentProfile();pending.resolve({id:12,name:'Fixture'});await selecting;
+ state=h.render('ProfileProvider');assert.equal(state.currentProfile,null);assert.equal(storage.getObject('pixel.selectedProfile:owner'),undefined);h.unmount();
+});

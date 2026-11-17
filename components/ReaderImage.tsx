@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useReaderImage } from '../hooks/useReaderImage';
 
-export interface ReaderImageProps { uri: string; page: number; active?: boolean }
-export default function ReaderImage({ uri, page, active }: ReaderImageProps) {
+export interface ReaderImageProps { uri: string; page: number; active?: boolean; onReady?: () => void }
+export default function ReaderImage({ uri, page, active, onReady }: ReaderImageProps) {
   const image = useReaderImage(uri, active);
   const { width } = useWindowDimensions();
   const [size, setSize] = useState({ uri: '', width: 0, height: 0 });
@@ -15,7 +15,7 @@ export default function ReaderImage({ uri, page, active }: ReaderImageProps) {
       style={StyleSheet.absoluteFill} onLoad={event => {
         const source = event.nativeEvent.source;
         if (source?.width > 0 && source?.height > 0) setSize({ uri, width: source.width, height: source.height });
-        image.onLoad();
+        image.onLoad(); onReady?.();
       }} onError={image.onError} />}
     {!image.loaded && <View style={styles.status} pointerEvents="box-none">
       <ActivityIndicator color="#83bdb4" />

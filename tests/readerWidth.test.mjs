@@ -47,3 +47,9 @@ test('native image fallback fills mobile widths, caps desktop width and discards
     assert.equal(tree.props.style.aspectRatio, 0.72);
   }
 });
+
+test('read-ready is emitted only when an image really loads, independently of image width',()=>{
+ let ready=0;const render=fixture('components/ReaderImage.web.tsx');
+ const tree=render({uri:'https://example.test/page.webp',page:1,onReady:()=>ready++});assert.equal(ready,0);
+ tree.props.children[0].props.onLoad({currentTarget:{naturalWidth:199,naturalHeight:8000}});assert.equal(ready,1);
+});

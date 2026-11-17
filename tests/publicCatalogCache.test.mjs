@@ -34,3 +34,13 @@ test('background refresh notifies mounted consumers once and unsubscribed views 
 test('transient calls do not retain query results in memory or persistent storage',async()=>{
  const disk=store(),cache=create(disk);let calls=0;const load=async()=>++calls;await cache.read('query',load,{persist:false});await cache.read('query',load,{persist:false});assert.equal(calls,2);await cache.flush();assert.equal(disk.data.size,0);
 });
+
+test('reader caches use a separate bounded namespace and never retain an empty chapter list',async()=>{
+ const disk=store(),reader=create(disk,{prefix:'pixel:manga-reader:v1:',maxEntries:2}),catalog=create(disk);let calls=0;
+ const accept=data=>data.chapters.length>0;
+ await reader.read('chapters',async()=>{calls++;return{chapters:[]};},{accept});
+ await reader.read('chapters',async()=>{calls++;return{chapters:[1]};},{accept});
+ await reader.flush();assert.equal(calls,2);assert.equal((await reader.read('chapters',async()=>{throw Error('offline');},{accept})).chapters[0],1);
+ await catalog.read('chapters',async()=>({separate:true}));await catalog.flush();
+ assert.ok(disk.data.has('pixel:manga-reader:v1:chapters'));assert.ok(disk.data.has('pixel:public-catalog:v1:chapters'));
+});

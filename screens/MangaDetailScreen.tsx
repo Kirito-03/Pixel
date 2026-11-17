@@ -16,7 +16,7 @@ import Header from '../components/Header';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useMyList } from '../contexts/MyListContext';
 import { mangaApi, Manga, MangaChapter } from '../services/mangaApi';
-import { saveMangaProgress } from '../utils/mangaProgress';
+import { isMangaChapterRead } from '../services/contentProgressEngine';
 
 function formatDate(iso?: string | null) {
   if (!iso) return '';
@@ -79,8 +79,8 @@ export default function MangaDetailScreen() {
       try {
         const [m, c] = await Promise.all([
           mangaApi.getById(id),
-          mangaApi.chapters(id, {
-            limit: 300,
+          mangaApi.chapters(id, { refresh: refreshRevision > 0,
+            limit: 500,
             preferredLanguage,
             allowEnglishFallback,
           }),
@@ -164,7 +164,6 @@ export default function MangaDetailScreen() {
       : 'Leer ahora';
 
   const openChapter = async (chapter: MangaChapter, _index?: number) => {
-    try { await saveMangaProgress(id, chapter.id, chapter.chapter, currentProfile?.id); } catch { setListError('No pudimos guardar el avance en este dispositivo.'); }
     rememberMangaReader(id, manga?.title || 'Manga', chapters);
     navigation.navigate('MangaReader', { id, chapterKey: mangaChapterKey(chapter) });
   };
@@ -333,20 +332,22 @@ export default function MangaDetailScreen() {
                   <Text style={[styles.noChaptersText, { width: '100%' }]}>No hay capítulos disponibles.</Text>
                 ) : (
                   chapters.map((chap, idx) => {
+                    const isRead = isMangaChapterRead(readingProgress, chap.id, chap.chapter);
                     const isLastRead = Boolean(readingProgress?.chapterId && String(readingProgress.chapterId) === String(chap.id));
                     return (
                     <TouchableOpacity
                       key={chap.id}
-                      accessibilityRole="button" accessibilityLabel={`Leer capítulo ${chap.chapter}`}
+                      accessibilityRole="button" accessibilityLabel={`Capítulo ${chap.chapter}${isRead ? ", leído" : ""}${isLastRead ? ", continuar" : ""}`}
                       style={[
                         styles.chapterCard,
                         { width: isSmallScreen ? '100%' : '49%' },
-                        isLastRead && { borderColor: 'rgba(229,9,20,0.75)', backgroundColor: 'rgba(229,9,20,0.12)' },
+                        isRead && { opacity: 0.6 },
+                        isLastRead && { borderColor: colors.textMuted },
                       ]}
                       activeOpacity={0.8}
                       onPress={() => openChapter(chap, idx)}
                     >
-                      <View style={[styles.chapterNumber, isLastRead && { backgroundColor: '#E50914' }]}>
+                      <View style={[styles.chapterNumber, isRead && { backgroundColor: colors.card }]}>
                         <Text style={styles.chapterNumberText}>{chap.chapter}</Text>
                       </View>
                       <View style={styles.chapterInfo}>
@@ -355,10 +356,10 @@ export default function MangaDetailScreen() {
                         </Text>
                         <Text style={styles.chapterDate}>
                           {chap.publish_at ? formatDate(chap.publish_at) : 'Sin fecha'}
-                          {isLastRead ? ' · Último leído' : ''}
+                          {isLastRead ? ' · Continuar' : isRead ? ' · Leído' : ''}
                         </Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color={isLastRead ? colors.primary : colors.textMuted} />
+                      <Ionicons name={isRead ? "checkmark" : "chevron-forward"} size={18} color={colors.textMuted} />
                     </TouchableOpacity>
                     );
                   })

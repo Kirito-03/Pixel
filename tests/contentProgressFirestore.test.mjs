@@ -55,3 +55,13 @@ test('repeated legacy imports share one flight and cannot claim the same files f
  assert.equal(JSON.parse(f.local.get('pixel_legacy_manga_claims_v1')).pixel_manga_progress_fixture.profileId,1);
  assert.equal((await f.api.legacyMangaRows()).length,0);
 });
+
+test('Firestore merges older-device read marks into the newer pointer without losing other settings',async()=>{
+ const f=fixture();f.setOnline(false);
+ await f.api.contentProgressSync.save(scope,'manga','fixture',{chapterId:'chapter-2',chapterNumber:'2'});await assert.rejects(f.api.contentProgressSync.sync(scope));
+ f.documents.get('profiles/a').content_progress_v1={'1':{'manga:fixture':{kind:'manga',id:'fixture',chapterId:'chapter-8',chapterNumber:'8',updatedAt:Date.now()+10000,revision:'web',readChapters:['n:8']}}};
+ f.setOnline(true);await f.api.contentProgressSync.sync(scope);
+ const saved=f.documents.get('profiles/a').content_progress_v1['1']['manga:fixture'];
+ assert.equal(saved.chapterNumber,'8');assert.ok(core.isMangaChapterRead(saved,'chapter-2','2'));assert.ok(core.isMangaChapterRead(saved,'chapter-8','8'));
+ assert.equal(f.documents.get('profiles/a').name,'Account');assert.equal((await f.api.contentProgressSync.read(scope)).pendingCount,0);
+});

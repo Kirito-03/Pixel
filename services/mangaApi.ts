@@ -1,3 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createPublicCatalogCache } from './publicCatalogCache';
+import { withReaderAbort } from './mangaReaderCache';
 import { backendClient } from './backendClient';
 import { getCurrentBaseURL } from './db/networkClient';
 
@@ -72,6 +75,8 @@ export type MangaChapterPages = {
   chapterId: string;
 };
 
+// Public chapter metadata only. Reading history remains in the profile outbox.
+const readerCache=createPublicCatalogCache(AsyncStorage,{prefix:'pixel:manga-reader:v1:',maxEntries:30,maxBytes:3*1024*1024,maxAgeMs:6*60*60*1000});
 export const mangaApi = {
   async list(params?: { page?: number; limit?: number; status?: string; search?: string; order?: string; publicationType?: string; genre?: string }, refresh = false) {
     const { data } = await backendClient.get('/api/manga', { params, ...(refresh ? { cache: false as const } : {}) });
@@ -89,14 +94,23 @@ export const mangaApi = {
   },
 
   async chapters(id: string, params?: { limit?: number; preferredLanguage?: string; allowEnglishFallback?: boolean; refresh?: boolean }) {
-    const { data } = await backendClient.get(`/api/manga/${id}/chapters`, { params, cache: false });
-    return data as MangaChaptersResponse;
+    const {refresh,...query}=params||{};
+    const key=`chapters:${getCurrentBaseURL()}:${id}:${JSON.stringify({limit:query.limit,preferredLanguage:query.preferredLanguage,allowEnglishFallback:query.allowEnglishFallback})}`;
+    return readerCache.read(key,async()=>{
+      const {data}=await backendClient.get(`/api/manga/${id}/chapters`,{params:{...query,...(refresh?{refresh:true}:{})},cache:false});
+      return data as MangaChaptersResponse;
+    },{force:!!refresh,ttl:120000,accept:data=>Array.isArray(data?.chapters)&&data.chapters.length>0});
   },
 
-  async chapterPages(chapterId: string, options: { signal?: AbortSignal } = {}) {
-    const { data } = await backendClient.get(`/api/manga/chapter/${encodeURIComponent(chapterId)}/pages`, { cache: false, signal: options.signal, timeout: 30000 });
+  async chapterPages(chapterId: string, options: { signal?: AbortSignal; refresh?: boolean } = {}) {
+    const data=await withReaderAbort(readerCache.read(`pages:${getCurrentBaseURL()}:${chapterId}`,async()=>{
+      // A shared request must outlive an individual screen's AbortSignal.
+      const {data}=await backendClient.get(`/api/manga/chapter/${encodeURIComponent(chapterId)}/pages`,{cache:false,timeout:30000});
+      if(!Array.isArray(data?.pages)||!data.pages.length||data.pages.some((p:unknown)=>typeof p!=='string'||!p))throw new Error('El origen todavía no entregó las páginas.');
+      return data as MangaChapterPages;
+    },{force:!!options.refresh,ttl:6*60*60*1000}),options.signal);
     if (data && Array.isArray(data.pages)) {
-      data.pages = data.pages.map((p: string) => {
+      return {...data,pages:data.pages.map((p: string) => {
         if (p.startsWith('/')) {
           return `${getCurrentBaseURL().replace(/\/$/, '')}${p}`;
         }
@@ -104,7 +118,7 @@ export const mangaApi = {
           return `${getCurrentBaseURL().replace(/\/$/, '')}/api/proxy/manga-image?url=${encodeURIComponent(p)}`;
         }
         return p;
-      });
+      })};
     }
     return data as MangaChapterPages;
   },

@@ -79,3 +79,6 @@ Actualización 1.0.25/código26: lector web y componente Image de respaldo llena
 
 
 Actualización 1.0.26/código27: diálogo de importación con texto correcto y espera limitada; cola local conservada, ACK tardío y exclusión de importaciones concurrentes entre perfiles. 197 pruebas aprobadas; APK firmada y descarga completa verificada. Instalada por Wi-Fi/IPv6 en el Samsung del usuario sin borrar datos: respaldo de 4 avances confirmado en el teléfono y comprobado en web. Se identificaron APK de Descargas con tamaño correcto pero contenido dañado y firma inválida. Ver docs/brain/2026-11-17-depuracion-apk-importacion-1-0-26.md.
+
+
+Actualización1.0.28/código30: capítulos de manga leídos atenuados y sincronizados por perfil, unión de marcas entre dispositivos y caché acotada del lector sin recomprimir imágenes. Entrada normal independiente de la comprobación administrativa, consultas de perfil con límite y respuesta visible al seleccionar.215 pruebas aprobadas; firma fijada y zipalign16 verificados. APK123641866 bytes; SHA256 `26b550d65648e515b935d87c320f90703323238625d623b9ea060259579c4506`. Instalada sin borrar datos; el usuario confirmó que ahora entra al contenido al tocar su perfil. Las etiquetas de temporadas de1.0.24 siguen incluidas. Ver docs/brain/2026-11-17-perfiles-entrada-1-0-28.md y docs/brain/2026-11-17-temporadas-leidos-cache-1-0-27.md.

@@ -70,3 +70,7 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-17-ancho-manga-descarga-apk-1-0-25]]: páginas estrechas, descarga completa de APK verificada, Nginx específico y diagnóstico físico pendiente por red Wi-Fi.
 
 - [[2026-11-17-depuracion-apk-importacion-1-0-26]]: APK corruptas identificadas, actualización real por Wi-Fi/IPv6, importación sin bloqueo y respaldo confirmado entre teléfono y web.
+
+- [[2026-11-17-temporadas-leidos-cache-1-0-27]]: temporadas conservadas, capítulos leídos atenuados por perfil y caché del lector Android/web.
+
+- [[2026-11-17-perfiles-entrada-1-0-28]]: entrada sin esperar a Admin, caché de perfiles por dueño, espera limitada y respuesta visible al tocar.

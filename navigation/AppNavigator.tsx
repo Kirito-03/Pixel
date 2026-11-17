@@ -135,10 +135,12 @@ function MainTabs({ route }: { route: any }) {
 }
 
 function MainTabsContent({ route }: { route: any }) {
+  const { user } = useAuth();
   const { reading } = useReaderChrome();
   const { colors } = useTheme();
   const { selectedProfile, userId } = route.params || {};
-  const { isAdmin } = useAdmin();
+  const { isAdmin: verifiedAdmin, adminUser, isLoading: adminLoading } = useAdmin();
+  const isAdmin = verifiedAdmin && !adminLoading && !!user?.email && adminUser?.email?.toLowerCase() === user.email.toLowerCase();
   const insets = useSafeAreaInsets();
 
   const { setCurrentProfile, currentProfile, adultContentEnabled } = useProfile();
@@ -397,12 +399,14 @@ export default function AppNavigator() {
   const { colors, theme } = useTheme();
   const { user, isLoading } = useAuth();
   const { currentProfile, profileLoading } = useProfile();
-  const { isAdmin, isLoading: adminLoading } = useAdmin();
+  const { isAdmin: verifiedAdmin, adminUser, isLoading: adminLoading } = useAdmin();
+  const isAdmin = verifiedAdmin && !adminLoading && !!user?.email && adminUser?.email?.toLowerCase() === user.email.toLowerCase();
   const activeLinking = React.useMemo(() => {
     const screens = profileNavigationScreens(linking.config!.screens as any, !!user, !!currentProfile, isAdmin);
     return { ...linking, config: { screens } };
   }, [!!user, !!currentProfile, isAdmin]);
-  if (isLoading || profileLoading || (user && currentProfile && adminLoading)) return <LoadingScreen />;
+  // Admin verification gates admin routes, never the normal viewing interface.
+  if (isLoading || profileLoading) return <LoadingScreen />;
   const initialRoute = !user ? 'Ingreso' : currentProfile ? 'Principal' : 'SeleccionPerfil';
 
   return (

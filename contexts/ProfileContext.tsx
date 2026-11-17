@@ -17,6 +17,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
   const scope = `${uid}:${profileSession}`;
   const liveScope = useRef(scope); liveScope.current = scope;
   const generation = useRef(0);
+  const selectionGeneration=useRef(0);
   const [state, setState] = useState<{ scope: string; profile: Profile | null; loading: boolean }>({ scope: '', profile: null, loading: true });
   const [adult, setAdult] = useState(false);
   const profileLoading = isLoading || state.scope !== scope || state.loading;
@@ -54,15 +55,16 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => { generation.current++; };
   }, [uid, profileSession, isLoading]);
   const setCurrentProfile = async (profile: Profile | null) => {
+    const selection=++selectionGeneration.current;
     const requestScope = scope;
     if (!profile) { persist(null); return; }
     if (!uid) throw new Error('Inicia sesión y elige un perfil.');
     const verified = await profileService.getProfile(Number(profile.id), uid);
-    if (liveScope.current !== requestScope) return;
+    if (liveScope.current !== requestScope || selection!==selectionGeneration.current) return;
     if (!verified) throw new Error('Este perfil ya no está disponible. Elige o crea otro.');
     persist(verified);
   };
-  const clearCurrentProfile = async () => { persist(null); };
+  const clearCurrentProfile = async () => { selectionGeneration.current++; persist(null); };
   const setAdultContentEnabled = async (enabled: boolean) => {
     if (!currentProfile) return;
     Storage.setString(`adultContentEnabled:${currentProfile.id}`, JSON.stringify(enabled)); setAdult(enabled);

@@ -1,0 +1,37 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';
+function load(file,mocks={},globals={}){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText,{exports,setTimeout,clearTimeout,Date,Map,Promise,Object,Error,Number,JSON,require:name=>{if(!(name in mocks))throw Error(name);return mocks[name];},...globals});return exports;}
+const tick=()=>new Promise(r=>setImmediate(r));
+test('a fresh server list verifies a profile without a second network roundtrip and stays isolated by owner',async()=>{
+ let time=1000,docs=0,one=0;const auth={currentUser:{uid:'owner-a'}},rows=[{id:'12',data:()=>({name:'Fixture',id:999})}];
+ const api=load('services/db/profileService.ts',{'../profileRequest':load('services/profileRequest.ts'),'../firebase':{auth,db:{}},'firebase/firestore':{collection:(_db,path)=>path,doc:(_db,path)=>path,getDocs:async()=>{docs++;return{docs:rows,metadata:{fromCache:false}};},getDoc:async()=>{one++;return{exists:()=>true,data:()=>({name:'Fixture'})};},deleteDoc:async()=>{},setDoc:async()=>{},serverTimestamp:()=>0}},{Date:{now:()=>time}}).profileService;
+ assert.equal((await api.getProfiles(0))[0].id,12);assert.equal((await api.getProfile(12,'owner-a')).id,12);assert.equal(one,0);await api.getProfiles(0);assert.equal(docs,1);
+ assert.equal(await api.getProfile(12,'owner-b'),null);auth.currentUser={uid:'owner-b'};await api.getProfile(12,'owner-b');assert.equal(one,1);
+ auth.currentUser={uid:'owner-a'};time+=61000;await api.getProfile(12,'owner-a');assert.equal(one,2);
+ await api.getProfiles(0);await api.deleteProfile(12);await api.getProfile(12,'owner-a');assert.equal(one,3);
+});
+test('a stalled verification returns a retryable error; a late result does not run selection side effects',async()=>{
+ const {withProfileDeadline}=load('services/profileRequest.ts');let release,applied=0;
+ const request=withProfileDeadline(new Promise(resolve=>release=resolve),5).then(()=>applied++);
+ await assert.rejects(request,/conexión/);release({id:12});await tick();assert.equal(applied,0);
+});
+function reactRuntime(){const state=[],effects=[];let cursor=0;const react={Fragment:'Fragment',createElement:(type,props,...children)=>({type,props:{...props,children}}),useState(initial){const i=cursor++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return[state[i],value=>state[i]=typeof value==='function'?value(state[i]):value];},useRef(initial){return state[cursor++]??={current:initial};},useEffect(fn,deps){const i=cursor++;if(!state[i]||deps.some((d,j)=>d!==state[i][j]))effects.push(fn);state[i]=deps;},useMemo:fn=>fn(),lazy:()=> 'Lazy'};return{react,render(fn){cursor=0;const tree=fn();for(const effect of effects.splice(0))effect();return tree;}};}
+function nodes(tree){if(!tree||typeof tree!=='object')return[];return[tree,...(tree.props?.children||[]).flat(Infinity).flatMap(nodes)];}
+test('a pending profile press gives feedback, ignores duplicate taps, and restores interaction after failure',async()=>{
+ const rt=reactRuntime();let reject,calls=0;const pending=new Promise((_,fail)=>reject=fail);
+ const native={View:'View',Text:'Text',Pressable:'Pressable',TouchableOpacity:'Touch',ScrollView:'Scroll',StyleSheet:{create:x=>x,absoluteFillObject:{}},Platform:{OS:'android'},useWindowDimensions:()=>({width:390}),Alert:{alert(){throw Error('Unexpected blocking alert');}}};
+ const Screen=load('screens/ProfileSelectionScreen.tsx',{'react':rt.react,'react-native':native,'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:24})},'@expo/vector-icons':{Ionicons:'Icon'},'expo-image-picker':{},'../contexts/ProfileContext':{useProfile:()=>({setCurrentProfile:()=>{calls++;return pending;}})},'../contexts/AuthContext':{useAuth:()=>({logout(){}})},'../hooks/useProfileManagement':{useProfileManagement:()=>({profiles:[{id:12,name:'Fixture'}],loading:false,error:null,getCorrectedAvatarUrl:x=>x})},'../components/modals/CreateProfileModal':{CreateProfileModal:'Create'},'../components/modals/DeleteProfileModal':{DeleteProfileModal:'Delete'},'../components/AnimatedProfileCard':{AnimatedProfileCard:'Card'},'../components/AnimatedLeftPanel':{default:'Background'},'../components/Loader':{default:'Loader'}}).default;
+ let tree=rt.render(()=>Screen({navigation:{}})),card=nodes(tree).find(n=>n.type==='Card');const selecting=card.props.onPress();card.props.onPress();assert.equal(calls,1);
+ tree=rt.render(()=>Screen({navigation:{}}));card=nodes(tree).find(n=>n.type==='Card');assert.equal(card.props.busy,true);assert.equal(card.props.disabled,true);
+ reject(Error('Vuelve a intentar'));await selecting;tree=rt.render(()=>Screen({navigation:{}}));assert.equal(nodes(tree).find(n=>n.type==='Card').props.disabled,false);assert.ok(nodes(tree).some(n=>n.props.accessibilityRole==='alert'));
+});
+test('admin verification does not block the viewer and pending admin rights cannot expose admin routes',()=>{
+ const rt=reactRuntime(),admin={isAdmin:true,isLoading:true,adminUser:{email:'owner@example.test'}},profile={currentProfile:{id:12},profileLoading:false};
+ const navigation=load('utils/profileNavigation.ts');
+ const modules={'react':rt.react,'react-native':{Platform:{OS:'android'},useWindowDimensions:()=>({width:390})},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:24,bottom:20})},'../contexts/ReaderChromeContext':{useReaderChrome:()=>({reading:false})},'@react-navigation/native':{NavigationContainer:'Navigation',DarkTheme:{colors:{}},DefaultTheme:{colors:{}}},'@react-navigation/native-stack':{createNativeStackNavigator:()=>({Navigator:'Stack',Screen:'Screen'})},'@react-navigation/bottom-tabs':{createBottomTabNavigator:()=>({Navigator:'Tabs',Screen:'Tab'})},'../contexts/ThemeContext':{useTheme:()=>({theme:'dark',colors:{}})},'../contexts/AuthContext':{useAuth:()=>({user:{uid:'a',email:'owner@example.test'},isLoading:false})},'../contexts/ProfileContext':{useProfile:()=>profile},'../contexts/AdminContext':{useAdmin:()=>admin},'../utils/profileNavigation':navigation};
+ const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../navigation/AppNavigator.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText+'\nexports.testTabs=MainTabsContent;',{exports,require:name=>modules[name]||{default:name},console});
+ const tabs=rt.render(()=>exports.testTabs({route:{params:{}}}));assert.equal(tabs.type,'Tabs');
+ let tree=rt.render(()=>exports.default());assert.equal(tree.type,'Navigation');let names=nodes(tree).filter(n=>n.type==='Screen').map(n=>n.props.name);assert.ok(names.includes('Principal'));assert.equal(names.includes('Admin'),false);
+ admin.isLoading=false;tree=rt.render(()=>exports.default());assert.ok(nodes(tree).some(n=>n.type==='Screen'&&n.props.name==='Admin'));
+ admin.adminUser={email:'other@example.test'};tree=rt.render(()=>exports.default());assert.equal(nodes(tree).some(n=>n.type==='Screen'&&n.props.name==='Admin'),false);
+ profile.currentProfile=null;admin.isLoading=true;tree=rt.render(()=>exports.default());names=nodes(tree).filter(n=>n.type==='Screen').map(n=>n.props.name);assert.ok(names.includes('SeleccionPerfil'));assert.equal(names.includes('Principal'),false);
+});

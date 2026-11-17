@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../services/contentProgressEngine.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports,Date,Math,Map,Set,Object,Promise,Number,Error,JSON,encodeURIComponent});
-const {createContentProgressEngine,progressKey,newerProgress}=exports;
+const {createContentProgressEngine,progressKey,newerProgress,mergeContentProgress,isMangaChapterRead,mergeReadChapters}=exports;
 const A={uid:'account-a',profileId:1}, B={uid:'account-a',profileId:2}, C={uid:'account-b',profileId:1};
 function storage() {const data=new Map();return {data,async getItem(key){return data.get(key)||null;},async setItem(key,value){data.set(key,value);}};}
 function cloud() {
@@ -12,7 +12,7 @@ function cloud() {
  const key=s=>`${s.uid}:${s.profileId}`;
  return {data,setOnline:value=>online=value,
   async read(scope){if(!online)throw Error('offline');return structuredClone(data.get(key(scope))||{});},
-  async write(scope,rows){if(!online)throw Error('offline');const all=data.get(key(scope))||{},confirmed={};for(const row of rows){const id=progressKey(row.kind,row.id);if(newerProgress(row,all[id]))all[id]=structuredClone(row);confirmed[id]=all[id];}data.set(key(scope),all);return structuredClone(confirmed);},
+  async write(scope,rows){if(!online)throw Error('offline');const all=data.get(key(scope))||{},confirmed={};for(const row of rows){const id=progressKey(row.kind,row.id);all[id]=structuredClone(mergeContentProgress(row,all[id]));confirmed[id]=all[id];}data.set(key(scope),all);return structuredClone(confirmed);},
  };
 }
 function client(remote,local=storage(),initial=1000) {let time=initial,uid='account-a';const engine=createContentProgressEngine({storage:local,remote,now:()=>time,assertScope:scope=>{if(scope.uid!==uid)throw Error('wrong account');}});return {engine,local,tick:value=>time=value,setUid:value=>uid=value};}
@@ -98,4 +98,49 @@ test('an unrelated server snapshot cannot clear a failed pending upload or claim
  await phone.engine.save(A,'manga','fixture',manga(12));await assert.rejects(phone.engine.sync(A));
  await phone.engine.acceptRemote(A,{},true);const state=await phone.engine.read(A);
  assert.equal(state.pendingCount,1);assert.equal(state.failed,true);assert.equal(state.lastSyncedAt,0);
+});
+
+test('read marks are a union across offline devices, but the latest continue pointer wins',async()=>{
+ const remote=cloud();remote.setOnline(false);const phone=client(remote,storage(),1000);
+ await phone.engine.save(A,'manga','fixture',manga(2));await assert.rejects(phone.engine.sync(A));
+ remote.setOnline(true);const web=client(remote,storage(),2000);
+ await web.engine.save(A,'manga','fixture',manga(8));await web.engine.sync(A);
+ await phone.engine.sync(A);await web.engine.sync(A);
+ for(const device of [phone,web]){
+  const row=(await device.engine.read(A)).records['manga:fixture'];
+  assert.equal(row.chapterNumber,'8');assert.ok(isMangaChapterRead(row,manga(2).chapterId,'2'));assert.ok(isMangaChapterRead(row,manga(8).chapterId,'8'));
+  assert.equal(isMangaChapterRead(row,manga(3).chapterId,'3'),false);assert.equal((await device.engine.read(A)).pendingCount,0);
+ }
+ assert.equal(Object.keys((await web.engine.read(B)).records).length,0);
+});
+test('cached or incomplete server histories do not acknowledge a locally read chapter',async()=>{
+ const remote=cloud();remote.setOnline(false);const device=client(remote);
+ await device.engine.save(A,'manga','fixture',manga(2));await assert.rejects(device.engine.sync(A));
+ const later={kind:'manga',id:'fixture',...manga(8),updatedAt:3000,revision:'remote'};
+ await device.engine.acceptRemote(A,{'manga:fixture':later},true);
+ let state=await device.engine.read(A);assert.equal(state.pendingCount,1);assert.equal(state.records['manga:fixture'].chapterNumber,'8');
+ remote.setOnline(true);await device.engine.sync(A);state=await device.engine.read(A);assert.equal(state.pendingCount,0);
+ assert.ok(isMangaChapterRead(remote.data.get('account-a:1')['manga:fixture'],manga(2).chapterId,'2'));
+});
+test('sequential marks compact into intervals, decimals work, and old last-only data implies just one chapter',()=>{
+ const compact=mergeReadChapters(Array.from({length:2000},(_,i)=>`n:${i+1}`));assert.deepEqual(Array.from(compact),['r:1-2000']);
+ const old={...manga(12)};assert.ok(isMangaChapterRead(old,'changed-id','12'));assert.equal(isMangaChapterRead(old,manga(11).chapterId,'11'),false);
+ const decimal={...manga(12),readChapters:['n:3.5']};assert.ok(isMangaChapterRead(decimal,'another','03.50'));
+ const special=mergeContentProgress({kind:'manga',id:'fixture',chapterId:'https%3A%2F%2Fexample.org%2Fspecial%2F',chapterNumber:'',updatedAt:1,revision:'x'});
+ assert.ok(isMangaChapterRead(special,'https://example.org/special/',''));
+ assert.throws(()=>mergeReadChapters(Array.from({length:400},(_,i)=>`n:${i*2}`)),/historial/);
+ const tiny=mergeContentProgress({kind:'manga',id:'fixture',chapterId:'tiny',chapterNumber:'0.000001',updatedAt:1,revision:'tiny'});assert.ok(isMangaChapterRead(tiny,'changed-id','0.000001'));
+});
+test('importing older last-only progress adds its read mark without replacing a newer continue pointer',async()=>{
+ const remote=cloud(),device=client(remote);await device.engine.save(A,'manga','fixture',manga(12));await device.engine.sync(A);
+ await device.engine.importRows(A,[{kind:'manga',id:'fixture',...manga(2),updatedAt:1,revision:'legacy'}]);
+ const row=(await device.engine.read(A)).records['manga:fixture'];assert.equal(row.chapterNumber,'12');assert.ok(isMangaChapterRead(row,manga(2).chapterId,'2'));
+ const copy=(await device.engine.read(A)).records['manga:fixture'];copy.readChapters.push('n:99');assert.equal(isMangaChapterRead((await device.engine.read(A)).records['manga:fixture'],'x','99'),false);
+});
+
+test('an overflowing fragmented union fails safely, preserves local outbox and never claims remote acknowledgement',async()=>{
+ const remote=cloud();remote.setOnline(false);const device=client(remote);await device.engine.save(A,'manga','fixture',manga(1));await assert.rejects(device.engine.sync(A));
+ const rows={kind:'manga',id:'fixture',...manga(1000),readChapters:Array.from({length:256},(_,i)=>`n:${1000+i*4}`),updatedAt:3000,revision:'web'};
+ remote.data.set('account-a:1',{'manga:fixture':rows});remote.setOnline(true);await assert.rejects(device.engine.sync(A),/historial/);
+ const state=await device.engine.read(A);assert.equal(state.pendingCount,1);assert.equal(state.failed,true);assert.equal(state.lastSyncedAt,0);assert.equal(state.records['manga:fixture'].chapterNumber,'1');assert.equal(remote.data.get('account-a:1')['manga:fixture'].readChapters.length,256);
 });

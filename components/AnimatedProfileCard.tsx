@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, Image, View, StyleSheet, Animated } from 'react-native';
+import { Pressable, Text, Image, View, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface Profile {
@@ -11,6 +11,7 @@ interface Profile {
 interface AnimatedProfileCardProps {
   profile: Profile;
   index: number;
+  busy?: boolean; disabled?: boolean;
   onPress: () => void;
   onLongPress: () => void;
   getCorrectedAvatarUrl: (url: string) => string;
@@ -19,6 +20,7 @@ interface AnimatedProfileCardProps {
 export const AnimatedProfileCard: React.FC<AnimatedProfileCardProps> = ({
   profile,
   index,
+  busy=false, disabled=false,
   onPress,
   onLongPress,
   getCorrectedAvatarUrl,
@@ -46,7 +48,7 @@ export const AnimatedProfileCard: React.FC<AnimatedProfileCardProps> = ({
 
   return (
     <Animated.View style={[styles.profileCard, { opacity, transform: [{ translateY }] }]}>
-      <Pressable 
+      <Pressable accessibilityRole="button" accessibilityLabel={`Abrir perfil ${profile.name}`} accessibilityState={{busy,disabled}} disabled={disabled}
         onPress={onPress} 
         onLongPress={onLongPress}
         // @ts-ignore - React Native Web hover support
@@ -66,6 +68,7 @@ export const AnimatedProfileCard: React.FC<AnimatedProfileCardProps> = ({
             </View>
           )}
 
+          {busy && <View pointerEvents="none" style={[StyleSheet.absoluteFillObject,{backgroundColor:'rgba(0,0,0,.55)',alignItems:'center',justifyContent:'center'}]}><ActivityIndicator color="#fff" /></View>}
           {isHovered && (
             <>
               <View style={styles.hoverCornerTopRight} />

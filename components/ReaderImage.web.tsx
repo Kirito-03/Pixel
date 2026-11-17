@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { useReaderImage } from '../hooks/useReaderImage';
 
-export default function ReaderImage({ uri, page, active }: { uri: string; page: number; active?: boolean }) {
+export default function ReaderImage({ uri, page, active, onReady }: { uri: string; page: number; active?: boolean; onReady?: () => void }) {
   const host = useRef<any>(null);
   const [near, setNear] = useState(page <= 2);
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function ReaderImage({ uri, page, active }: { uri: string; page: 
   return <View ref={host} style={{ width: '100%', maxWidth: 800, alignSelf: 'center', minHeight: image.loaded ? 0 : 360, backgroundColor: '#101010' }}>
     {(!image.failed && (near || image.loaded)) && <img key={`${uri}-${image.attempt}`} src={image.source} alt={`Página ${page}`}
       loading={page <= 2 ? 'eager' : 'lazy'} decoding="async"
-      onLoad={image.onLoad} onError={image.onError}
+      onLoad={event => { image.onLoad(); onReady?.(); }} onError={image.onError}
       style={{ display: 'block', width: '100%', height: 'auto', opacity: image.loaded ? 1 : 0 }} />}
     {!image.loaded && <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 20 }}>
       <ActivityIndicator color="#83bdb4" />

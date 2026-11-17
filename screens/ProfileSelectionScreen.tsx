@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,9 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
   const { setCurrentProfile } = useProfile();
   const { profiles, loading, error, loadProfiles, createProfile, deleteProfile, getCorrectedAvatarUrl } = useProfileManagement();
 
+  const [selectingId,setSelectingId]=useState<number|null>(null);
+  const selecting=useRef(false);
+  const [selectionError,setSelectionError]=useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   useEffect(() => { if (!loading && !error && profiles.length === 0) setShowCreateModal(true); }, [loading, error, profiles.length]);
   const [newProfileName, setNewProfileName] = useState('');
@@ -120,15 +123,18 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
   };
 
   const handleSelectProfile = async (profile: Profile) => {
+    if(selecting.current)return;
+    selecting.current=true;setSelectingId(profile.id);setSelectionError('');
     try { await setCurrentProfile(profile); }
-    catch (error) { Alert.alert('Perfil no disponible', error instanceof Error ? error.message : 'Elige otro perfil.'); }
+    catch (error) { setSelectionError(error instanceof Error ? error.message : 'No se pudo abrir el perfil. Reintenta.'); }
+    finally {selecting.current=false;setSelectingId(null);}
     // The root navigator opens content only after an explicit profile selection.
   };
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={StyleSheet.absoluteFillObject}>
+        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
           <AnimatedLeftPanel fullScreenMode={true} />
         </View>
         <View style={styles.loadingContainer}>
@@ -141,7 +147,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
   return (
     <View style={styles.container}>
       {/* Background Glitch Engine */}
-      <View style={StyleSheet.absoluteFillObject}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
         <AnimatedLeftPanel fullScreenMode={true} />
       </View>
 
@@ -182,6 +188,8 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
             <Text style={styles.titleRed}>VIENDO?</Text>
           </View>
 
+          {!!selectionError && <Text accessibilityRole="alert" style={{color:'#ddd',textAlign:'center',padding:16,maxWidth:420}}>{selectionError}</Text>}
+          {selectingId!==null && <Text accessibilityLiveRegion="polite" style={{color:'#ccc',textAlign:'center',marginBottom:20}}>Abriendo perfil…</Text>}
           {!!error && <View style={{ padding: 20, maxWidth: 420, gap: 12 }}><Text style={{ color: '#ddd', textAlign: 'center' }}>No se pudieron cargar tus perfiles.</Text><TouchableOpacity accessibilityRole="button" onPress={loadProfiles} style={{ padding: 14, backgroundColor: '#202b29' }}><Text style={{ color: '#fff', textAlign: 'center' }}>Reintentar</Text></TouchableOpacity></View>}
           {!error && profiles.length === 0 && <Text style={{ color: '#bbb', textAlign: 'center', paddingHorizontal: 24, marginBottom: 24 }}>Crea tu primer perfil para empezar.</Text>}
           {/* Profiles Grid */}
@@ -190,6 +198,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
               <AnimatedProfileCard
                 key={profile.id}
                 profile={profile}
+                busy={selectingId===profile.id} disabled={selectingId!==null}
                 index={index}
                 onPress={() => handleSelectProfile(profile)}
                 onLongPress={() => {
@@ -203,6 +212,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({ navigat
             {profiles.length < 5 && (
               <View style={styles.addProfileWrapper}>
                 <Pressable
+                  disabled={selectingId!==null}
                   style={styles.addProfileCard}
                   onPress={() => setShowCreateModal(true)}
                   // @ts-ignore
