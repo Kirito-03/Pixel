@@ -43,4 +43,4 @@ Fecha: 2026-11-17. Rama: kirito.
 APK publicada tras verificar SHA256 y tamaño remoto antes de sustituir latest.json. La API pública confirma 1.0.24/code25 y SHA256 esperado; descarga parcial HTTP206 con Content-Range 0-3/123631506 y cabecera ZIP PK0304.
 
 Descarga: https://pixelnosekai.com/api/app-release/android/download?build=25
-MCP pixel_brain disponible, pero la unidad Reze está desmontada y devuelve Vault root directory does not exist. Nota guardada en el proyecto; copia a Obsidian pendiente de montar la unidad.
+Unidad Reze montada de nuevo el 2026-11-17. MCP pixel_brain comprobado con lectura y escritura; esta nota y su enlace del índice se sincronizan con la bóveda externa Pixel. Las notas anteriores que indicaban sincronización manga/H pendiente describen versiones previas a 1.0.24.
