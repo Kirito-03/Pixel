@@ -76,3 +76,6 @@ Actualización 1.0.21 / código 22: título del lector de manga visible solo al 
 
 
 Actualización 1.0.25/código26: lector web y componente Image de respaldo llenan el ancho disponible aunque el archivo original mida199px; HTML nativo con contenedores de ancho explícito. Descarga APK con proxy Nginx específico y empaquetador que valida zipalign16. 192 pruebas aprobadas; firma fijada y descarga completa/SHA256 comprobados. El usuario conserva1.0.23/código24 y reporta App no instalada con1.0.24; el motivo exacto en Android sigue pendiente porque el teléfono solo admite depuración Wi-Fi y está en otra red. No desinstalar para actualizar. Ver docs/brain/2026-11-17-ancho-manga-descarga-apk-1-0-25.md.
+
+
+Actualización 1.0.26/código27: diálogo de importación con texto correcto y espera limitada; cola local conservada, ACK tardío y exclusión de importaciones concurrentes entre perfiles. 197 pruebas aprobadas; APK firmada y descarga completa verificada. Instalada por Wi-Fi/IPv6 en el Samsung del usuario sin borrar datos: respaldo de 4 avances confirmado en el teléfono y comprobado en web. Se identificaron APK de Descargas con tamaño correcto pero contenido dañado y firma inválida. Ver docs/brain/2026-11-17-depuracion-apk-importacion-1-0-26.md.

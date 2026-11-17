@@ -10,6 +10,7 @@ type Props = {
   errorText?: string | null;
   iconName?: React.ComponentProps<typeof Ionicons>['name'] | null;
   confirmText?: string;
+  busyText?: string;
   cancelText?: string;
   destructive?: boolean;
   onCancel: () => void;
@@ -23,6 +24,7 @@ export default function ConfirmDialog({
   errorText = null,
   iconName = 'trash-outline',
   confirmText = 'Eliminar',
+  busyText,
   cancelText = 'Cancelar',
   destructive = true,
   onCancel,
@@ -30,6 +32,8 @@ export default function ConfirmDialog({
 }: Props) {
   const [mounted, setMounted] = useState(visible);
   const [loading, setLoading] = useState(false);
+  const request = useRef(0);
+  useEffect(() => { if (!visible) { request.current++; setLoading(false); } }, [visible]);
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.96)).current;
 
@@ -56,11 +60,12 @@ export default function ConfirmDialog({
 
   const handleConfirm = async () => {
     if (loading) return;
+    const generation = ++request.current;
     setLoading(true);
     try {
       await onConfirm();
     } finally {
-      setLoading(false);
+      if (request.current === generation) setLoading(false);
     }
   };
 
@@ -98,7 +103,7 @@ export default function ConfirmDialog({
                 style={({ pressed }) => [styles.btn, { backgroundColor: confirmColor }, pressed && styles.pressed, loading && styles.btnDisabled]}
                 disabled={loading}
               >
-                <Text style={styles.btnText}>{loading ? 'Eliminando...' : confirmText}</Text>
+                <Text style={styles.btnText}>{loading ? busyText || (destructive ? 'Eliminando…' : 'Guardando…') : confirmText}</Text>
               </Pressable>
             </View>
           </LinearGradient>

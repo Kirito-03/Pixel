@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
-function load(file,mocks={}) {const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}}).outputText,{exports,Date,Math,Map,Set,Object,Promise,Number,Error,JSON,encodeURIComponent,require:name=>mocks[name]||{}});return exports;}
+function load(file,mocks={}) {const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}}).outputText,{exports,setTimeout,clearTimeout,Date,Math,Map,Set,Object,Promise,Number,Error,JSON,encodeURIComponent,require:name=>mocks[name]||{}});return exports;}
 const core=load('services/contentProgressEngine.ts');
+const deadline=load('services/progressDeadline.ts');
 function fixture(){
  const documents=new Map([['profiles/a',{name:'Account',search_history:{1:{queries:['fixture']}}}],['profiles/a/profiles/1',{name:'One'}],['profiles/a/profiles/2',{name:'Two'}]]),local=new Map();
  const auth={currentUser:{uid:'a'}};let online=true;
@@ -16,8 +17,8 @@ function fixture(){
   onSnapshot(){return()=>{};},
  };
  const storage={async getItem(key){return local.get(key)||null;},async setItem(key,value){local.set(key,value);},async getAllKeys(){return [...local.keys()];},async multiGet(keys){return keys.map(key=>[key,local.get(key)||null]);}};
- const api=load('services/contentProgressSync.ts',{'@react-native-async-storage/async-storage':storage,'firebase/firestore':firestore,'./firebase':{auth,db:{}},'./contentProgressEngine':core});
- return {api,auth,documents,local,setOnline:value=>online=value};
+ const api=load('services/contentProgressSync.ts',{'@react-native-async-storage/async-storage':storage,'firebase/firestore':firestore,'./firebase':{auth,db:{}},'./contentProgressEngine':core,'./progressDeadline':deadline});
+ return {api,auth,documents,local,firestore,setOnline:value=>online=value};
 }
 const scope={uid:'a',profileId:1};
 test('Firestore updates one profile with merge and retains account settings and the other profile',async()=>{
@@ -39,4 +40,18 @@ test('legacy imports are claimed only after a cloud confirmation, retained local
  assert.equal((await f.api.legacyMangaRows()).length,0);assert.equal(f.local.has('pixel_manga_progress_fixture'),true);
  assert.equal(f.documents.get('profiles/a').content_progress_v1['1']['manga:fixture'].chapterNumber,'12');
  assert.equal(JSON.parse(f.local.get('pixel_legacy_manga_claims_v1')).pixel_manga_progress_fixture.profileId,1);
+});
+
+test('repeated legacy imports share one flight and cannot claim the same files for another profile concurrently',async()=>{
+ const f=fixture();f.local.set('pixel_manga_progress_fixture',JSON.stringify({chapterId:'chapter-19',chapterNumber:'19',updatedAt:1000}));
+ let entered,release;const writing=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ const original=f.firestore.runTransaction;
+ f.firestore.runTransaction=async(...args)=>{entered();await gate;return original(...args);};
+ const first=f.api.importLegacyManga(scope);
+ assert.equal(f.api.importLegacyManga(scope),first);
+ await writing;
+ await assert.rejects(f.api.importLegacyManga({uid:'a',profileId:2}),/otro perfil/);
+ release();await first;
+ assert.equal(JSON.parse(f.local.get('pixel_legacy_manga_claims_v1')).pixel_manga_progress_fixture.profileId,1);
+ assert.equal((await f.api.legacyMangaRows()).length,0);
 });

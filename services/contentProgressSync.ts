@@ -1,3 +1,4 @@
+import { withProgressDeadline } from './progressDeadline';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDocFromServer, onSnapshot, runTransaction } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -15,10 +16,10 @@ function rows(data: any, scope: ProgressScope) { return (data?.content_progress_
 // Per-profile maps stay separate; video files are never part of this document.
 export const contentProgressSync=createContentProgressEngine({ storage: AsyncStorage, assertScope,
   remote: {
-    async read(scope) { const snap=await getDocFromServer(ref(scope)); assertScope(scope); return rows(snap.data(),scope); },
+    async read(scope) { const snap=await withProgressDeadline(getDocFromServer(ref(scope))); assertScope(scope); return rows(snap.data(),scope); },
     async write(scope, changes) {
       const account=ref(scope), profile=doc(db,'profiles',scope.uid,'profiles',String(scope.profileId));
-      return runTransaction(db,async tx => {
+      return withProgressDeadline(runTransaction(db,async tx => {
         assertScope(scope);
         const selected=await tx.get(profile); if (!selected.exists()) throw Error('Este perfil ya no existe.');
         const snapshot=await tx.get(account), existing=rows(snapshot.data(),scope);
@@ -32,7 +33,7 @@ export const contentProgressSync=createContentProgressEngine({ storage: AsyncSto
         assertScope(scope);
         if (Object.keys(updates).length) tx.set(account,{content_progress_v1:{[String(scope.profileId)]:updates}},{merge:true});
         return confirmed;
-      });
+      }, {maxAttempts: 2}));
     },
   },
 });
@@ -61,7 +62,7 @@ export async function legacyMangaRows() {
   } catch {} }
   return result;
 }
-export async function importLegacyManga(scope: ProgressScope) {
+async function importLegacyMangaNow(scope: ProgressScope) {
   const legacy=await legacyMangaRows();
   await contentProgressSync.importRows(scope,legacy.map(item=>item.row));
   assertScope(scope);
@@ -72,4 +73,16 @@ export async function importLegacyManga(scope: ProgressScope) {
   for (const item of confirmed) claims[item.key]={uid:scope.uid,profileId:scope.profileId};
   await AsyncStorage.setItem('pixel_legacy_manga_claims_v1',JSON.stringify(claims));
   // Keep original legacy files as an additional recovery copy; no unconfirmed deletion.
+}
+
+// One explicitly assigned legacy import at a time, even if a UI deadline expires.
+let activeLegacyImport: {owner:string;task:Promise<void>} | null = null;
+export function importLegacyManga(scope: ProgressScope): Promise<void> {
+  assertScope(scope);
+  const owner=`${scope.uid}:${scope.profileId}`;
+  if(activeLegacyImport) return activeLegacyImport.owner===owner ? activeLegacyImport.task : Promise.reject(new Error('Hay una importación en curso para otro perfil. Espera a que termine.'));
+  const task=Promise.resolve().then(()=>importLegacyMangaNow(scope));
+  activeLegacyImport={owner,task};
+  void task.finally(()=>{if(activeLegacyImport?.task===task)activeLegacyImport=null;}).catch(()=>{});
+  return task;
 }
