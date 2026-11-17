@@ -6,15 +6,15 @@ export interface ReaderImageProps { uri: string; page: number; active?: boolean 
 export default function ReaderImage({ uri, page, active }: ReaderImageProps) {
   const image = useReaderImage(uri, active);
   const { width } = useWindowDimensions();
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  const renderWidth = Math.min(width, 800, size.width || 800);
-  const ratio = size.width && size.height ? size.width / size.height : 0.72;
+  const [size, setSize] = useState({ uri: '', width: 0, height: 0 });
+  const renderWidth = Math.min(width, 800);
+  const ratio = size.uri === uri && size.width && size.height ? size.width / size.height : 0.72;
   return <View style={{ width: renderWidth, aspectRatio: ratio, alignSelf: 'center', backgroundColor: '#111' }}>
     {!image.failed && <Image key={`${uri}-${image.attempt}`} accessibilityLabel={`Página ${page}`}
       source={{ uri: image.source }} resizeMode="contain" resizeMethod="resize"
       style={StyleSheet.absoluteFill} onLoad={event => {
         const source = event.nativeEvent.source;
-        if (source?.width > 0 && source?.height > 0) setSize({ width: source.width, height: source.height });
+        if (source?.width > 0 && source?.height > 0) setSize({ uri, width: source.width, height: source.height });
         image.onLoad();
       }} onError={image.onError} />}
     {!image.loaded && <View style={styles.status} pointerEvents="box-none">

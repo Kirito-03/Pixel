@@ -24,6 +24,11 @@ test('release endpoint serves manifest and APK, blocks stale builds and invalid 
  fs.writeFileSync(path.join(directory,valid.filename),'PKtest');fs.writeFileSync(path.join(directory,'latest.json'),JSON.stringify(valid));
  const manifest=await fetch(url);assert.equal(manifest.status,200);assert.equal(manifest.headers.get('cache-control'),'no-store');assert.equal((await manifest.json()).downloadUrl,'https://pixelnosekai.com/api/app-release/android/download?build=2');
  const artifact=await fetch(url+'/download?build=2');assert.equal(artifact.status,200);assert.match(artifact.headers.get('content-disposition'),/pixel-1.0.1-2.apk/);assert.equal(await artifact.text(),'PKtest');
+ const first = await fetch(url+'/download?build=2', {headers:{Range:'bytes=0-1'}});
+ assert.equal(first.status,206);assert.equal(first.headers.get('content-range'),'bytes 0-1/6');
+ const rest = await fetch(url+'/download?build=2', {headers:{Range:'bytes=2-'}});
+ assert.equal(rest.status,206);assert.equal(rest.headers.get('content-range'),'bytes 2-5/6');
+ assert.equal((await first.text())+(await rest.text()),'PKtest');
  assert.equal((await fetch(url+'/download?build=1')).status,409);
  fs.writeFileSync(path.join(directory,'latest.json'),JSON.stringify({...valid,filename:'../private.apk'}));assert.equal((await fetch(url)).status,503);assert.equal((await fetch(url+'/download')).status,404);
  fs.writeFileSync(path.join(directory,'latest.json'),JSON.stringify({...valid,size:100}));assert.equal((await fetch(url)).status,503);

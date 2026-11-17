@@ -35,8 +35,10 @@ function packageRelease() {
   const destination = path.resolve(process.argv[4] || path.join(root, 'server/releases/android'));
   const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(os.homedir(), 'Android/Sdk');
   const versions = fs.readdirSync(path.join(sdk, 'build-tools')).sort((a,b) => b.localeCompare(a, undefined, { numeric: true }));
-  const tools = versions.map(version => path.join(sdk, 'build-tools', version)).find(dir => fs.existsSync(path.join(dir, 'aapt')) && fs.existsSync(path.join(dir, 'apksigner')));
-  if (!tools) throw Error('No se encuentran aapt/apksigner en Android SDK.');
+  const tools = versions.map(version => path.join(sdk, 'build-tools', version)).find(dir => fs.existsSync(path.join(dir, 'aapt')) && fs.existsSync(path.join(dir, 'apksigner')) && fs.existsSync(path.join(dir, 'zipalign')));
+  if (!tools) throw Error('No se encuentran aapt/apksigner/zipalign en Android SDK.');
+  // Android devices with 16 KiB pages also require correctly aligned native libraries.
+  execFileSync(path.join(tools, 'zipalign'), ['-c', '-P', '16', '4', apk], { encoding: 'utf8' });
   const badging = execFileSync(path.join(tools, 'aapt'), ['dump', 'badging', apk], { encoding: 'utf8' });
   const info = badging.match(/package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'/);
   if (!info || info[1] !== config.android.package || Number(info[2]) !== config.android.versionCode || info[3] !== config.version) throw Error('La APK no corresponde a la versión de app.json. Prepara y compila otra vez.');

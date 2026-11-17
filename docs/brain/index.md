@@ -66,3 +66,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-16-lector-manga-transicion-1-0-23]] — Controles del lector Android con transición suave, menú inferior por dirección y separación de Volver.
 
 - [[2026-11-17-respaldo-perfil-bloqueo-temporadas-1-0-24]]: respaldo manga/H por cuenta y perfil, importación de lecturas anteriores, bloqueo que se desvanece y etiquetas de temporada correctas.
+
+- [[2026-11-17-ancho-manga-descarga-apk-1-0-25]]: páginas estrechas, descarga completa de APK verificada, Nginx específico y diagnóstico físico pendiente por red Wi-Fi.

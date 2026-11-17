@@ -73,3 +73,6 @@ Actualización1.0.19/código20: Similares deduplicado por identidad AniList/fech
 
 
 Actualización 1.0.21 / código 22: título del lector de manga visible solo al inicio y oculto al bajar, botón flotante lateral "↑ Inicio" que acompaña al deslizar (Web y Android) más botón al final del capítulo, y corrección de acceso directo / recarga en `/admin/dashboard` web. APK 123601858 bytes; SHA256 `6710575d86b4e9c37b0795632e14bf46d54f29264994e722b8c6aef1d6055fb8`. Firma, manifiesto público y descarga HTTP 200 verificados; sin dispositivo ADB conectado para instalación física. Ver docs/brain/2026-11-16-manga-reader-admin-apk.md.
+
+
+Actualización 1.0.25/código26: lector web y componente Image de respaldo llenan el ancho disponible aunque el archivo original mida199px; HTML nativo con contenedores de ancho explícito. Descarga APK con proxy Nginx específico y empaquetador que valida zipalign16. 192 pruebas aprobadas; firma fijada y descarga completa/SHA256 comprobados. El usuario conserva1.0.23/código24 y reporta App no instalada con1.0.24; el motivo exacto en Android sigue pendiente porque el teléfono solo admite depuración Wi-Fi y está en otra red. No desinstalar para actualizar. Ver docs/brain/2026-11-17-ancho-manga-descarga-apk-1-0-25.md.
