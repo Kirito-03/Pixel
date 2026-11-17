@@ -1,3 +1,5 @@
+import { useProgressSync } from '../contexts/ProgressSyncContext';
+import { useProfile } from '../contexts/ProfileContext';
 import { useReaderImage } from '../hooks/useReaderImage';
 import { mangaChapterKey, rememberMangaReader } from '../utils/mangaChapterNavigation';
 import { useTheme } from '../contexts/ThemeContext';
@@ -14,7 +16,7 @@ import Header from '../components/Header';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useMyList } from '../contexts/MyListContext';
 import { mangaApi, Manga, MangaChapter } from '../services/mangaApi';
-import { getMangaProgress, MangaReadingProgress, saveMangaProgress } from '../utils/mangaProgress';
+import { saveMangaProgress } from '../utils/mangaProgress';
 
 function formatDate(iso?: string | null) {
   if (!iso) return '';
@@ -30,6 +32,8 @@ function fallbackDescription(title?: string | null) {
 
 export default function MangaDetailScreen() {
   const { colors, theme } = useTheme();
+  const { currentProfile } = useProfile();
+  const progressSync = useProgressSync();
   const styles = detailPalette(baseStyles, colors, {
     text: ['title', 'sectionTitle', 'tagText', 'chapterNumberText', 'chapterCardTitle', 'secondaryText'],
     secondary: ['metaText', 'excerpt'], muted: ['metaDot', 'availabilityNote', 'noChaptersText', 'chapterDate', 'emptyTitle'],
@@ -66,22 +70,7 @@ export default function MangaDetailScreen() {
   const [allowEnglishFallback, setAllowEnglishFallback] = useState(true);
   const [imageError, setImageError] = useState(false);
   const coverImage = useReaderImage(manga?.cover_url || '');
-  const [readingProgress, setReadingProgress] = useState<MangaReadingProgress | null>(null);
-
-  const loadProgress = useCallback(async () => {
-    if (!id) {
-      setReadingProgress(null);
-      return;
-    }
-    const progress = await getMangaProgress(id);
-    setReadingProgress(progress);
-  }, [id]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadProgress();
-    }, [loadProgress])
-  );
+  const readingProgress = progressSync.records[`manga:${id}`] || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -175,12 +164,7 @@ export default function MangaDetailScreen() {
       : 'Leer ahora';
 
   const openChapter = async (chapter: MangaChapter, _index?: number) => {
-    await saveMangaProgress(id, chapter.id, chapter.chapter);
-    setReadingProgress({
-      chapterId: chapter.id,
-      chapterNumber: String(chapter.chapter ?? ''),
-      updatedAt: Date.now(),
-    });
+    try { await saveMangaProgress(id, chapter.id, chapter.chapter, currentProfile?.id); } catch { setListError('No pudimos guardar el avance en este dispositivo.'); }
     rememberMangaReader(id, manga?.title || 'Manga', chapters);
     navigation.navigate('MangaReader', { id, chapterKey: mangaChapterKey(chapter) });
   };

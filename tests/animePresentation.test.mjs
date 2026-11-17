@@ -54,3 +54,16 @@ test('explicit seasons released on different dates remain distinct even if impor
  const rows=exports.relatedAnime({id:1,title:'Different work'},[{id:2,title:'Long Chronicle Season 1',poster_url:poster,release_date:'2024-01-01'},{id:3,title:'Long Chronicle Season 2',poster_url:poster,release_date:'2025-01-01'}],[{id:2,title:'Long Chronicle Season 1',poster_url:poster,release_date:'2024-01-01'},{id:3,title:'Long Chronicle Season 2',poster_url:poster,release_date:'2025-01-01'}]);
  assert.equal(rows.map(r=>r.id).join(','),'2,3');
 });
+
+test('standalone sequel entries display their franchise season without renumbering storage',()=>{
+ assert.equal(exports.animeSeasonLabel('Black Clover 2nd Season',1,1),'Temporada 2');
+ assert.equal(exports.animeSeasonLabel('Example Season 3',1,1),'Temporada 3');
+ assert.equal(exports.animeSeasonLabel('Ejemplo Segunda Temporada',1,1),'Temporada 2');
+ assert.equal(exports.animeSeasonLabel('Ejemplo 2ª temporada',1,1),'Temporada 2');
+ assert.equal(exports.animeSeasonLabel('Example Final Season Part 2',1,1),'Temporada final');
+ // Explicit multi-season groups win. Years, cours and parts do not imply seasons.
+ assert.equal(exports.animeSeasonLabel('Example 2nd Season',1,2),'Temporada 1');
+ assert.equal(exports.animeSeasonLabel('Example 2nd Season',3,1),'Temporada 3');
+ assert.equal(exports.animeSeasonLabel('Example Part 2 (2026)',1,1),'Temporada 1');
+ assert.equal(exports.animeSeasonLabel('Lupin III',1,1),'Temporada 1');
+});

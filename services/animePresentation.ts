@@ -37,3 +37,21 @@ export function relatedAnime(current: CatalogAnime, seasons: CatalogAnime[], sim
  }
  return result;
 }
+
+// Catalog entries often represent one franchise season but store their episodes
+// in local group 1. Only the presentation label changes; IDs/progress stay intact.
+export function animeSeasonLabel(title: string, storedSeason: number, groupCount = 1): string {
+ const fallback = `Temporada ${storedSeason}`;
+ if (storedSeason !== 1 || groupCount !== 1) return fallback;
+ const value = String(title || '').normalize('NFKC');
+ const explicit = value.match(/\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/i)
+   || value.match(/\b(?:season|temporada)\s+(\d{1,2})\b/i)
+   || value.match(/\b(\d{1,2})\s*[.ªº°a]?\s+temporada\b/i);
+ if (explicit && Number(explicit[1]) > 0) return `Temporada ${Number(explicit[1])}`;
+ const words: Record<string, number> = {first:1,second:2,third:3,fourth:4,fifth:5,primera:1,segunda:2,tercera:3,cuarta:4,quinta:5};
+ const word = value.match(/\b(first|second|third|fourth|fifth)\s+season\b/i)
+   || value.match(/\b(primera|segunda|tercera|cuarta|quinta)\s+temporada\b/i);
+ if (word) return `Temporada ${words[word[1].toLowerCase()]}`;
+ if (/\b(?:final\s+season|temporada\s+final)\b/i.test(value)) return 'Temporada final';
+ return fallback;
+}

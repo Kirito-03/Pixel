@@ -1,3 +1,4 @@
+import { useProgressSync } from '../contexts/ProgressSyncContext';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
@@ -36,6 +37,7 @@ export default function HentaiSeriesModal({
 }: HentaiSeriesModalProps) {
   const { colors, theme } = useTheme();
   const { adultContentEnabled, currentProfile } = useProfile();
+  const progressSync = useProgressSync();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';
@@ -105,6 +107,8 @@ export default function HentaiSeriesModal({
   const displayData = details || anime;
   const episodes = sortEpisodesAscending(displayData.episodes);
   const firstEpisode = getFirstEpisode(episodes);
+  const savedProgress=progressSync.records[`h_anime:${displayData?.slug || ''}`];
+  const playEpisode=episodes.find(ep=>ep.number===savedProgress?.episodeNumber)||firstEpisode;
 
   return (
     <Modal
@@ -206,19 +210,19 @@ export default function HentaiSeriesModal({
                 )}
 
                 <View style={styles.actionRow}>
-                  {firstEpisode && (
+                  {playEpisode && (
                     <TouchableOpacity
                       accessibilityRole="button"
-                      accessibilityLabel={`Reproducir episodio ${firstEpisode.number}`}
+                      accessibilityLabel={`Reproducir episodio ${playEpisode.number}`}
                       style={[styles.playHeroBtn, { backgroundColor: colors.text }, isWeb && ({ cursor: 'pointer' } as any)]}
                       activeOpacity={0.85}
                       onPress={() => {
-                        onPlayEpisode(displayData.slug, firstEpisode.number, episodes);
+                        onPlayEpisode(displayData.slug, playEpisode.number, episodes);
                       }}
                     >
                       <Ionicons name="play" size={18} color={colors.background} />
                       <Text style={[styles.playHeroBtnText, { color: colors.background }]}>
-                        Reproducir Ep. {firstEpisode.number}
+                        {savedProgress?.episodeNumber === playEpisode.number ? 'Continuar' : 'Reproducir'} Ep. {playEpisode.number}
                       </Text>
                     </TouchableOpacity>
                   )}

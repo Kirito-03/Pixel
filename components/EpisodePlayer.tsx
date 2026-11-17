@@ -33,6 +33,7 @@ interface EpisodePlayerProps {
   animeTitle: string;
   animeId: number;
   seasonNumber: number;
+  seasonLabel?: string;
   profileId?: number;
   resumeTimeSeconds?: number;
   onClose: () => void;
@@ -285,6 +286,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
   animeTitle,
   animeId,
   seasonNumber,
+  seasonLabel,
   profileId,
   resumeTimeSeconds = 0,
   onClose,
@@ -728,7 +730,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
           )}
           {/* Interfaz Animada */}
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: locked ? 0 : uiOpacity }]} pointerEvents={showUI && !locked ? 'box-none' : 'none'}>
-            <PlaybackChrome title={animeTitle} subtitle={`Temporada ${seasonNumber || 1} · Episodio ${episode.number}`}
+            <PlaybackChrome title={animeTitle} subtitle={`${seasonLabel || `Temporada ${seasonNumber || 1}`} · Episodio ${episode.number}`}
               onClose={handleClose} servers={sources} selectedIndex={Math.max(0, sources.indexOf(selectedSource!))}
               menuOpen={serverMenuOpen} onMenuChange={open => { setServerMenuOpen(open); serverMenuOpenRef.current = open; showUITemporarily(); }}
               onSelectServer={index => { flushLatestSnapshotRef.current(); setSelectedSource(sources[index]); setCanControlEmbed(false); setWebViewLoading(true); }}
@@ -760,7 +762,7 @@ const EpisodePlayer: React.FC<EpisodePlayerProps> = ({
         onProgress={sendProgress}
       />
     );
-  }, [locked, selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds, serverMenuOpen, sources, seasonNumber]);
+  }, [locked, selectedSource, episode, animeTitle, hasNextEpisode, hasPreviousEpisode, onNextEpisode, onPreviousEpisode, handleClose, handleNextEpisode, handlePreviousEpisode, sendProgress, canControlEmbed, isPlaying, showUI, webViewLoading, showUITemporarily, uiOpacity, resumeTimeSeconds, serverMenuOpen, sources, seasonNumber, seasonLabel]);
 
   // ── Loading / Error screens ──────────────────────────────────
   if (loading || loadedEpisode.current !== String(episode.id)) {

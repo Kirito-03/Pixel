@@ -1,3 +1,5 @@
+import { useProgressSync } from '../contexts/ProgressSyncContext';
+import { contentProgressSync } from '../services/contentProgressSync';
 import CatalogFilterDialog from '../components/CatalogFilterDialog';
 import CatalogPagination from '../components/CatalogPagination';
 import { HentaiCard } from '../components/HentaiComponents';
@@ -42,6 +44,8 @@ export default function NSFWScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { adultContentEnabled, currentProfile } = useProfile();
+  const progressSync = useProgressSync();
+  const [resumeTimeSeconds,setResumeTimeSeconds] = useState(0);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
@@ -200,6 +204,8 @@ export default function NSFWScreen() {
     episodes?: { number: number }[]
   ) => {
     if (!adultContentEnabled) return;
+    const saved=progressSync.records[`h_anime:${slug}`];
+    setResumeTimeSeconds(saved?.episodeNumber===episodeNumber&&saved.positionKnown?saved.currentTime||0:0);
 
     if (Array.isArray(episodes)) {
       setPlayingEpisodes(episodes);
@@ -223,6 +229,7 @@ export default function NSFWScreen() {
         setPlayingServers(servers);
         setPlayingEpisode(episodeNumber);
         setShowPlayer(true);
+        if(progressSync.scope)void contentProgressSync.save(progressSync.scope,'h_anime',slug,{episodeNumber,currentTime:0,duration:0,positionKnown:false}).catch(()=>{});
       } else {
         const msg = 'No se encontraron servidores de video para este episodio.';
         if (showPlayerRef.current) {
@@ -593,7 +600,9 @@ export default function NSFWScreen() {
           navigationBarTranslucent
           onRequestClose={closePlayer}
         >
-          <HentaiVideoPlayer
+          <HentaiVideoPlayer key={`${progressSync.scope?.uid}:${profileId}:${selectedAnime.slug}`}
+            contentId={selectedAnime.slug} resumeTimeSeconds={resumeTimeSeconds}
+            onProgress={record=>{if(!progressSync.scope||!record.contentId)return;const {contentId,...value}=record;void contentProgressSync.save(progressSync.scope,'h_anime',contentId,value).catch(()=>{});}}
             animeTitle={selectedAnime.title}
             episodeNumber={playingEpisode}
             servers={playingServers}

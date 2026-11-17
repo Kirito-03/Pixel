@@ -7,6 +7,7 @@ import AppNavigator from './navigation/AppNavigator';
 // Prevenir que se auto oculte si es que Expo lo está haciendo a medias
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+import { ProgressSyncProvider } from './contexts/ProgressSyncContext';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { MyListProvider } from './contexts/MyListContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -34,10 +35,10 @@ export default function App() {
         <AuthProvider>
           <AdminProvider>
             <ProfileProvider>
-              <MyListProvider>
+              <ProgressSyncProvider><MyListProvider>
                 <AppNavigator />
                 <ThemedStatusBar />
-              </MyListProvider>
+              </MyListProvider></ProgressSyncProvider>
             </ProfileProvider>
           </AdminProvider>
         </AuthProvider>

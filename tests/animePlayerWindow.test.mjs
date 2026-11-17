@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+const presentation = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../services/animePresentation.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports:presentation,URL});
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function fixture({ os = 'android', profile = null, canReach = async () => true, getEpisodes = async () => [] } = {}) {
   const hooks = [], cleanups = new Map(); let cursor = 0, effects = [];
@@ -16,6 +18,7 @@ function fixture({ os = 'android', profile = null, canReach = async () => true, 
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../components/AnimeSeriesModalWrapper.tsx', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true } }).outputText, {
     exports, console, require(name) {
       if (name === 'react') return react;
+      if (name.includes('animePresentation')) return presentation;
       if (name === 'react-native') return { Platform: { OS: os }, Modal: 'Modal', Alert: { alert() {} } };
       if (name === './AnimeSeriesModal') return { default: 'Details', __esModule: true };
       if (name === './EpisodePlayer') return { default: 'Player', __esModule: true };
@@ -45,10 +48,12 @@ test('Android keeps the same details window visible when entering and leaving di
 test('opening from My List completes despite intermediate renders and is consumed once on exit', async () => {
   let resolve, calls = 0;
   const f = fixture({ getEpisodes: () => { calls++; return new Promise(done => resolve = done); } });
-  const direct = { ...props, startFromEpisodeId: 11, startFromTimeSeconds: 30 };
+  const direct = { ...props, content: {...props.content, title:'Black Clover 2nd Season'}, startFromEpisodeId: 11, startFromTimeSeconds: 30 };
   f.render(direct); f.render(direct);
   resolve([{ id: 11, season: 1, episode_number: 11, stream_url: 'https://video.test/drive.webm' }]); await tick();
   let tree = f.render(direct); assert.equal(details(tree).props.playback.props.resumeTimeSeconds, 30);
+  assert.equal(details(tree).props.playback.props.seasonNumber, 1);
+  assert.equal(details(tree).props.playback.props.seasonLabel, 'Temporada 2');
   details(tree).props.onClosePlayback(); tree = f.render(direct); await tick(); tree = f.render(direct);
   assert.equal(details(tree).props.playback, null); assert.equal(details(tree).props.visible, true); assert.equal(calls, 1);
 });

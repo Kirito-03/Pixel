@@ -1,3 +1,4 @@
+import { animeSeasonLabel } from '../services/animePresentation';
 import React, { useState, useRef } from 'react';
 import { Alert, Modal, Platform } from 'react-native';
 import AnimeSeriesModal from './AnimeSeriesModal';
@@ -80,7 +81,7 @@ export default function AnimeSeriesModalWrapper({
           .map(([season, eps]) => ({
             id: `season-${season}`,
             season,
-            title: season === 1 ? 'Temporada 1' : `Temporada ${season}`,
+            title: animeSeasonLabel(content.title, season, grouped.size),
             episodes: eps.sort((a, b) => a.number - b.number),
           }));
 
@@ -164,7 +165,7 @@ export default function AnimeSeriesModalWrapper({
 
   const player = visible && showEpisodePlayer && selectedEpisode && selectedSeason ? (
     <EpisodePlayer episode={selectedEpisode} animeTitle={getTitle()}
-      animeId={content?.id ? Number(content.id) : 0} seasonNumber={selectedSeason.season}
+      animeId={content?.id ? Number(content.id) : 0} seasonNumber={selectedSeason.season} seasonLabel={selectedSeason.title}
       profileId={currentProfile?.id} resumeTimeSeconds={resumeTimeSeconds}
       onClose={handleCloseEpisodePlayer} onNextEpisode={handleNextEpisode} onPreviousEpisode={handlePreviousEpisode}
       hasNextEpisode={currentEpisodeIndex < selectedSeason.episodes.length - 1} hasPreviousEpisode={currentEpisodeIndex > 0} />

@@ -1,3 +1,4 @@
+import { useProgressSync } from '../contexts/ProgressSyncContext';
 import Loader from '../components/Loader';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
@@ -30,7 +31,7 @@ import { myListApi, MyListEntry, MyListContentType } from '../services/myListApi
 import { continueWatchingApi, ContinueWatchingEntry } from '../services/continueWatchingApi';
 import { progressApi } from '../services/progressApi';
 import { getResumeTarget } from '../services/resumeTarget';
-import { getAllMangaProgress, MangaReadingProgress } from '../utils/mangaProgress';
+import { MangaReadingProgress } from '../utils/mangaProgress';
 
 function normalizeImagePath(path?: string | null): string {
   if (!path) return '';
@@ -55,6 +56,7 @@ export default function MyListScreen() {
   const [continueContentWidth, setContinueContentWidth] = useState(0);
   const { currentProfile, adultContentEnabled } = useProfile();
   const { user } = useAuth();
+  const progressSync = useProgressSync();
   const { refreshMyList, removeFromMyList } = useMyList();
   const { navigateByLabel } = useTabNavigation();
   const navigation = useNavigation<any>();
@@ -84,6 +86,9 @@ export default function MyListScreen() {
   } | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setMangaProgressById(Object.fromEntries(Object.values(progressSync.records).filter(row => row.kind === 'manga').map(row => [row.id,{chapterId:row.chapterId!,chapterNumber:row.chapterNumber!,updatedAt:row.updatedAt}])));
+  }, [progressSync.records]);
   const listRequest = useRef(0);
   const currentScope = `${user?.uid}:${currentProfile?.id}:${adultContentEnabled}`;
   const scopeRef = useRef(currentScope);
@@ -92,7 +97,7 @@ export default function MyListScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      getAllMangaProgress().then(setMangaProgressById).catch(() => {});
+
       if (currentProfile && user?.uid) loadMyList();
     }, [currentProfile, user?.uid, adultContentEnabled])
   );
@@ -323,11 +328,15 @@ export default function MyListScreen() {
       />
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshingSection} onRefresh={async () => { setRefreshingSection(true); try { await Promise.all([loadMyList(), refreshMyList(), getAllMangaProgress().then(setMangaProgressById)]); } finally { setRefreshingSection(false); } }} />}
+        refreshControl={<RefreshControl refreshing={refreshingSection} onRefresh={async () => { setRefreshingSection(true); try { await Promise.all([loadMyList(), refreshMyList(), progressSync.syncNow()]); } finally { setRefreshingSection(false); } }} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingTop: Platform.OS === 'web' ? 96 : insets.top + 80, paddingBottom: Math.max(40, insets.bottom + 24), paddingHorizontal: gutter }]}
       >
         <View style={styles.boundedContent}>
+        {progressSync.legacyCount>0&&<TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir perfil para respaldar lecturas anteriores" onPress={()=>navigateByLabel('Perfil')} style={{padding:14,marginBottom:16,backgroundColor:colors.card}}>
+          <Text style={{color:colors.text,fontWeight:'700'}}>Tienes {progressSync.legacyCount} lecturas anteriores por respaldar</Text>
+          <Text style={{color:colors.textSecondary,marginTop:4}}>Abre Perfil → Preferencias para importarlas a tu perfil y verlas también en la web.</Text>
+        </TouchableOpacity>}
         <View style={styles.pageHeader}>
           <View style={styles.headingCopy}>
             <Text style={[styles.eyebrow, { color: colors.primary }]}>TU COLECCIÓN</Text>
@@ -464,11 +473,12 @@ export default function MyListScreen() {
                   const meta = item.type === 'anime' ? metaByAnimeId.get(Number(item.id)) : undefined;
                   const currentEpisode = typeof meta?.episode_number === 'number' ? meta.episode_number : undefined;
                   const totalEpisodes = typeof meta?.total_episodes === 'number' ? meta.total_episodes : undefined;
-                  const progress = Number(meta?.progress_percent ?? 0) / 100;
+                  const hProgress = item.type === 'h_anime' ? progressSync.records[`h_anime:${item.id}`] : undefined;
+                  const progress = hProgress?.duration ? Math.min(1,(hProgress.currentTime||0)/hProgress.duration) : Number(meta?.progress_percent ?? 0) / 100;
                   const mangaProg = item.type === 'manga' ? mangaProgressById[String(item.id)] : undefined;
                   const mangaChapterLabel = mangaProg
                     ? (mangaProg.chapterNumber ? `Último: Cap. ${mangaProg.chapterNumber}` : 'Leyendo')
-                    : undefined;
+                    : hProgress ? `Continuar Ep. ${hProgress.episodeNumber}${hProgress.positionKnown ? ` · ${Math.floor((hProgress.currentTime||0)/60)}:${String((hProgress.currentTime||0)%60).padStart(2,'0')}` : ''}` : undefined;
                   return (
                 <View
                   key={`${item.type}:${item.id}`}

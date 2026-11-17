@@ -1,5 +1,5 @@
 import {episodeThumbnailURL} from '../utils/episodeThumbnail';
-import { resolveAnimeTrailer, relatedAnime, seriesSearchTerm } from '../services/animePresentation';
+import { resolveAnimeTrailer, relatedAnime, seriesSearchTerm, animeSeasonLabel } from '../services/animePresentation';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { briefSynopsis, cleanSynopsisText } from '../utils/briefSynopsis';
 import MovieRow from './MovieRow';
@@ -379,7 +379,7 @@ export default function AnimeSeriesModal({
         .map(([season, eps]) => ({
           id: `season-${season}`,
           season,
-          title: season === 1 ? 'Temporada 1' : `Temporada ${season}`,
+          title: animeSeasonLabel(anime.title, season, grouped.size),
           episodes: eps.sort((a, b) => a.number - b.number),
         }));
 
@@ -1044,7 +1044,7 @@ export default function AnimeSeriesModal({
               return (
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityLabel={`Ver episodio ${nextEp.number} de la temporada ${targetSeason.season}`}
+                  accessibilityLabel={`Ver episodio ${nextEp.number} de ${targetSeason.title.toLowerCase()}`}
                   accessibilityState={{ busy: loadingContinue, disabled: loadingContinue }} disabled={loadingContinue}
                   style={[continueStyles.card, { marginTop: 0 }]}
                   onPress={() => handlePlayEpisode(nextEp, targetSeason, resumeTime)}
@@ -1074,7 +1074,7 @@ export default function AnimeSeriesModal({
                     <Text style={continueStyles.epTitle} numberOfLines={1}>
                       Ep. {nextEp.number} — {nextEp.title}
                     </Text>
-                    <Text numberOfLines={1} style={continueStyles.duration}>Temporada {targetSeason.season}{resumeTime > 0 ? ` · Minuto ${Math.floor(resumeTime / 60)}` : ''}</Text>
+                    <Text numberOfLines={1} style={continueStyles.duration}>{targetSeason.title}{resumeTime > 0 ? ` · Minuto ${Math.floor(resumeTime / 60)}` : ''}</Text>
                   </View>
 
                   {/* CTA horizontal premium */}

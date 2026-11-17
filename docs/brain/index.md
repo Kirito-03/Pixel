@@ -1,6 +1,6 @@
 # Brain Vault Index
 
-Este directorio (`docs/brain/`) es la bóveda local de notas Markdown servida por el MCP de Obsidian (`tools/obsidian-mcp/server.py`).
+Este directorio (`docs/brain/`) conserva las notas del proyecto en Git. El servidor `tools/obsidian-mcp/server.py` puede servirlo como bóveda local; el MCP `pixel_brain` de esta sesión está configurado para la bóveda externa Pixel en la unidad Reze.
 
 ## Regla de registro de decisiones
 
@@ -12,7 +12,7 @@ En estas notas se distinguen explícitamente:
 ## Coordinación actual
 
 - **Codex**: revisa la seguridad de backend y frontend.
-- **MCP local Obsidian**: confinado exclusivamente a `docs/brain/` (solo archivos `.md`, sin traversal, sin rutas absolutas, sin symlinks y sin ejecución de contenido).
+- **MCP Obsidian**: confinado a su raíz de bóveda configurada (solo archivos `.md`, sin traversal, sin rutas absolutas, sin symlinks y sin ejecución de contenido). La bóveda externa requiere montar Reze; si está ausente se conserva la nota en este directorio y se registra la copia pendiente.
 
 - [[2026-11-13-pixel-auditoria-y-drive]]: estado verificado, cambios locales, seguridad pendiente y diseño Drive.
 
@@ -64,3 +64,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-16-android-manga-1-0-22]] — Android: navegación, botones, ancho del lector y APK.
 
 - [[2026-11-16-lector-manga-transicion-1-0-23]] — Controles del lector Android con transición suave, menú inferior por dirección y separación de Volver.
+
+- [[2026-11-17-respaldo-perfil-bloqueo-temporadas-1-0-24]]: respaldo manga/H por cuenta y perfil, importación de lecturas anteriores, bloqueo que se desvanece y etiquetas de temporada correctas.

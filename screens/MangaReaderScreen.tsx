@@ -1,3 +1,4 @@
+import { useProfile } from '../contexts/ProfileContext';
 import { createReaderChromeController } from '../utils/readerChrome';
 import { useReaderChrome } from '../contexts/ReaderChromeContext';
 import Loader from '../components/Loader';
@@ -25,6 +26,7 @@ function sanitizeChapters(value: unknown): MangaChapter[] {
 export default function MangaReaderScreen() {
   const navigation = useNavigation<any>(), route = useRoute<any>();
   const focused = useIsFocused();
+  const { currentProfile } = useProfile();
   const { navigateByLabel } = useTabNavigation();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -136,8 +138,8 @@ export default function MangaReaderScreen() {
     return () => controller.abort();
   }, [chapterId, retryKey, paused, active, chaptersLoading]);
   useEffect(() => {
-    if (mangaId && chapterId && pages.length) saveMangaProgress(mangaId, chapterId, current?.chapter);
-  }, [mangaId, chapterId, current?.chapter, pages.length]);
+    if (mangaId && chapterId && pages.length) void saveMangaProgress(mangaId, chapterId, current?.chapter, currentProfile?.id).catch(() => {});
+  }, [mangaId, chapterId, current?.chapter, pages.length, currentProfile?.id]);
 
   const openChapter = (target?: MangaChapter) => {
     if (!target || target.id === chapterId) return;

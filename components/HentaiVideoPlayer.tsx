@@ -25,7 +25,11 @@ interface VideoServer {
   url: string;
 }
 
+type HProgressReport = { contentId:string; episodeNumber:number; currentTime:number; duration:number; positionKnown:boolean };
 interface HentaiVideoPlayerProps {
+  contentId?: string;
+  resumeTimeSeconds?: number;
+  onProgress?: (value:HProgressReport) => void;
   animeTitle: string;
   episodeNumber: number;
   servers: VideoServer[];
@@ -43,6 +47,7 @@ interface HentaiVideoPlayerProps {
 
 export default function HentaiVideoPlayer({
   animeTitle,
+  contentId = '', resumeTimeSeconds = 0, onProgress,
   episodeNumber,
   servers,
   onClose,
@@ -62,10 +67,45 @@ export default function HentaiVideoPlayer({
   const [activeServer, setActiveServer] = useState<VideoServer | null>(
     servers.length > 0 ? servers[0] : null
   );
+  const playableServer=activeServer&&servers.includes(activeServer)?activeServer:null;
   const [loading, setLoading] = useState(servers.length > 0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
 
+  const webViewRef=useRef<WebView>(null), frameRef=useRef<HTMLIFrameElement>(null);
+  const progressRef=useRef<HProgressReport|null>(null), progressCallback=useRef(onProgress);
+  progressCallback.current=onProgress;
+  const lastReported=useRef(0), restored=useRef(false), resumeTarget=useRef(resumeTimeSeconds);
+  const emitProgress=useCallback((force=false)=>{
+    if(!progressRef.current||(!force&&Date.now()-lastReported.current<15000))return;
+    lastReported.current=Date.now();progressCallback.current?.({...progressRef.current});
+  },[]);
+  useEffect(()=>{
+    const previousCallback=progressCallback.current;
+    progressRef.current={contentId,episodeNumber,currentTime:0,duration:0,positionKnown:false};
+    lastReported.current=0;restored.current=false;resumeTarget.current=resumeTimeSeconds;
+    return()=>{if(progressRef.current)previousCallback?.({...progressRef.current});};
+  },[contentId,episodeNumber]);
+  useEffect(()=>{restored.current=false;},[activeServer?.url]);
+  const captureProgress=useCallback((time:number,duration:number,force=false)=>{
+    if(!Number.isFinite(time)||time<0||!Number.isFinite(duration)||duration<=0)return;
+    progressRef.current={contentId,episodeNumber,currentTime:Math.floor(time),duration:Math.floor(duration),positionKnown:true};
+    resumeTarget.current=time;
+    emitProgress(force);
+  },[contentId,episodeNumber,emitProgress]);
+  useEffect(()=>{
+    if(!isWeb)return;
+    const capture=()=>{try{
+      const video=frameRef.current?.contentDocument?.querySelector('video');
+      if(!video||!Number.isFinite(video.duration)||video.duration<=0)return;
+      if(!restored.current){if(resumeTarget.current>0)video.currentTime=Math.min(resumeTarget.current,Math.max(0,video.duration-1));restored.current=true;}
+      captureProgress(video.currentTime,video.duration);
+    }catch{/* An external iframe may expose only its episode, not its minute. */}};
+    const timer=setInterval(capture,1500);
+    const flush=()=>{capture();emitProgress(true);};
+    window.addEventListener('pagehide',flush);
+    return()=>{flush();clearInterval(timer);window.removeEventListener('pagehide',flush);};
+  },[isWeb,contentId,episodeNumber,resumeTimeSeconds,captureProgress,emitProgress]);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPausedRef = useRef(false);
@@ -128,8 +168,9 @@ export default function HentaiVideoPlayer({
 
   const handleClose = useCallback(() => {
     clearHideTimer();
+    emitProgress(true);
     onClose();
-  }, [clearHideTimer, isWeb, onClose]);
+  }, [clearHideTimer, isWeb, onClose, emitProgress]);
 
   const webMouseProps = isWeb
     ? ({
@@ -164,7 +205,7 @@ export default function HentaiVideoPlayer({
               </TouchableOpacity>
             )}
           </View>
-        ) : activeServer ? (
+        ) : playableServer ? (
           <>
             {loading && (
               <View style={styles.loaderContainer} pointerEvents="none">
@@ -173,9 +214,9 @@ export default function HentaiVideoPlayer({
             )}
 
             {isWeb ? (
-              <iframe
-                key={`${episodeNumber}-${activeServer.server}-${activeServer.url}`}
-                src={activeServer.url}
+              <iframe ref={frameRef}
+                key={`${episodeNumber}-${playableServer.server}-${playableServer.url}`}
+                src={playableServer.url}
                 style={styles.iframe as any}
                 allowFullScreen
                 frameBorder="0"
@@ -186,9 +227,9 @@ export default function HentaiVideoPlayer({
                 }}
               />
             ) : (
-              <WebView
-                key={`${episodeNumber}-${activeServer.server}-${activeServer.url}`}
-                source={{ uri: activeServer.url }}
+              <WebView ref={webViewRef}
+                key={`${episodeNumber}-${playableServer.server}-${playableServer.url}`}
+                source={{ uri: playableServer.url }}
                 style={styles.webview}
                 allowsFullscreenVideo={true}
                 javaScriptEnabled={true}
@@ -209,6 +250,11 @@ export default function HentaiVideoPlayer({
                   try {
                     const msg = JSON.parse(event.nativeEvent.data);
                     if (msg?.type === 'pixel:player' && msg.canControl) {
+                      if(!restored.current&&Number(msg.duration)>0){
+                        restored.current=true;
+                        if(resumeTarget.current>0){webViewRef.current?.injectJavaScript(`window.__pixelSeekPlayback?.(${Number(resumeTarget.current)});true;`);return;}
+                      }
+                      if(restored.current)captureProgress(Number(msg.currentTime),Number(msg.duration),!msg.playing&&!isPausedRef.current);
                       if (!msg.playing && !isPausedRef.current) {
                         isPausedRef.current = true;
                         showControls(false);
@@ -222,7 +268,7 @@ export default function HentaiVideoPlayer({
                   }
                 }}
                 onShouldStartLoadWithRequest={(request) =>
-                  shouldAllowEmbeddedNavigation(request.url || '', activeServer.url)
+                  shouldAllowEmbeddedNavigation(request.url || '', playableServer.url)
                 }
                 onLoadEnd={() => {
                   setLoading(false);
@@ -280,8 +326,8 @@ export default function HentaiVideoPlayer({
           menuOpen={serverMenuOpen} onMenuChange={open => {
             setServerMenuOpen(open); serverMenuOpenRef.current = open; showControls(!open);
           }} onSelectServer={index => { setLoading(true); setActiveServer(servers[index]); }}
-          onPrevious={hasPreviousEpisode && onPreviousEpisode ? () => { showControls(true); onPreviousEpisode(); } : undefined}
-          onNext={hasNextEpisode && onNextEpisode ? () => { showControls(true); onNextEpisode(); } : undefined} />
+          onPrevious={hasPreviousEpisode && onPreviousEpisode ? () => { emitProgress(true); showControls(true); onPreviousEpisode(); } : undefined}
+          onNext={hasNextEpisode && onNextEpisode ? () => { emitProgress(true); showControls(true); onNextEpisode(); } : undefined} />
       </Animated.View>
       <PlaybackLock locked={locked} visible={controlsVisible} onLock={()=>{clearHideTimer();setLocked(true);setControlsVisible(false);setServerMenuOpen(false);serverMenuOpenRef.current=false;}} onUnlock={()=>{setLocked(false);showControls(true);}}/>
     </View>

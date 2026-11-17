@@ -1,3 +1,4 @@
+import ProgressBackupPanel from '../components/ProgressBackupPanel';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Switch, ActivityIndicator, Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -115,6 +116,7 @@ export default function ProfileScreen() {
                   <Row label="Acceso con Google" detail="La contraseña y la seguridad de este acceso se gestionan en tu cuenta de Google." />}
               </>}
             </View>
+            {section === 'preferences' && <ProgressBackupPanel />}
             {section === 'preferences' && Platform.OS === 'android' && <View style={[styles.surface, { backgroundColor: colors.card }]}>
               <Row label="Versión de la app" detail={`${updates.installedVersion} · compilación ${updates.installedCode}`}>
                 <Action title="Buscar actualización" onPress={() => { void updates.check(); }} busy={updates.checking} />

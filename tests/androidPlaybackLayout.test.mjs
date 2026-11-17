@@ -21,7 +21,7 @@ function runtime(file, mocks = {}) {
     StyleSheet: { create: value => value, absoluteFill: {}, absoluteFillObject: {} }, useWindowDimensions: () => ({ width: 390, height: 844 }),
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     AccessibilityInfo: { isReduceMotionEnabled: async () => false, addEventListener: () => ({ remove() {} }) },
-    Animated: { Value: function Value() { this.interpolate = value => value; }, View: 'Animated.View', timing: () => ({ start: cb => cb?.({ finished: true }), stop() {} }) },
+    Animated: { Value: function Value() { this.interpolate = value => value; this.stopAnimation = () => {}; }, View: 'Animated.View', timing: () => ({ start: cb => cb?.({ finished: true }), stop() {} }) },
   };
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true } }).outputText, {
@@ -95,7 +95,8 @@ test('reader footer opens the actual next chapter and disappears on the last one
     '../hooks/useTabNavigation': { useTabNavigation: () => ({ navigateByLabel() {} }) },
     '../services/mangaApi': { mangaApi: { getById: async () => ({title:'Fixture'}), chapters: async () => ({ chapters }), chapterPages: async () => ({ pages: ['https://example.test/page.jpg'] }) } },
     '../contexts/ReaderChromeContext': { useReaderChrome: () => chrome },
-    '../utils/mangaProgress': { saveMangaProgress() {} },
+    '../contexts/ProfileContext': { useProfile: () => ({currentProfile:{id:1}}) },
+    '../utils/mangaProgress': { async saveMangaProgress() {} },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 24 }) },
     '../utils/mangaChapterNavigation': { getMangaReaderContext: () => undefined, mangaChapterKey: chapter => 'cap-' + chapter.chapter },
     '../utils/readerRetry': { loadReaderPages: async ({request}) => (await request()).pages, readerRetryDelay: () => 3000 },
@@ -138,4 +139,46 @@ test('embedded playback stays locked through provider interaction and pause mess
  type(tree,'WebView').props.onMessage({nativeEvent:{data:'user_interaction'}});tree=f.render(props);
  assert.equal(type(tree,'PlaybackLock').props.locked,true);assert.equal(type(tree,'Animated.View').props.pointerEvents,'none');
  type(tree,'PlaybackLock').props.onUnlock();tree=f.render(props);assert.equal(type(tree,'Animated.View').props.pointerEvents,'box-none');
+});
+
+
+test('locked playback fades the unlock button, keeps intercepting touches, and only reveals it on a tap',()=>{
+ const f=runtime('components/PlaybackLock.tsx');let unlocked=0,locked=0;
+ const props={locked:true,visible:false,onLock:()=>locked++,onUnlock:()=>unlocked++};
+ let tree=f.render(props);tree=f.render(props);
+ assert.equal(type(tree,'Animated.View').props.pointerEvents,'auto');
+ f.hide();tree=f.render(props);
+ assert.equal(type(tree,'Animated.View').props.pointerEvents,'none');
+ assert.equal(type(tree,'Animated.View').props.importantForAccessibility,'no-hide-descendants');
+ const blocker=find(tree,'Pantalla bloqueada. Toca para mostrar cómo desbloquear');
+ blocker.props.onPress();tree=f.render(props);
+ assert.equal(unlocked,0);assert.equal(type(tree,'Animated.View').props.pointerEvents,'auto');
+ const button=find(tree,'Mantén pulsado para desbloquear controles');
+ button.props.onPressIn();assert.equal(f.timeouts.size,0);
+ button.props.onLongPress();assert.equal(unlocked,1);
+ const unlockedProps={...props,locked:false,visible:true};
+ tree=f.render(unlockedProps);tree=f.render(unlockedProps);
+ assert.equal(find(tree,'Pantalla bloqueada. Toca para mostrar cómo desbloquear'),null);
+ find(tree,'Bloquear controles').props.onPress();assert.equal(locked,1);
+ f.unmount();assert.equal(f.timeouts.size,0);
+});
+
+test('H reports the known episode/minute, restores a saved minute, and flushes the old episode before switching',()=>{
+ const reports=[],scripts=[];
+ const f=runtime('components/HentaiVideoPlayer.tsx',{
+  '../hooks/useImmersivePlayer':{useImmersivePlayer(){}},'react-native-webview':{WebView:'WebView'},
+  '../utils/embeddedPlayerBridge':{EMBEDDED_PLAYER_BRIDGE:'',shouldAllowEmbeddedNavigation:()=>true},
+ });
+ const servers=[{server:'Fixture',url:'https://example.test/embed'}];
+ const props={contentId:'fixture',animeTitle:'Fixture',episodeNumber:2,resumeTimeSeconds:420,servers,onClose(){},onProgress:value=>reports.push(value)};
+ let tree=f.render(props);tree=f.render(props);
+ type(tree,'WebView').props.ref.current={injectJavaScript:script=>scripts.push(script)};
+ const report=value=>type(tree,'WebView').props.onMessage({nativeEvent:{data:JSON.stringify({type:'pixel:player',canControl:true,playing:true,duration:1440,...value})}});
+ report({currentTime:0});assert.ok(scripts.some(script=>script.includes('420')));assert.equal(reports.length,0);
+ report({currentTime:422});assert.equal(reports.at(-1).episodeNumber,2);assert.equal(reports.at(-1).currentTime,422);
+ const next={...props,episodeNumber:3,resumeTimeSeconds:0};tree=f.render(next);tree=f.render(next);
+ assert.equal(reports.at(-1).episodeNumber,2);assert.equal(reports.at(-1).currentTime,422);
+ type(tree,'WebView').props.onMessage({nativeEvent:{data:JSON.stringify({type:'pixel:player',canControl:true,playing:true,duration:1440,currentTime:10})}});
+ assert.equal(reports.at(-1).episodeNumber,3);assert.equal(reports.at(-1).currentTime,10);
+ f.unmount();assert.equal(reports.at(-1).episodeNumber,3);
 });
