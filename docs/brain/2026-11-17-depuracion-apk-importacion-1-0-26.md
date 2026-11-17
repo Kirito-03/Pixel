@@ -43,3 +43,7 @@ La confirmación no se obtuvo borrando datos del teléfono. Las pruebas unitaria
 Captura local de validación (fuera de Git): work/phone-backup-confirmed-126.png. scrcpy se cierra al terminar la revisión; no queda una captura continua.
 
 Descarga vigente: https://pixelnosekai.com/api/app-release/android/download?build=27
+
+## Copia a Obsidian pendiente
+
+Al cerrar esta revisión, Reze vuelve a estar desmontada. El MCP pixel_brain devuelve Vault root directory does not exist; la escritura de esta nota y la ampliación del índice externo no se realizaron. La nota completa y el índice local sí están guardados en docs/brain y Git. Copiar por MCP y verificar lectura cuando se monte de nuevo la bóveda.
