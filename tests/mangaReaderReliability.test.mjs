@@ -108,3 +108,24 @@ test('native scroll bridge preserves its reserved layout and reports offsets to 
  assert.deepEqual(messages.filter(m=>m.type==='scroll').map(m=>m.value),[0,30,112,109,100,24]);
  assert.equal(messages.some(m=>m.type==='atTop'),false);
 });
+test('reader arrow follows deliberate scroll direction and long chapters use bounded layout reads',()=>{
+ let y=0,scroll,visible=false,reads=0;const messages=[];
+ const pages=Array.from({length:1024},(_,i)=>({dataset:{page:String(i+1)},querySelector:()=>({}),getBoundingClientRect(){reads++;return{top:i*500-y};}}));
+ const document={querySelectorAll:()=>pages,querySelector:()=>({classList:{toggle:(_,value)=>{visible=value;}}}),addEventListener:(_,fn)=>{scroll=fn;}};
+ const scope={window:{ReactNativeWebView:{postMessage:value=>messages.push(JSON.parse(value))},get scrollY(){return y;}},document,URL,Array,Math,Number,innerHeight:800,IntersectionObserver:function(){this.observe=()=>{};},requestAnimationFrame:fn=>fn(),setTimeout,clearTimeout};
+ vm.runInNewContext(html.nativeReaderHtml([]).match(/<script>([\s\S]*)<\/script>/)[1],scope);
+ y=10000;scroll();assert.equal(visible,false);assert.ok(reads<=11);
+ y=9960;scroll();assert.equal(visible,true);
+ y=9963;scroll();assert.equal(visible,true);
+ y=10030;scroll();assert.equal(visible,false);
+ const before=messages.filter(m=>m.type==='page').length;scroll();assert.equal(messages.filter(m=>m.type==='page').length,before);
+ y=0;scroll();assert.equal(visible,false);
+});
+test('web arrow resets its direction history below its reveal threshold',()=>{
+ const {createReaderChromeController}=module('utils/readerChrome.ts');let controller=createReaderChromeController();
+ const update=y=>{if(y<=160)controller=createReaderChromeController();return y>160&&controller(y).bottomVisible;};
+ assert.equal(update(200),false);assert.equal(update(140),false);assert.equal(update(180),false);
+ assert.equal(update(300),false);assert.equal(update(250),true);assert.equal(update(252),true);assert.equal(update(320),false);
+ const source=fs.readFileSync(new URL('../screens/MangaReaderScreen.tsx',import.meta.url),'utf8');
+ assert.match(source,/if \(contentOffset.y <= 160\) chromeController.current = createReaderChromeController\(\)/);
+});

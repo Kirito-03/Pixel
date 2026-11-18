@@ -234,7 +234,9 @@ export default function MangaReaderScreen() {
         onScroll={event => {
           const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
           setAtTop(contentOffset.y <= 24);
-          setShowFloatingTop(contentOffset.y > 160);
+          if (contentOffset.y <= 160) chromeController.current = createReaderChromeController();
+          const chrome = chromeController.current(contentOffset.y);
+          setShowFloatingTop(contentOffset.y > 160 && chrome.bottomVisible);
           if (hasMore && contentSize.height - contentOffset.y - layoutMeasurement.height < layoutMeasurement.height) loadMore();
           const page = Object.entries(offsets.current).filter(([, y]) => y <= contentOffset.y + layoutMeasurement.height * 0.3).map(([key]) => Number(key)).pop();
           if (page !== undefined) setActivePage(page + 1);
@@ -252,7 +254,6 @@ export default function MangaReaderScreen() {
           style={[styles.floatingTopButton, { right: width < 768 ? 14 : 24 }]}
         >
           <Ionicons name="arrow-up" size={18} color="#fff" />
-          <Text style={styles.floatingTopText}>Inicio</Text>
         </TouchableOpacity>
       )}
     </> : <>
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
   statusCopy: { color: '#bbb', fontSize: 14, lineHeight: 22, textAlign: 'center' },
   loadMore: { minHeight: 48, backgroundColor: '#252525', paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   scrollTopButton: { minHeight: 48, backgroundColor: '#1c1c1c', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 22, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  floatingTopButton: { position: 'absolute', bottom: 24, zIndex: 50, minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(20,20,20,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  floatingTopButton: { position: 'absolute', bottom: 24, zIndex: 50, width: 44, minHeight: 44, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 10, borderRadius: 6, backgroundColor: 'rgba(20,20,20,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row', alignItems: 'center', gap: 6 },
   floatingTopText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   pauseButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 },
   footer: { width: '100%', maxWidth: 840, alignSelf: 'center', alignItems: 'center', paddingVertical: 24, gap: 12 },

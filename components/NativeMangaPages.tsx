@@ -8,9 +8,10 @@ export default function NativeMangaPages({ pages, previous, next, active, onPrev
 }) {
   const ref = useRef<WebView>(null);
   const html = useMemo(() => nativeReaderHtml(pages, previous, next, topSpace, bottomSpace), [pages, previous, next, topSpace, bottomSpace]);
+  const source = useMemo(() => ({ html, baseUrl: 'https://pixelnosekai.com' }), [html]);
   const setActive = () => ref.current?.injectJavaScript(`window.pixelReaderActive&&window.pixelReaderActive(${active});true;`);
   useEffect(() => { setActive(); }, [active, html]);
-  return <WebView ref={ref} source={{ html, baseUrl: 'https://pixelnosekai.com' }} style={{ flex: 1, backgroundColor: '#080808' }}
+  return <WebView ref={ref} source={source} style={{ flex: 1, backgroundColor: '#080808' }}
     cacheEnabled cacheMode="LOAD_DEFAULT"
     javaScriptEnabled domStorageEnabled={false} mixedContentMode="never" setSupportMultipleWindows={false}
     javaScriptCanOpenWindowsAutomatically={false} onOpenWindow={() => {}} onLoadEnd={setActive}
