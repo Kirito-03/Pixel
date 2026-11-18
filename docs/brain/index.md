@@ -76,3 +76,5 @@ En estas notas se distinguen explícitamente:
 - [[2026-11-17-perfiles-entrada-1-0-28]]: entrada sin esperar a Admin, caché de perfiles por dueño, espera limitada y respuesta visible al tocar.
 
 - [[2026-11-17-lector-flecha-fluidez-1-0-29]]: flecha discreta según dirección y menos trabajo de posiciones durante el scroll nativo.
+
+- [[2026-11-18-backend-drive-y-colas]]: recuperación de backend y puente Drive, imagen rechazada por origen y propuesta de cola por etapas.
