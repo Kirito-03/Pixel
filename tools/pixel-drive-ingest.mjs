@@ -67,7 +67,7 @@ function getRemoteFileSize(remotePath) {
     }
   } catch {}
   try {
-    const out = runCapture(RCLONE_BIN, ['ls', remotePath]);
+    const out = runCapture(RCLONE_BIN, ['ls', '--contimeout', '15s', '--timeout', '30s', remotePath]);
     if (!out) return 0;
     const match = out.match(/^\s*(\d+)\s+/);
     return match ? Number(match[1]) : 0;
@@ -507,7 +507,7 @@ async function main() {
           ORDER BY
             (COUNT(*) FILTER (WHERE e.stream_url LIKE '%/api/stream/%' OR e.storage_type = 'gdrive') > 0) DESC,
             e.anime_id ASC
-          LIMIT 1
+          LIMIT 5
         )
         SELECT e.id, e.anime_id, e.episode_number
         FROM anime_episodes e
@@ -515,21 +515,26 @@ async function main() {
         WHERE e.is_active = true
           AND e.external_servers @> '[{"server":"MP4Upload"}]'::jsonb
           AND (e.stream_url IS NULL OR NOT e.stream_url LIKE '%/api/stream/%')
-        ORDER BY e.episode_number ASC
+        ORDER BY (ta.synced_count > 0) DESC, e.anime_id ASC, e.episode_number ASC
         LIMIT $1
       `,
-      [limit]
+      [Math.max(limit * 5, 15)]
     );
     if (rows.length > 0) {
-      console.log(`[DriveIngest] Completando Anime #${rows[0].anime_id} (${rows.length} episodios en este lote)...`);
+      console.log(`[DriveIngest] Iniciando lote (meta=${limit}, candidatos=${rows.length}, primero=Anime #${rows[0].anime_id} Ep ${rows[0].episode_number})...`);
     } else {
       console.log(`[DriveIngest] No hay episodios pendientes con MP4Upload.`);
     }
+    let succeeded = 0;
     let failed = 0;
     for (const row of rows) {
-      if (!await ingestEpisode(row.id)) failed++;
+      if (succeeded >= limit) break;
+      if (await ingestEpisode(row.id)) succeeded++;
+      else failed++;
     }
-    if (failed) throw new Error(`${failed} episodios quedan pendientes para reintentar.`);
+    if (succeeded === 0 && failed > 0) {
+      throw new Error(`${failed} episodios candidatos fallaron en este lote.`);
+    }
   } else {
     console.log(`
 Uso de pixel-drive-ingest:

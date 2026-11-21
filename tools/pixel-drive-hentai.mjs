@@ -85,7 +85,7 @@ function getRemoteFileSize(remotePath) {
     }
   } catch {}
   try {
-    const out = runCapture(RCLONE_BIN, ['ls', remotePath]);
+    const out = runCapture(RCLONE_BIN, ['ls', '--contimeout', '15s', '--timeout', '30s', remotePath]);
     if (!out) return 0;
     const match = out.match(/^\s*(\d+)\s+/);
     return match ? Number(match[1]) : 0;
@@ -310,15 +310,22 @@ async function main() {
          AND NOT (he.video_servers::text LIKE '%/api/stream/%')
        ORDER BY he.episode_number ASC
        LIMIT $1`,
-      [limit]
+      [Math.max(limit * 4, 8)]
     );
     if (rows.length > 0) {
-      console.log(`[HentaiIngest] Completando Hentai #${rows[0].hentai_id} (${rows.length} episodios en este lote)...`);
+      console.log(`[HentaiIngest] Completando Hentai #${rows[0].hentai_id} (meta=${limit}, candidatos=${rows.length})...`);
     } else {
       console.log(`[HentaiIngest] No hay episodios Hentai pendientes con MP4Upload.`);
     }
+    let succeeded = 0;
+    let failed = 0;
     for (const r of rows) {
-      await ingestHentaiEpisode(r.id);
+      if (succeeded >= limit) break;
+      if (await ingestHentaiEpisode(r.id)) succeeded++;
+      else failed++;
+    }
+    if (succeeded === 0 && failed > 0) {
+      throw new Error(`${failed} episodios Hentai candidatos fallaron en este lote.`);
     }
   } else {
     console.log(`

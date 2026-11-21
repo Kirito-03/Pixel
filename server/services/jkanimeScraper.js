@@ -24,20 +24,48 @@ async function getBrowserPage() {
   return { browser: browserInstance, page };
 }
 
-async function fetchHtmlWithCloak(url, timeoutMs) {
-  const { page } = await getBrowserPage();
+async function fetchHtmlWithAxios(url, timeoutMs) {
   try {
-    const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
-    if (res && res.status() === 404) {
-       const err = new Error('Not Found');
-       err.status = 404;
-       throw err;
-    }
-    const html = await page.content();
-    await page.close();
-    return html;
+    const res = await axios.get(url, {
+      headers: BROWSER_HEADERS,
+      timeout: timeoutMs,
+      maxRedirects: 5,
+    });
+    return typeof res.data === 'string' ? res.data : String(res.data || '');
   } catch (err) {
-    await page.close().catch(() => {});
+    if (err.response?.status === 404) {
+      const notFound = new Error('Not Found');
+      notFound.status = 404;
+      throw notFound;
+    }
+    throw err;
+  }
+}
+
+async function fetchHtmlWithCloak(url, timeoutMs) {
+  if (process.platform === 'android') {
+    return fetchHtmlWithAxios(url, timeoutMs);
+  }
+  try {
+    const { page } = await getBrowserPage();
+    try {
+      const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+      if (res && res.status() === 404) {
+         const err = new Error('Not Found');
+         err.status = 404;
+         throw err;
+      }
+      const html = await page.content();
+      await page.close();
+      return html;
+    } catch (err) {
+      await page.close().catch(() => {});
+      throw err;
+    }
+  } catch (err) {
+    if (/Unsupported platform/i.test(err?.message || '')) {
+      return fetchHtmlWithAxios(url, timeoutMs);
+    }
     throw err;
   }
 }

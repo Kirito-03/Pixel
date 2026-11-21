@@ -943,13 +943,23 @@ export async function syncNextCatalogPage() {
   try {
     // Usamos runSyncAllCatalogJob pero solo para 1 página
     await runSyncAllCatalogJob(fakeJob, currentPage, currentPage);
-    console.log(`[SmartBot] Página ${currentPage} escaneada exitosamente.`);
 
-    // Avanzar de página
-    currentPage++;
-    if (currentPage > MAX_PAGE) {
+    if (fakeJob.status === 'error') {
+      console.warn(`[SmartBot] Error escaneando página ${currentPage}: ${fakeJob.errors.join('; ') || 'desconocido'}. Se mantiene la página actual.`);
+      return;
+    }
+
+    const foundTotal = Number(fakeJob.result?.total || 0);
+    if (foundTotal === 0 && currentPage > 1) {
+      console.log(`[SmartBot] Página ${currentPage} vacía (fin del catálogo actual); reiniciando ciclo en página 1.`);
       currentPage = 1;
-      console.log(`[SmartBot] Se llegó a la última página del catálogo, reiniciando a la página 1.`);
+    } else {
+      console.log(`[SmartBot] Página ${currentPage} escaneada (${foundTotal} animes).`);
+      currentPage++;
+      if (currentPage > MAX_PAGE) {
+        currentPage = 1;
+        console.log(`[SmartBot] Se llegó a la última página del catálogo, reiniciando a la página 1.`);
+      }
     }
 
     // Guardar memoria

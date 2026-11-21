@@ -55,7 +55,7 @@ function getRemoteFileSize(remoteOrStreamUrl) {
       const rel = rcloneTarget.split('/api/stream/')[1] || '';
       rcloneTarget = `pixel-drive:PixelNoSekai/${decodeURIComponent(rel)}`;
     }
-    const out = runCapture(RCLONE_BIN, ['ls', rcloneTarget]);
+    const out = runCapture(RCLONE_BIN, ['ls', '--contimeout', '15s', '--timeout', '30s', rcloneTarget]);
     if (!out) return 0;
     const match = out.match(/^\s*(\d+)\s+/);
     return match ? Number(match[1]) : 0;
@@ -99,17 +99,21 @@ function parseMangaChapter(urlStr) {
   }
 }
 
-/** Download a single image using curl with referer */
+/** Share the backend source cooldown; never retry denial responses in curl. */
 async function downloadImage(url, destPath) {
   const partialPath = `${destPath}.part`;
+  const source = new URL(url);
+  const downloadUrl = source.origin === 'https://dragontranslation.org'
+    ? `http://127.0.0.1:3001/api/proxy/manga-image?url=${encodeURIComponent(source.href)}`
+    : source.href;
   await runCommand('curl', [
     '-sS',
     '-L',
-    '--fail', '--retry', '2', '--retry-delay', '2', '--retry-all-errors',
+    '--fail',
     '--connect-timeout', '10', '--max-time', '90',
     '-e', 'https://dragontranslation.org/',
     '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    url,
+    downloadUrl,
     '-o', partialPath,
   ]);
   // Keep the original bytes. An HTTP error/HTML response must not become a page.
@@ -131,7 +135,7 @@ function imageFingerprint(file) {
 function remoteInventory(remoteDir) {
   let entries;
   try {
-    entries = JSON.parse(runCapture(RCLONE_BIN, ['lsjson', '--files-only', '--max-depth', '1', '--hash', remoteDir]));
+    entries = JSON.parse(runCapture(RCLONE_BIN, ['lsjson', '--files-only', '--max-depth', '1', '--hash', '--contimeout', '15s', '--timeout', '45s', remoteDir]));
   } catch (error) {
     // rclone 3 means a missing directory; auth/network errors must not look empty.
     if (error.exitCode === 3) return new Map();
@@ -435,16 +439,22 @@ export async function ingestManga(mangaId, limit = 50) {
   }
 }
 
-/** Ingest pending chapters across the catalog into Google Drive (completes one manga before moving to the next) */
+/** Ingest pending chapters across the catalog into Google Drive (completes one manga before moving to the next, prioritizing user-read manga) */
 export async function ingestBatchManga(limit = 3) {
   const pool = await getPool();
-  console.log(`[MangaIngest] Buscando hasta ${limit} capítulos del manga en curso para completar antes de pasar al siguiente...`);
+  console.log(`[MangaIngest] Buscando hasta ${limit} capítulos del manga en curso o leído por usuarios para completar antes de pasar al siguiente...`);
   const { rows } = await pool.query(
     `
       WITH target_manga AS (
         SELECT
           mc.manga_id,
-          COUNT(*) FILTER (WHERE mp.pages::text LIKE '%/api/stream/Manga/%') AS synced_count
+          COUNT(*) FILTER (WHERE mp.pages::text LIKE '%/api/stream/Manga/%') AS synced_count,
+          COUNT(*) FILTER (WHERE mp.pages IS NOT NULL AND mp.pages::text NOT LIKE '%/api/stream/Manga/%') AS read_pending_count,
+          MAX(mp.fetched_at) AS last_read_at,
+          EXISTS (
+            SELECT 1 FROM pns_my_list_items ml
+            WHERE ml.content_type = 'manga' AND ml.content_id = mc.manga_id
+          ) AS in_my_list
         FROM manga_chapters_cache mc
         LEFT JOIN manga_page_cache mp ON mp.chapter_url = mc.external_url
         WHERE mc.external_url IS NOT NULL
@@ -452,6 +462,14 @@ export async function ingestBatchManga(limit = 3) {
         HAVING COUNT(*) FILTER (WHERE mp.pages IS NULL OR mp.pages::text NOT LIKE '%/api/stream/Manga/%') > 0
         ORDER BY
           (COUNT(*) FILTER (WHERE mp.pages::text LIKE '%/api/stream/Manga/%') > 0) DESC,
+          (COUNT(*) FILTER (WHERE mp.pages IS NOT NULL AND mp.pages::text NOT LIKE '%/api/stream/Manga/%') >= 3) DESC,
+          EXISTS (
+            SELECT 1 FROM pns_my_list_items ml
+            WHERE ml.content_type = 'manga' AND ml.content_id = mc.manga_id
+          ) DESC,
+          (COUNT(*) FILTER (WHERE mp.pages IS NOT NULL AND mp.pages::text NOT LIKE '%/api/stream/Manga/%') >= 1) DESC,
+          COUNT(*) FILTER (WHERE mp.pages IS NOT NULL AND mp.pages::text NOT LIKE '%/api/stream/Manga/%') DESC,
+          MAX(mp.fetched_at) DESC NULLS LAST,
           mc.manga_id ASC
         LIMIT 1
       )
